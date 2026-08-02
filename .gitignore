@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Rust / Tauri
+target/
+native/src-tauri/gen/
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# macOS
+.DS_Store
+DerivedData/
+
+# NUNCA no repositório
+models/*.gguf
+models/*.bin
+*.db
+*.db-wal
+*.db-shm
+.env
+*.p12
+*.mobileprovision
+data/
+phrases.json          # commita phrases.example.json
