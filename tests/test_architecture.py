@@ -12,7 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-PURE_LAYERS = ("ev/domain", "ev/application", "ev/router")
+PURE_LAYERS = ("ev/domain", "ev/application", "ev/router", "ev/registry.py")
 
 FORBIDDEN = frozenset(
     {
@@ -45,15 +45,20 @@ def _is_forbidden(name: str) -> bool:
     return any(".".join(parts[:i]) in FORBIDDEN for i in range(1, len(parts) + 1))
 
 
+def _sources(layer: str) -> list[Path]:
+    path = ROOT / layer
+    return sorted(path.rglob("*.py")) if path.is_dir() else [path]
+
+
 def test_pure_layers_exist() -> None:
     for layer in PURE_LAYERS:
-        assert (ROOT / layer).is_dir(), f"missing layer: {layer}"
+        assert (ROOT / layer).exists(), f"missing layer: {layer}"
 
 
 def test_pure_layers_do_not_touch_the_outside_world() -> None:
     offenders: list[str] = []
     for layer in PURE_LAYERS:
-        for path in sorted((ROOT / layer).rglob("*.py")):
+        for path in _sources(layer):
             tree = ast.parse(path.read_text(encoding="utf-8"))
             offenders.extend(
                 f"{path.relative_to(ROOT)} imports {name}"
