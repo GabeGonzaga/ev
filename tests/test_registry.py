@@ -6,7 +6,7 @@ import pytest
 from pydantic import BaseModel
 
 from ev.application.confirmation import ConfirmationRequest
-from ev.application.policy import PolicyDecision
+from ev.application.policy import PolicyDecision, PolicyVerdict
 from ev.domain.permissions import Permission
 from ev.domain.results import ToolErrorCode, ToolResult
 from ev.domain.risk import RiskLevel
@@ -19,11 +19,11 @@ class OpenArgs(BaseModel):
 
 
 class FixedPolicy:
-    def __init__(self, decision: PolicyDecision) -> None:
-        self.decision = decision
+    def __init__(self, decision: PolicyDecision, reason: str | None = None) -> None:
+        self.verdict = PolicyVerdict(decision=decision, reason=reason)
 
-    def decide(self, spec: ToolSpec[Any]) -> PolicyDecision:
-        return self.decision
+    def decide(self, spec: ToolSpec[Any]) -> PolicyVerdict:
+        return self.verdict
 
 
 class FixedConfirmation:
@@ -66,13 +66,14 @@ def build(
     *,
     risk: RiskLevel = RiskLevel.SAFE,
     decision: PolicyDecision = PolicyDecision.ALLOW,
+    reason: str | None = None,
     confirms: bool = True,
     name: str = "browser.open_url",
 ) -> tuple[Registry, FixedConfirmation, FakeJournal]:
     confirmation = FixedConfirmation(confirms)
     journal = FakeJournal()
     registry = Registry(
-        policy=FixedPolicy(decision), confirmation=confirmation, journal=journal
+        policy=FixedPolicy(decision, reason), confirmation=confirmation, journal=journal
     )
     registry.register(
         ToolSpec(
@@ -173,6 +174,23 @@ async def test_a_denied_call_does_not_run() -> None:
     assert result.error.code is ToolErrorCode.PERMISSION_DENIED
     assert handler.calls == []
     assert journal.records[0].result.ok is False
+
+
+@pytest.mark.asyncio
+async def test_the_policys_reason_reaches_the_user() -> None:
+    registry, _, _ = build(
+        Handler(),
+        decision=PolicyDecision.DENY,
+        reason="browser.open_url needs permission not granted: accessibility",
+    )
+
+    result = await registry.call("browser.open_url", {"url": "https://a.test"})
+
+    assert result.error is not None
+    assert (
+        result.error.message
+        == "browser.open_url needs permission not granted: accessibility"
+    )
 
 
 @pytest.mark.asyncio

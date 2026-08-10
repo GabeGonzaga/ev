@@ -22,7 +22,7 @@ from typing import Any, Protocol
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ev.application.confirmation import ConfirmationRequest
-from ev.application.policy import PolicyDecision
+from ev.application.policy import PolicyDecision, PolicyVerdict
 from ev.domain.permissions import Permission
 from ev.domain.results import ToolErrorCode, ToolResult
 from ev.domain.risk import RiskLevel
@@ -64,15 +64,15 @@ class CallRecord(BaseModel):
     """Destructive actions are flushed now, not batched (invariant 5)."""
 
 
-class PermissionPolicy(Protocol):
-    def decide(self, spec: ToolSpec[Any]) -> PolicyDecision: ...
+class PolicyPort(Protocol):
+    def decide(self, spec: ToolSpec[Any]) -> PolicyVerdict: ...
 
 
-class Confirmation(Protocol):
+class ConfirmationPort(Protocol):
     async def confirm(self, request: ConfirmationRequest) -> bool: ...
 
 
-class Journal(Protocol):
+class JournalPort(Protocol):
     async def record(self, record: CallRecord) -> None: ...
 
 
@@ -87,9 +87,9 @@ class Registry:
     def __init__(
         self,
         *,
-        policy: PermissionPolicy,
-        confirmation: Confirmation,
-        journal: Journal,
+        policy: PolicyPort,
+        confirmation: ConfirmationPort,
+        journal: JournalPort,
     ) -> None:
         self._tools: dict[str, ToolSpec[Any]] = {}
         self._policy = policy
@@ -163,21 +163,24 @@ class Registry:
 
         normalised: dict[str, object] = validated.model_dump(mode="json")
 
-        decision = self._policy.decide(spec)
-        if decision is PolicyDecision.DENY:
+        verdict = self._policy.decide(spec)
+        if verdict.decision is PolicyDecision.DENY:
             return await self._finish(
                 spec,
                 normalised,
                 ToolResult.failure(
                     spec.name,
                     ToolErrorCode.PERMISSION_DENIED,
-                    f"policy denied {spec.name}",
+                    verdict.reason or f"policy denied {spec.name}",
                 ),
             )
 
         # Invariant 5 is enforced here rather than delegated to the policy, so
         # that a policy bug cannot make a destructive action run unconfirmed.
-        if decision is PolicyDecision.CONFIRM or spec.risk is RiskLevel.DESTRUCTIVE:
+        if (
+            verdict.decision is PolicyDecision.CONFIRM
+            or spec.risk is RiskLevel.DESTRUCTIVE
+        ):
             request = ConfirmationRequest(
                 tool=spec.name, risk=spec.risk, arguments=normalised
             )
