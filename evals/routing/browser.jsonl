@@ -1,0 +1,20 @@
+{"id": "open-url-bare-domain", "locale": "en", "utterance": "open github.com", "tool": "browser.open_url", "arguments": {"url": "https://github.com"}}
+{"id": "open-url-bare-domain", "locale": "pt-PT", "utterance": "abre github.com", "tool": "browser.open_url", "arguments": {"url": "https://github.com"}}
+{"id": "open-url-with-scheme", "locale": "en", "utterance": "open https://example.com/docs", "tool": "browser.open_url", "arguments": {"url": "https://example.com/docs"}}
+{"id": "open-url-with-scheme", "locale": "pt-PT", "utterance": "abre https://example.com/docs", "tool": "browser.open_url", "arguments": {"url": "https://example.com/docs"}}
+{"id": "open-url-named-site", "locale": "en", "utterance": "go to the site example.com", "tool": "browser.open_url", "arguments": {"url": "https://example.com"}}
+{"id": "open-url-named-site", "locale": "pt-PT", "utterance": "vai ao site example.com", "tool": "browser.open_url", "arguments": {"url": "https://example.com"}}
+{"id": "open-url-with-path", "locale": "en", "utterance": "visit example.com/pricing", "tool": "browser.open_url", "arguments": {"url": "https://example.com/pricing"}}
+{"id": "open-url-with-path", "locale": "pt-PT", "utterance": "abre a página example.com/pricing", "tool": "browser.open_url", "arguments": {"url": "https://example.com/pricing"}}
+{"id": "open-url-keeps-case", "locale": "en", "utterance": "open Example.com/Docs", "tool": "browser.open_url", "arguments": {"url": "https://Example.com/Docs"}}
+{"id": "open-url-keeps-case", "locale": "pt-PT", "utterance": "abre Example.com/Docs", "tool": "browser.open_url", "arguments": {"url": "https://Example.com/Docs"}}
+{"id": "open-url-trailing-punctuation", "locale": "en", "utterance": "open github.com.", "tool": "browser.open_url", "arguments": {"url": "https://github.com"}}
+{"id": "open-url-trailing-punctuation", "locale": "pt-PT", "utterance": "abre github.com!", "tool": "browser.open_url", "arguments": {"url": "https://github.com"}}
+{"id": "escalate-application-name", "locale": "en", "utterance": "open Safari", "tool": null, "arguments": {}}
+{"id": "escalate-application-name", "locale": "pt-PT", "utterance": "abre o Visual Studio Code", "tool": null, "arguments": {}}
+{"id": "escalate-file-name", "locale": "en", "utterance": "open report.pdf", "tool": null, "arguments": {}}
+{"id": "escalate-file-name", "locale": "pt-PT", "utterance": "abre o relatório.pdf", "tool": null, "arguments": {}}
+{"id": "escalate-unrelated-intent", "locale": "en", "utterance": "play the album Blonde", "tool": null, "arguments": {}}
+{"id": "escalate-unrelated-intent", "locale": "pt-PT", "utterance": "toca o álbum Blonde", "tool": null, "arguments": {}}
+{"id": "escalate-question", "locale": "en", "utterance": "what is the weather like today?", "tool": null, "arguments": {}}
+{"id": "escalate-question", "locale": "pt-PT", "utterance": "como está o tempo hoje?", "tool": null, "arguments": {}}
