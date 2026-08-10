@@ -8,10 +8,14 @@ the router select a target far outside the browser. http and https only.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 
 class OpenUrlArgs(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    url: HttpUrl
+    url: HttpUrl = Field(
+        # The description reaches the model in the generated spec; the type is
+        # what enforces it. Both come from this one declaration.
+        description="An http or https URL. Other schemes are refused.",
+    )
