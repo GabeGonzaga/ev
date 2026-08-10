@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from ev.application.policy import (
     PermissionLedger,
@@ -14,7 +14,7 @@ from ev.registry import ToolSpec
 
 
 class NoArgs(BaseModel):
-    pass
+    model_config = ConfigDict(extra="forbid")
 
 
 async def _never_called(args: NoArgs) -> ToolResult:  # pragma: no cover

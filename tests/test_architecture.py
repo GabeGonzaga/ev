@@ -45,6 +45,17 @@ def _is_forbidden(name: str) -> bool:
     return any(".".join(parts[:i]) in FORBIDDEN for i in range(1, len(parts) + 1))
 
 
+SHELL_APIS = frozenset(
+    {
+        "create_subprocess_shell",
+        "system",
+        "popen",
+        "check_output",
+        "getoutput",
+    }
+)
+
+
 def _sources(layer: str) -> list[Path]:
     path = ROOT / layer
     return sorted(path.rglob("*.py")) if path.is_dir() else [path]
@@ -65,4 +76,19 @@ def test_pure_layers_do_not_touch_the_outside_world() -> None:
                 for name in sorted(_imported_names(tree))
                 if _is_forbidden(name)
             )
+    assert offenders == []
+
+
+def test_nothing_anywhere_reaches_a_shell() -> None:
+    # Invariant 3: there is no run_shell tool, and there is no shell under one
+    # either. ProcessRunner takes argv, so a tool argument cannot become a
+    # command line.
+    offenders: list[str] = []
+    for path in sorted((ROOT / "ev").rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Attribute) and node.attr in SHELL_APIS:
+                offenders.append(f"{path.relative_to(ROOT)} calls {node.attr}")
+            elif isinstance(node, ast.keyword) and node.arg == "shell":
+                offenders.append(f"{path.relative_to(ROOT)} passes shell=")
     assert offenders == []

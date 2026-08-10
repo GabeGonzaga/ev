@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from ev.application.confirmation import ConfirmationRequest
 from ev.application.policy import PolicyDecision, PolicyVerdict
@@ -14,6 +14,8 @@ from ev.registry import CallRecord, Registry, ToolSpec
 
 
 class OpenArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     url: str
     background: bool = False
 
@@ -108,6 +110,30 @@ def test_tool_names_must_be_capability_dot_tool() -> None:
                     handler=Handler(),
                 )
             )
+
+
+def test_an_args_model_must_forbid_unknown_fields() -> None:
+    # Pydantic ignores extras by default, which would let a field the model
+    # invented pass validation unseen.
+    class Sloppy(BaseModel):
+        url: str
+
+    registry = Registry(
+        policy=FixedPolicy(PolicyDecision.ALLOW),
+        confirmation=FixedConfirmation(True),
+        journal=FakeJournal(),
+    )
+
+    with pytest.raises(ValueError, match="extra='forbid'"):
+        registry.register(
+            ToolSpec(
+                name="browser.open_url",
+                description="",
+                args=Sloppy,
+                risk=RiskLevel.SAFE,
+                handler=Handler(),
+            )
+        )
 
 
 def test_a_tool_cannot_be_registered_twice() -> None:
@@ -270,6 +296,18 @@ async def test_an_adapter_that_raises_becomes_a_typed_failure() -> None:
     assert result.error is not None
     assert result.error.code is ToolErrorCode.ADAPTER_FAILED
     assert result.error.message == "osascript exited 1"
+    assert journal.records[0].result.error is not None
+
+
+@pytest.mark.asyncio
+async def test_a_timeout_is_not_reported_as_a_failure() -> None:
+    # Nothing says the action did not happen -- only that E.V. stopped waiting.
+    registry, _, journal = build(Handler(raises=TimeoutError()))
+
+    result = await registry.call("browser.open_url", {"url": "https://a.test"})
+
+    assert result.error is not None
+    assert result.error.code is ToolErrorCode.TIMEOUT
     assert journal.records[0].result.error is not None
 
 

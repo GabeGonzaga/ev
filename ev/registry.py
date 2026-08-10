@@ -101,6 +101,11 @@ class Registry:
             raise ValueError(f"tool name must be capability.tool: {spec.name!r}")
         if spec.name in self._tools:
             raise ValueError(f"tool already registered: {spec.name}")
+        if spec.args.model_config.get("extra") != "forbid":
+            # Pydantic ignores unknown fields by default. An ignored field is
+            # an argument the model supplied, nobody validated, and nobody
+            # sees -- so it must be an error, not silence.
+            raise ValueError(f"{spec.name}: args model must set extra='forbid'")
         self._tools[spec.name] = spec
 
     def tools(self) -> list[ToolSpec[Any]]:
@@ -197,6 +202,12 @@ class Registry:
 
         try:
             result = await spec.handler(validated)
+        except TimeoutError:
+            # Distinct from a failure: nothing says the action did not happen,
+            # only that E.V. stopped waiting for it.
+            result = ToolResult.failure(
+                spec.name, ToolErrorCode.TIMEOUT, f"{spec.name} timed out"
+            )
         except Exception as error:  # the adapter boundary, not a bare except
             result = ToolResult.failure(
                 spec.name,
