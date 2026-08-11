@@ -42,6 +42,7 @@ nothing below it takes a `dict` — a handler receives its validated args model.
 |---|---|---|
 | `ev/domain/` | nothing | everything |
 | `protocol/` | domain | everything else |
+| `native/` | the generated schema | the Python at all |
 | `ev/application/` | domain | infrastructure, capabilities |
 | `ev/router/` | domain | everything else |
 | `ev/registry.py` | domain, application | infrastructure, capabilities |
@@ -87,12 +88,15 @@ structure shaped by symmetry rather than by a decision.
 | Enforcing the `Content` marker | tools feed each other — macros, phase 4 |
 | Streaming model responses | something can render a partial answer |
 | `sqlite-vec`, FTS5 | retrieval actually lands (phase 4) |
-| Rust / TypeScript generation from `ev.schema.json` | the native host that consumes them exists |
+| TypeScript generation from `ev.schema.json` | the UI that consumes it exists (phase 3) |
+| Tauri, npm, a webview | phase 3. The host is a plain binary until then |
+| Audio, camera, Accessibility in `native/` | phase 2 and later, one decision each |
 | A second resident model | never on the interactive path |
 
 ## What does not exist yet
 
-No voice, no native host, no UI.
+No voice, no UI. The native host exists as a signed binary that speaks the
+protocol and nothing else: no audio, no TCC-facing capability, no Tauri.
 
 Tier 2, the generation path and `make eval` exist. `qwen3:8b` is the measured
 default (ADR 0013): 17/18 routing, 0/8 inventions, 10/10 arguments accepted.
@@ -144,3 +148,4 @@ nothing, because `open(1)` needs nothing.
 | [0013](adr/0013-qwen3-8b-is-the-default-model.md) | qwen3:8b is the default model |\n| [0014](adr/0014-the-router-does-not-narrate.md) | The router does not narrate; the prompt was not the problem |
 | [0015](adr/0015-the-protocol-is-authored-in-pydantic.md) | The protocol is authored in Pydantic and shipped as JSON Schema |
 | [0016](adr/0016-the-daemon-and-why-not-for-the-reason-given.md) | The daemon, and not for the reason I gave |
+| [0017](adr/0017-the-native-host-skeleton.md) | The native host skeleton, and what a second language found |

@@ -28,6 +28,17 @@ from protocol.messages import (
 )
 
 
+def _is_response(message: dict[str, Any], identifier: str) -> bool:
+    """Events carry `type`; responses carry `id`, `ok` and `payload`.
+
+    Matching on the id alone is ambiguous: `confirmation.required` has an `id`
+    of its own, meaning the confirmation rather than the request. Writing the
+    Rust client is what surfaced that -- one implementation can be
+    self-consistent about a shape that is not actually unambiguous.
+    """
+    return "type" not in message and message.get("id") == identifier
+
+
 class DaemonUnavailable(Exception):
     def __init__(self, path: Path) -> None:
         super().__init__(f"no daemon at {path}. Start one with: ev --serve")
@@ -94,7 +105,7 @@ class IpcClient:
 
         while True:
             message = await self._read()
-            if message.get("id") == identifier:
+            if _is_response(message, identifier):
                 return message
 
     async def submit(
@@ -114,7 +125,7 @@ class IpcClient:
         while True:
             message = await self._read()
 
-            if message.get("id") == identifier:
+            if _is_response(message, identifier):
                 return message, events
 
             events.append(message)

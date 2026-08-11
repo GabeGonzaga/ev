@@ -10,6 +10,7 @@ build/
 
 # Rust / Tauri
 target/
+native/target/
 native/src-tauri/gen/
 
 # Node

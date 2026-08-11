@@ -7,8 +7,8 @@ is right.
 |---|---|---|
 | 0 | Headless core: registry, journal, migrations, tools, CLI | done |
 | 1 | Ollama tier 2, structured output, evals, confidence policy, translation capability | current |
-| 1.5 | Typed IPC protocol + signed native host skeleton | current |
-| 2 | Push-to-talk, VAD, whisper.cpp, AVSpeechSynthesizer | |
+| 1.5 | Typed IPC protocol + signed native host skeleton | done |
+| 2 | Push-to-talk, VAD, whisper.cpp, AVSpeechSynthesizer | current |
 | 3 | Tauri, menu bar, NSPanel, settings, history | |
 | 4 | JSON macros, more adapters, retrieval | |
 | 5 | Camera and vision | |
@@ -71,8 +71,9 @@ rather than theory:
 |---|---|
 | `protocol/`: message types, versioned handshake, committed JSON Schema | done |
 | `ev/infrastructure/ipc/`: the Unix socket daemon, with the CLI as its client | done |
-| Rust and TypeScript generation from the artifact | with the host |
-| Signed native host skeleton | |
+| Rust generation from the artifact, committed and CI-checked | done |
+| TypeScript generation | with the UI, phase 3 |
+| Signed native host skeleton | done |
 
 ## What each phase is waiting for
 

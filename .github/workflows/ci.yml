@@ -34,3 +34,39 @@ jobs:
 
       - name: Lint
         run: make lint
+
+  host:
+    # The native host builds on both too. Its socket client is portable; only
+    # signing is macOS-only, and signing identities do not belong in CI.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: actions/cache@v4
+        with:
+          # cargo-typify is compiled from source; without this every run pays
+          # several minutes to rebuild a tool that never changes.
+          path: |
+            ~/.cargo/bin/cargo-typify
+            ~/.cargo/registry
+            native/target
+          key: ${{ matrix.os }}-host-${{ hashFiles('native/Cargo.toml') }}
+
+      - name: Install the schema generator
+        run: cargo install cargo-typify --locked || true
+
+      - name: Protocol artifact is current
+        # The reason generated/ is committed: three languages read it, and a
+        # stale one is a disagreement nobody sees until the handshake.
+        run: make protocol-check-rust
+
+      - name: Gate
+        run: make rust

@@ -337,6 +337,34 @@ async def test_a_client_that_never_answers_is_not_consent(state: Path) -> None:
         break
 
 
+async def test_an_event_is_never_mistaken_for_a_response(state: Path) -> None:
+    """confirmation.required carries an `id` of its own.
+
+    A client correlating on the id alone can read that event as the answer to
+    its request. Writing the Rust client is what surfaced it: one
+    implementation can be self-consistent about a shape that is not actually
+    unambiguous. Both clients now dispatch on the presence of `type`.
+    """
+    confirmation = SessionConfirmation()
+    core = Core(ToolResult.success("system.empty_trash"), confirm_with=confirmation)
+
+    async for _ in start(state, core, confirmation):
+        seen: list[str] = []
+
+        def ask(event: dict[str, Any], kinds: list[str] = seen) -> bool:
+            kinds.append(str(event["type"]))
+            return True
+
+        async with IpcClient(socket_path(state)) as client:
+            response, _events = await client.submit("empty it", ask=ask)
+
+        # The event was routed to `ask`, not returned as the turn's answer.
+        assert seen == ["confirmation.required"]
+        assert response["payload"]["outcome"] == "ran"
+        assert "type" not in response
+        break
+
+
 async def test_an_unbound_confirmation_declines() -> None:
     # Nobody is connected to ask. Declining is the only honest answer.
     confirmation = SessionConfirmation()

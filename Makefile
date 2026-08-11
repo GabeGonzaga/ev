@@ -1,7 +1,7 @@
 PY ?= $(shell [ -x .venv/bin/python ] && echo .venv/bin/python || echo python3)
 
 .DEFAULT_GOAL := help
-.PHONY: help test lint format install eval protocol protocol-check
+.PHONY: help test lint format install eval protocol protocol-check rust sign
 
 help:
 	@echo "test     run the suite (must pass on Linux and macOS alike)"
@@ -11,6 +11,8 @@ help:
 	@echo "eval     golden routing and translation evals. Needs Ollama. NOT in CI"
 	@echo "         make eval ARGS='--model qwen3:8b --model llama3.1:8b'"
 	@echo "protocol regenerate protocol/generated/ from protocol/messages.py"
+	@echo "rust     fmt, clippy, test and build the native host. Needs cargo"
+	@echo "sign     code-sign the host with your Apple Development identity"
 
 test:
 	$(PY) -m pytest
@@ -19,12 +21,38 @@ test:
 eval:
 	$(PY) -m evals.run $(ARGS)
 
+CARGO ?= $(shell command -v cargo 2>/dev/null || echo $(HOME)/.cargo/bin/cargo)
+HOST := native/target/release/ev-host
+
 protocol:
 	$(PY) -m protocol.export
+	$(CARGO) typify --output protocol/generated/rust/protocol.rs \
+		protocol/generated/ev.schema.json
 
-# Part of lint, so a stale artifact fails the build rather than the handshake.
+# Each toolchain checks its own view of the artifact. Neither skips quietly if
+# the other is missing: that is how three languages drift apart.
 protocol-check:
 	$(PY) -m protocol.export --check
+
+protocol-check-rust:
+	@$(CARGO) typify --output /tmp/ev.protocol.rs \
+		protocol/generated/ev.schema.json
+	@diff -q /tmp/ev.protocol.rs protocol/generated/rust/protocol.rs \
+		|| (echo "protocol/generated/rust is stale. Run: make protocol"; exit 1)
+	@echo "protocol.rs matches ev.schema.json"
+
+rust: protocol-check-rust
+	cd native && $(CARGO) fmt --check
+	cd native && $(CARGO) clippy --all-targets -- -D warnings
+	cd native && $(CARGO) test
+	cd native && $(CARGO) build --release
+
+# Local only. TCC keys its grants to a code signature, so an unsigned host is
+# re-prompted on every rebuild. Signing identities do not belong in CI.
+sign: rust
+	codesign --force --options runtime --timestamp \
+		--sign "Apple Development: gggonzaga@icloud.com (AT55SB74NF)" $(HOST)
+	codesign --verify --verbose=2 $(HOST)
 
 lint: protocol-check
 	$(PY) -m ruff check .
