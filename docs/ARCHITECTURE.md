@@ -49,6 +49,11 @@ nothing below it takes a `dict` — a handler receives its validated args model.
 | `ev/capabilities/` | domain, registry, infrastructure | other capabilities |
 | `ev/infrastructure/` | domain, registry | application, capabilities, router |
 
+`protocol/generated/` holds the same contract three times -- JSON Schema, Rust,
+TypeScript -- generated from one Pydantic source and committed. Each toolchain
+checks its own view (`make protocol-check`, `-rust`, `-typescript`), so none is
+skipped quietly when its toolchain is absent.
+
 `tests/test_architecture.py` enforces the parts of this that can be checked:
 no outside-world imports above infrastructure, and no shell API anywhere.
 
@@ -89,7 +94,6 @@ structure shaped by symmetry rather than by a decision.
 | Enforcing the `Content` marker | tools feed each other — macros, phase 4 |
 | Streaming model responses | something can render a partial answer |
 | `sqlite-vec`, FTS5 | retrieval actually lands (phase 4) |
-| TypeScript generation from `ev.schema.json` | the UI that consumes it exists |
 | Tauri, npm, a webview | phase 3. The host is a plain binary until then |
 | A model-based VAD | a measurement showing energy is not enough |
 | A global hotkey (event tap, Accessibility) | phase 3, with the app bundle |

@@ -103,7 +103,7 @@ which is not built.
 | | |
 |---|---|
 | Journal read API, `history.query` at protocol 1.2, `--history` | done |
-| TypeScript generated from the schema | |
+| TypeScript generated from the schema, CI-checked | done |
 | Tauri shell: menu bar, NSPanel | |
 | Settings and history views | |
 | App bundle with `Info.plist`, and its own TCC identity | |

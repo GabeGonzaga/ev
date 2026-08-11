@@ -31,10 +31,14 @@ models:
 models-check:
 	$(PY) models/download.py --check
 
+TSGEN := npx --yes json-schema-to-typescript@15
+
 protocol:
 	$(PY) -m protocol.export
 	$(CARGO) typify --output protocol/generated/rust/protocol.rs \
 		protocol/generated/ev.schema.json
+	$(TSGEN) --input protocol/generated/ev.schema.json \
+		--output protocol/generated/typescript/protocol.ts --bannerComment=
 
 # Each toolchain checks its own view of the artifact. Neither skips quietly if
 # the other is missing: that is how three languages drift apart.
@@ -47,6 +51,15 @@ protocol-check-rust:
 	@diff -q /tmp/ev.protocol.rs protocol/generated/rust/protocol.rs \
 		|| (echo "protocol/generated/rust is stale. Run: make protocol"; exit 1)
 	@echo "protocol.rs matches ev.schema.json"
+
+# The third view. Its toolchain is node, so it checks itself rather than being
+# skipped when node is missing.
+protocol-check-typescript:
+	@$(TSGEN) --input protocol/generated/ev.schema.json \
+		--output /tmp/ev.protocol.ts --bannerComment= >/dev/null
+	@diff -q /tmp/ev.protocol.ts protocol/generated/typescript/protocol.ts \
+		|| (echo "protocol/generated/typescript is stale. Run: make protocol"; exit 1)
+	@echo "protocol.ts matches ev.schema.json"
 
 rust: protocol-check-rust
 	cd native && $(CARGO) fmt --check

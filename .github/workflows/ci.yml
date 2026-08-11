@@ -68,5 +68,8 @@ jobs:
         # stale one is a disagreement nobody sees until the handshake.
         run: make protocol-check-rust
 
+      - name: The TypeScript view too
+        run: make protocol-check-typescript
+
       - name: Gate
         run: make rust
