@@ -92,9 +92,14 @@ structure shaped by symmetry rather than by a decision.
 
 No voice, no native host, no UI.
 
-Tier 2, the generation path and `make eval` exist. What the first measurements
-showed is ADR 0012 — including that self-reported confidence carried almost no
-information, and that a routing call took 3.5 s against a 900 ms budget.
+Tier 2, the generation path and `make eval` exist. `qwen3:8b` is the measured
+default (ADR 0013): 17/18 routing, 0/8 inventions, 10/10 arguments accepted.
+
+Two findings hold across four models. Self-reported confidence carries almost
+no information — every model rates its wrong answers 1.00 as readily as its
+right ones (ADR 0012). And **the model path is over budget**: 2.06 s median
+against the 900 ms allotted to the router. That makes every tier 1 hit worth
+~2 s, not the ~900 ms the tiering was justified with.
 
 The suite reaches no model at all. An autouse fixture fails any test that would
 open a socket to Ollama, because that test would pass or fail according to
@@ -134,3 +139,4 @@ nothing, because `open(1)` needs nothing.
 | [0010](adr/0010-confidence-has-three-bands.md) | Confidence has three bands; the middle one asks |
 | [0011](adr/0011-generated-text-is-content-typed.md) | Generated text is content-typed; a failed translation returns the original |
 | [0012](adr/0012-what-the-evals-measured.md) | What the evals measured, and what changed because of it |
+| [0013](adr/0013-qwen3-8b-is-the-default-model.md) | qwen3:8b is the default model |

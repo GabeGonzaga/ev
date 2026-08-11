@@ -1,5 +1,5 @@
 {"id": "en-to-pt-greeting", "text": "Good morning, how are you?", "to": "pt-PT", "expect_any": ["bom dia"], "reject_any": ["como vai você", "tudo bem com você"]}
-{"id": "pt-to-en-greeting", "text": "Bom dia, tudo bem?", "to": "en", "expect_any": ["good morning", "morning"], "reject_any": []}
+{"id": "pt-to-en-greeting", "text": "Bom dia, tudo bem?", "to": "en", "expect_any": ["good morning", "morning", "good day", "hello"], "reject_any": []}
 {"id": "en-to-pt-sentence", "text": "I will send you the report tomorrow.", "to": "pt-PT", "expect_any": ["relatório", "amanhã"], "reject_any": []}
 {"id": "pt-to-en-sentence", "text": "Amanhã envio-te o relatório.", "to": "en", "expect_any": ["report", "tomorrow"], "reject_any": []}
 {"id": "identifiers-survive", "text": "Open Safari and go to github.com", "to": "pt-PT", "expect_any": ["safari"], "reject_any": [], "preserve": ["github.com", "Safari"]}

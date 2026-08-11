@@ -49,6 +49,11 @@ mutates the library and remains a later decision.
 | Confidence policy, wired into the turn | done |
 | Translation capability | done |
 | `make eval` and tier 2 golden cases | done |
+| Model chosen by measurement, not guess | done |
+
+Open, and deliberately not decided here: the model path measures 2.06 s against
+a 900 ms budget on both 8B candidates. Shorter prompt, smaller model, or an
+honest budget — see ADR 0013.
 
 `make eval` has two specific jobs waiting for it, both from observed behaviour
 rather than theory:
