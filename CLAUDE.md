@@ -31,8 +31,9 @@ E.V. is not a general agent. It does twenty things reliably rather than
 anything unreliably. If a request implies unbounded control of the machine,
 push back and propose a bounded adapter instead.
 
-**Current phase: 0 (headless core).** Tier 2 routing, voice, native host and
-GUI are not built. Do not scaffold them unless the task explicitly says so.
+**Current phase: 1 (Ollama structured routing).** Phase 0 (headless core) is
+done. Voice, native host and GUI are not built. Do not scaffold them unless
+the task explicitly says so.
 
 ---
 
@@ -456,8 +457,8 @@ Do not introduce, and push back if asked:
 
 | Phase | Scope | State |
 |---|---|---|
-| 0 | Headless core: registry, journal, migrations, tools, CLI | current |
-| 1 | Ollama tier 2, structured output, evals, confidence policy, translation capability | |
+| 0 | Headless core: registry, journal, migrations, tools, CLI | done |
+| 1 | Ollama tier 2, structured output, evals, confidence policy, translation capability | current |
 | 1.5 | Typed IPC protocol + signed native host skeleton | |
 | 2 | Push-to-talk, VAD, whisper.cpp, AVSpeechSynthesizer | |
 | 3 | Tauri, menu bar, NSPanel, settings, history | |

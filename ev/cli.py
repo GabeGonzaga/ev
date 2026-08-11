@@ -28,10 +28,14 @@ from ev.application.policy import PermissionLedger, PermissionPolicy
 from ev.capabilities.browser.adapters import OpenAdapter
 from ev.capabilities.browser.service import BrowserService
 from ev.capabilities.browser.tools import browser_tools
+from ev.capabilities.music.adapters import MusicAdapter
+from ev.capabilities.music.service import MusicService
+from ev.capabilities.music.tools import music_tools
 from ev.domain.results import ToolResult
 from ev.infrastructure.database.connection import connect, default_database_path
 from ev.infrastructure.database.journal import SqliteJournal
 from ev.infrastructure.database.migrations import migrate
+from ev.infrastructure.macos.applescript import AppleScriptClient
 from ev.infrastructure.macos.processes import ProcessRunner
 from ev.infrastructure.permissions import (
     grants_path,
@@ -103,7 +107,12 @@ def build_registry(
     )
 
     processes = ProcessRunner()
-    for spec in browser_tools(BrowserService(OpenAdapter(processes))):
+    applescript = AppleScriptClient(processes)
+
+    for spec in (
+        *browser_tools(BrowserService(OpenAdapter(processes))),
+        *music_tools(MusicService(MusicAdapter(applescript))),
+    ):
         registry.register(spec)
 
     return registry

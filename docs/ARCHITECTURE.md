@@ -55,10 +55,13 @@ Each subsystem has one public port. Today there is one:
 | Port | Owns |
 |---|---|
 | `ProcessRunner` | every subprocess. argv only — no shell, no `cwd`, no `env` |
+| `AppleScriptClient` | every AppleScript. Constant source, values as `argv` |
 
-`AppleScriptClient`, `AccessibilityClient`, `ShortcutsClient` and
-`NativeBridge` are named in `CLAUDE.md` and do not exist yet. They arrive with
-the capability that needs them, not before.
+`AppleScriptClient` goes through `ProcessRunner` rather than around it.
+
+`AccessibilityClient`, `ShortcutsClient` and `NativeBridge` are named in
+`CLAUDE.md` and do not exist yet. They arrive with the capability that needs
+them, not before.
 
 ## Triggers
 
@@ -82,10 +85,10 @@ No voice, no native host, no UI, no model. `ev/router/model.py` was deleted
 rather than left empty: an empty module advertises a contract nobody has
 decided.
 
-Every tool declaring a TCC permission is currently unreachable, because
-`PermissionLedger` reports `UNDETERMINED` for everything and ADR 0003 denies on
-unknown state. That is deliberate, and it is why `browser.open_url` — which
-needs no permission — is the capability that proves the chain.
+A tool declaring a TCC permission is denied until the user asserts the grant
+(`--grant`, ADR 0007) or, from phase 1.5, a host reports it. `music.play`
+declares `APPLE_EVENTS` and takes that path; `browser.open_url` declares
+nothing, because `open(1)` needs nothing.
 
 ## Testing shape
 
@@ -109,3 +112,4 @@ needs no permission — is the capability that proves the chain.
 | [0005](adr/0005-adapters-receive-argv-and-a-constrained-type.md) | Adapters receive argv and constrained types |
 | [0006](adr/0006-the-static-router-escalates-rather-than-guesses.md) | The static router escalates rather than guesses |
 | [0007](adr/0007-asserted-permissions-until-a-host-reports-them.md) | The user may assert a permission until a host reports it |
+| [0008](adr/0008-applescript-values-travel-as-argv.md) | AppleScript values travel as argv; albums start at a track |

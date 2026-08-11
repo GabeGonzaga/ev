@@ -120,4 +120,22 @@ def test_an_unknown_utterance_returns_none() -> None:
     # None is "not mine", not "no": phase 1 hands this to the model router.
     router = StaticRouter()
 
-    assert router.resolve("play the album Blonde") is None
+    assert router.resolve("empty the trash") is None
+
+
+def test_a_play_without_a_kind_escalates() -> None:
+    # "play Blonde" is an album or a track. Tier 1 will not pick one.
+    router = StaticRouter()
+
+    assert router.resolve("play Blonde") is None
+    assert router.resolve("toca Blonde") is None
+
+
+def test_the_kind_word_becomes_the_argument() -> None:
+    router = StaticRouter()
+
+    resolution = router.resolve("põe o disco Cantigas do Maio")
+
+    assert resolution is not None
+    assert resolution.tool == "music.play"
+    assert resolution.arguments == {"name": "Cantigas do Maio", "kind": "album"}

@@ -35,7 +35,10 @@ def test_specs_are_json_and_name_the_tools(capsys: pytest.CaptureFixture[str]) -
 
     specs = json.loads(capsys.readouterr().out)
 
-    assert [spec["function"]["name"] for spec in specs] == ["browser.open_url"]
+    assert [spec["function"]["name"] for spec in specs] == [
+        "browser.open_url",
+        "music.play",
+    ]
 
 
 def test_the_manifest_reports_risk_and_permissions(
@@ -102,7 +105,7 @@ def test_words_do_not_need_quoting(tmp_path: Path, fake_bin: FakeBin) -> None:
 def test_an_unrouted_utterance_says_so(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    code = main(["--database", str(tmp_path / "ev.db"), "play the album Blonde"])
+    code = main(["--database", str(tmp_path / "ev.db"), "empty the trash"])
 
     assert code == EXIT_NOT_UNDERSTOOD
     assert "did not understand" in capsys.readouterr().err
@@ -166,7 +169,7 @@ def test_the_repl_keeps_going_after_a_bad_turn(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    lines = iter(["play the album Blonde", "open github.com"])
+    lines = iter(["empty the trash", "open github.com"])
 
     def fake_input(prompt: str = "") -> str:
         try:

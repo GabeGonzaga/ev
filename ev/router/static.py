@@ -84,6 +84,33 @@ def _url(groups: Mapping[str, str]) -> dict[str, object] | None:
     return {"url": f"https://{url}"}
 
 
+_KINDS = {
+    "album": "album",
+    "record": "album",
+    "álbum": "album",
+    "albúm": "album",
+    "disco": "album",
+    "track": "track",
+    "song": "track",
+    "faixa": "track",
+    "música": "track",
+    "musica": "track",
+    "tema": "track",
+    "playlist": "playlist",
+    "lista": "playlist",
+}
+_KIND = "|".join(sorted(_KINDS, key=len, reverse=True))
+
+
+def _play(groups: Mapping[str, str]) -> dict[str, object] | None:
+    # The kind word is required by the pattern. "play Blonde" is ambiguous
+    # between an album and a track, so it escalates rather than picking one.
+    kind = _KINDS.get(groups["kind"].casefold())
+    if kind is None:
+        return None
+    return {"name": groups["name"].strip(), "kind": kind}
+
+
 @dataclass(frozen=True, slots=True)
 class Rule:
     tool: str
@@ -111,6 +138,18 @@ RULES: tuple[Rule, ...] = (
         rf"^(?:por\s+favor\s+)?(?:abre|abrir|abra|vai\s+ao|vai\s+à|vai\s+a|"
         rf"vai\s+para)\s+(?:o\s+|a\s+)?(?:site\s+|página\s+|pagina\s+)?{_URL}$",
         _url,
+    ),
+    _rule(
+        "music.play",
+        rf"^(?:please\s+)?(?:play|put\s+on)\s+(?:the\s+)?(?P<kind>{_KIND})\s+"
+        rf"(?P<name>.+)$",
+        _play,
+    ),
+    _rule(
+        "music.play",
+        rf"^(?:por\s+favor\s+)?(?:toca|tocar|põe|poe|coloca|pôe)\s+"
+        rf"(?:o\s+|a\s+)?(?P<kind>{_KIND})\s+(?P<name>.+)$",
+        _play,
     ),
 )
 

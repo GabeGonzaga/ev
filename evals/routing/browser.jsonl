@@ -14,7 +14,7 @@
 {"id": "escalate-application-name", "locale": "pt-PT", "utterance": "abre o Visual Studio Code", "tool": null, "arguments": {}}
 {"id": "escalate-file-name", "locale": "en", "utterance": "open report.pdf", "tool": null, "arguments": {}}
 {"id": "escalate-file-name", "locale": "pt-PT", "utterance": "abre o relatório.pdf", "tool": null, "arguments": {}}
-{"id": "escalate-unrelated-intent", "locale": "en", "utterance": "play the album Blonde", "tool": null, "arguments": {}}
-{"id": "escalate-unrelated-intent", "locale": "pt-PT", "utterance": "toca o álbum Blonde", "tool": null, "arguments": {}}
+{"id": "escalate-unrelated-intent", "locale": "en", "utterance": "empty the trash", "tool": null, "arguments": {}}
+{"id": "escalate-unrelated-intent", "locale": "pt-PT", "utterance": "esvazia o lixo", "tool": null, "arguments": {}}
 {"id": "escalate-question", "locale": "en", "utterance": "what is the weather like today?", "tool": null, "arguments": {}}
 {"id": "escalate-question", "locale": "pt-PT", "utterance": "como está o tempo hoje?", "tool": null, "arguments": {}}

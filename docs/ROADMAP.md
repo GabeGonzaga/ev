@@ -5,8 +5,8 @@ is right.
 
 | Phase | Scope | State |
 |---|---|---|
-| 0 | Headless core: registry, journal, migrations, tools, CLI | current |
-| 1 | Ollama tier 2, structured output, evals, confidence policy, translation capability | |
+| 0 | Headless core: registry, journal, migrations, tools, CLI | done |
+| 1 | Ollama tier 2, structured output, evals, confidence policy, translation capability | current |
 | 1.5 | Typed IPC protocol + signed native host skeleton | |
 | 2 | Push-to-talk, VAD, whisper.cpp, AVSpeechSynthesizer | |
 | 3 | Tauri, menu bar, NSPanel, settings, history | |
@@ -30,12 +30,15 @@ chain testable on Linux.
 | Static router, tier 0 and tier 1, golden cases in PT and EN | done |
 | CLI: one-shot, `--repl`, `--specs`, `--manifest` | done |
 | Asserted permissions, so AppleScript tools are reachable before the host exists | done |
-| `music.play` over AppleScript | |
+| `music.play` over AppleScript | done |
 
-Phase 0 is not finished while every AppleScript tool is unreachable. ADR 0003
-denies any tool declaring a permission until something reports it granted, and
-in phase 0 nothing does — so the last two rows exist to make the second
-capability real rather than theoretical.
+Phase 0 is done: two capabilities, one of them through the permission gate and
+the AppleScript port, with 167 tests that run on Linux.
+
+Known limitation, recorded in ADR 0008: album playback starts at the album's
+first track and lets Music continue in library order, because Music's `play`
+takes a single item. Exact album playback needs a temporary playlist, which
+mutates the library and remains a later decision.
 
 ## What each phase is waiting for
 

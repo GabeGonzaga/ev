@@ -21,14 +21,37 @@ FAKE_BIN = Path(__file__).parent / "fakes" / "bin"
 class FakeBin:
     log: Path
 
-    def argv(self) -> list[str]:
-        """Every argument the fake executable was given, in order."""
+    def runs(self) -> list[list[str]]:
+        """Every run, as [command, *arguments].
+
+        The log is NUL-separated and each run is prefixed with its argument
+        count, so a multi-line AppleScript source arrives here byte for byte.
+        """
         if not self.log.exists():
             return []
-        return self.log.read_text(encoding="utf-8").splitlines()
+
+        tokens = self.log.read_text(encoding="utf-8").split("\0")
+        if tokens and tokens[-1] == "":
+            tokens.pop()
+
+        runs: list[list[str]] = []
+        index = 0
+        while index < len(tokens):
+            count = int(tokens[index])
+            runs.append(tokens[index + 1 : index + 2 + count])
+            index += 2 + count
+        return runs
+
+    def command(self) -> str:
+        """The executable of the last run, by the name the adapter asked for."""
+        return self.runs()[-1][0]
+
+    def argv(self) -> list[str]:
+        """The arguments of the last run, without the executable."""
+        return self.runs()[-1][1:]
 
     def was_run(self) -> bool:
-        return self.log.exists()
+        return bool(self.runs())
 
 
 @pytest.fixture

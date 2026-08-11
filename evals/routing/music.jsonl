@@ -1,0 +1,14 @@
+{"id": "play-album", "locale": "en", "utterance": "play the album Blonde", "tool": "music.play", "arguments": {"name": "Blonde", "kind": "album"}}
+{"id": "play-album", "locale": "pt-PT", "utterance": "toca o álbum Blonde", "tool": "music.play", "arguments": {"name": "Blonde", "kind": "album"}}
+{"id": "play-album-synonym", "locale": "en", "utterance": "put on the record Blonde", "tool": "music.play", "arguments": {"name": "Blonde", "kind": "album"}}
+{"id": "play-album-synonym", "locale": "pt-PT", "utterance": "põe o disco Blonde", "tool": "music.play", "arguments": {"name": "Blonde", "kind": "album"}}
+{"id": "play-track", "locale": "en", "utterance": "play the song Nikes", "tool": "music.play", "arguments": {"name": "Nikes", "kind": "track"}}
+{"id": "play-track", "locale": "pt-PT", "utterance": "toca a música Nikes", "tool": "music.play", "arguments": {"name": "Nikes", "kind": "track"}}
+{"id": "play-playlist", "locale": "en", "utterance": "play the playlist Focus", "tool": "music.play", "arguments": {"name": "Focus", "kind": "playlist"}}
+{"id": "play-playlist", "locale": "pt-PT", "utterance": "toca a playlist Focus", "tool": "music.play", "arguments": {"name": "Focus", "kind": "playlist"}}
+{"id": "play-keeps-the-name-verbatim", "locale": "en", "utterance": "play the album The Miseducation of Lauryn Hill", "tool": "music.play", "arguments": {"name": "The Miseducation of Lauryn Hill", "kind": "album"}}
+{"id": "play-keeps-the-name-verbatim", "locale": "pt-PT", "utterance": "toca o álbum Cantigas do Maio", "tool": "music.play", "arguments": {"name": "Cantigas do Maio", "kind": "album"}}
+{"id": "escalate-ambiguous-kind", "locale": "en", "utterance": "play Blonde", "tool": null, "arguments": {}}
+{"id": "escalate-ambiguous-kind", "locale": "pt-PT", "utterance": "toca Blonde", "tool": null, "arguments": {}}
+{"id": "escalate-missing-name", "locale": "en", "utterance": "play the album", "tool": null, "arguments": {}}
+{"id": "escalate-missing-name", "locale": "pt-PT", "utterance": "toca o álbum", "tool": null, "arguments": {}}

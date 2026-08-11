@@ -1,0 +1,29 @@
+#!/bin/sh
+# One fake for every executable an adapter may run; the symlinks beside it
+# decide which name it answers to.
+#
+# Each run is written as: argc, command, then every argument, NUL-separated.
+# NUL is the only byte argv cannot contain, and the count is what separates one
+# run from the next -- a newline would not, because an AppleScript source is
+# full of them and is passed as a single argument.
+#
+# EV_FAKE_LOG     file to append runs to
+# EV_FAKE_EXIT    exit code to return, default 0
+# EV_FAKE_STDOUT  text to write to stdout
+# EV_FAKE_STDERR  text to write to stderr
+
+printf '%s\0' "$#" >> "$EV_FAKE_LOG"
+printf '%s\0' "$(basename "$0")" >> "$EV_FAKE_LOG"
+for argument in "$@"; do
+    printf '%s\0' "$argument" >> "$EV_FAKE_LOG"
+done
+
+if [ -n "$EV_FAKE_STDOUT" ]; then
+    printf '%s' "$EV_FAKE_STDOUT"
+fi
+
+if [ -n "$EV_FAKE_STDERR" ]; then
+    printf '%s\n' "$EV_FAKE_STDERR" >&2
+fi
+
+exit "${EV_FAKE_EXIT:-0}"
