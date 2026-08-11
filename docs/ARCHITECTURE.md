@@ -94,7 +94,6 @@ structure shaped by symmetry rather than by a decision.
 | Enforcing the `Content` marker | tools feed each other — macros, phase 4 |
 | Streaming model responses | something can render a partial answer |
 | `sqlite-vec`, FTS5 | retrieval actually lands (phase 4) |
-| Tauri, npm, a webview | phase 3. The host is a plain binary until then |
 | A model-based VAD | a measurement showing energy is not enough |
 | A global hotkey (event tap, Accessibility) | phase 3, with the app bundle |
 | `AudioSession` as a type | the host needs ducking, routes or interruptions |
@@ -103,7 +102,7 @@ structure shaped by symmetry rather than by a decision.
 
 ## What does not exist yet
 
-No UI, no wake word, no Tauri.
+No wake word.
 
 The voice loop closes: the host records on a keypress, the core transcribes and
 routes, and the host speaks the answer. What it does not have is its own TCC
@@ -164,4 +163,4 @@ nothing, because `open(1)` needs nothing.
 | [0017](adr/0017-the-native-host-skeleton.md) | The native host skeleton, and what a second language found |
 | [0018](adr/0018-where-speech-happens.md) | Where speech happens: capture is native, transcription is core |
 | [0019](adr/0019-capture-in-the-host.md) | Capture in the host, and what the microphone actually asked |
-| [0020](adr/0020-vad-is-energy-based-and-relative-to-the-room.md) | VAD is energy-based, and relative to the room |
+| [0020](adr/0020-vad-is-energy-based-and-relative-to-the-room.md) | VAD is energy-based, and relative to the room |\n| [0021](adr/0021-the-app-is-the-tcc-subject.md) | The app is the TCC subject; the panel executes nothing |

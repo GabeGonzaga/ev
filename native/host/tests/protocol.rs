@@ -20,7 +20,7 @@ use std::thread;
 #[allow(dead_code)]
 mod client;
 
-#[path = "../../protocol/generated/rust/protocol.rs"]
+#[path = "../../../protocol/generated/rust/protocol.rs"]
 // Generated code is held to the generator's standards, not ours. The crate
 // denies all of clippy; these are the lints the output trips, allowed here
 // rather than by loosening the rules for the code we write.

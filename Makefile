@@ -1,7 +1,7 @@
 PY ?= $(shell [ -x .venv/bin/python ] && echo .venv/bin/python || echo python3)
 
 .DEFAULT_GOAL := help
-.PHONY: help test lint format install eval protocol protocol-check rust sign models
+.PHONY: help test lint format install eval protocol protocol-check rust sign models ui app
 
 help:
 	@echo "test     run the suite (must pass on Linux and macOS alike)"
@@ -13,6 +13,8 @@ help:
 	@echo "protocol regenerate protocol/generated/ from protocol/messages.py"
 	@echo "rust     fmt, clippy, test and build the native host. Needs cargo"
 	@echo "sign     code-sign the host with your Apple Development identity"
+	@echo "ui       typecheck and build the panel"
+	@echo "app      build EV.app, then sign it with entitlements"
 	@echo "models   download model weights and verify their checksums"
 
 test:
@@ -60,6 +62,23 @@ protocol-check-typescript:
 	@diff -q /tmp/ev.protocol.ts protocol/generated/typescript/protocol.ts \
 		|| (echo "protocol/generated/typescript is stale. Run: make protocol"; exit 1)
 	@echo "protocol.ts matches ev.schema.json"
+
+IDENTITY ?= Apple Development: gggonzaga@icloud.com (AT55SB74NF)
+APP := native/target/release/bundle/macos/EV.app
+
+ui: protocol-check-typescript
+	npm --prefix ui ci
+	npm --prefix ui run build
+
+# The bundle is what gives E.V. its own TCC identity: launched from a shell the
+# host borrows the terminal's grants, and only a bundled app gets an identity
+# macOS decides about. Signing stays local; identities do not belong in CI.
+app:
+	cd native/src-tauri && $(CARGO) tauri build
+	codesign --force --deep --options runtime --timestamp \
+		--entitlements native/src-tauri/entitlements.plist \
+		--sign "$(IDENTITY)" $(APP)
+	codesign --verify --verbose=2 $(APP)
 
 rust: protocol-check-rust
 	cd native && $(CARGO) fmt --check

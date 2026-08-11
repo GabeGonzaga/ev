@@ -17,6 +17,7 @@ native/src-tauri/gen/
 node_modules/
 dist/
 .vite/
+ui/dist/
 
 # macOS
 .DS_Store

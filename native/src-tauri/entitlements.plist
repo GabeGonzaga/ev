@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- The microphone, under the hardened runtime. -->
+  <key>com.apple.security.device.audio-input</key>
+  <true/>
+
+  <!-- Apple Events, which is how music.play reaches Music. Until this exists
+       and macOS has been asked, that tool is denied by policy (ADR 0003). -->
+  <key>com.apple.security.automation.apple-events</key>
+  <true/>
+
+  <!-- Deliberately absent: com.apple.security.app-sandbox. E.V. spawns open,
+       osascript and whisper-cli, and the sandbox forbids all three. That is a
+       decision with consequences for distribution, not an oversight. -->
+</dict>
+</plist>

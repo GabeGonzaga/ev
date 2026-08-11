@@ -73,3 +73,25 @@ jobs:
 
       - name: Gate
         run: make rust
+
+  panel:
+    # The UI is typechecked and built, not run: a webview in CI would test the
+    # runner's graphics stack rather than this code.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install
+        run: npm --prefix ui ci
+
+      - name: The TypeScript view is current
+        run: make protocol-check-typescript
+
+      - name: Build
+        run: npm --prefix ui run build

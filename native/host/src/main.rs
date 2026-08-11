@@ -12,34 +12,14 @@
 //!     ev-host "abre example.com"
 //!     ev-host --socket /tmp/ev/ev.sock "open github.com"
 
-mod audio;
-mod client;
-
-/// The generated view of the contract, produced from
-/// `protocol/generated/ev.schema.json` and committed beside it.
-/// `make protocol-check-rust` fails if the two disagree.
-///
-/// One fidelity gap, deliberately not papered over: the schema declares a
-/// discriminator on `type`, and the generator emits `#[serde(untagged)]`
-/// unions, which match by field shape instead. That happens to work today
-/// because the messages' required fields differ, and would stop working the
-/// moment two shared a shape. Nothing here relies on those unions -- the
-/// client reads `type` itself and deserialises the concrete struct, which is
-/// generated faithfully.
-#[path = "../../protocol/generated/rust/protocol.rs"]
-// Generated code is held to the generator's standards, not ours. The crate
-// denies all of clippy; these are the lints the output trips, allowed here
-// rather than by loosening the rules for the code we write.
-#[allow(dead_code, clippy::derivable_impls, clippy::to_string_trait_impl)]
-mod protocol;
-
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process::{Command, ExitCode};
 
 use serde_json::Value;
 
-use crate::client::{Client, Error};
+use ev_host::audio;
+use ev_host::client::{Client, Error};
 
 const EXIT_FAILED: u8 = 1;
 const EXIT_NOT_UNDERSTOOD: u8 = 2;

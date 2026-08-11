@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- A menu bar item, not an application to switch to. No Dock icon, and no
+       window until asked for. -->
+  <key>LSUIElement</key>
+  <true/>
+
+  <!-- The sentence macOS shows when it asks. Without this key it does not ask;
+       it refuses, and the refusal looks like a bug in the microphone. -->
+  <key>NSMicrophoneUsageDescription</key>
+  <string>E.V. listens when you ask it to, and only then. Audio stays on this Mac.</string>
+
+  <!-- Music, Notes, Finder and the rest are reached by Apple Events. Until
+       this is granted, tools that need it are denied before macOS is asked. -->
+  <key>NSAppleEventsUsageDescription</key>
+  <string>E.V. controls apps you name — playing an album, opening a note — and nothing else.</string>
+</dict>
+</plist>

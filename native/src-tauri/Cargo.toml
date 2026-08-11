@@ -1,0 +1,26 @@
+[package]
+name = "ev-app"
+version = "0.1.0"
+description = "E.V. — the menu bar and the panel"
+edition = "2021"
+rust-version = "1.77.2"
+publish = false
+
+[lib]
+name = "ev_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+# The socket client and the microphone, shared with the terminal host rather
+# than written twice. Capture lives in the app because TCC attributes a
+# permission to the app, not to a helper it launches (ADR 0019).
+ev-host = { path = "../host" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tauri = { version = "2.11.3", features = ["tray-icon"] }
+
+[lints.rust]
+unsafe_code = "forbid"

@@ -1,22 +1,11 @@
-[package]
-name = "ev-host"
-version = "0.1.0"
-edition = "2021"
-description = "The native host: the signed process that talks to the E.V. daemon"
-publish = false
+# The native side is a workspace, not a crate: the CLI host and the app share
+# the socket client and the capture code, and sharing them by path dependency
+# is the alternative to keeping two copies honest by hand.
+[workspace]
+resolver = "2"
+members = ["host", "src-tauri"]
 
-[dependencies]
-base64 = "0.22"
-cpal = "0.15"
-hound = "3"
+[workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-# The socket, and nothing else. No HTTP client, no async runtime yet: the host
-# does one blocking conversation per turn, and a runtime would be a dependency
-# in search of a use until audio arrives.
-
-[lints.rust]
-unsafe_code = "forbid"
-
-[lints.clippy]
-all = "deny"
+base64 = "0.22"

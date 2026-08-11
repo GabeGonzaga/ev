@@ -104,9 +104,9 @@ which is not built.
 |---|---|
 | Journal read API, `history.query` at protocol 1.2, `--history` | done |
 | TypeScript generated from the schema, CI-checked | done |
-| Tauri shell: menu bar, NSPanel | |
-| Settings and history views | |
-| App bundle with `Info.plist`, and its own TCC identity | |
+| Tauri shell: menu bar, panel, four commands | done |
+| History in the panel; settings beyond locale | partial |
+| App bundle, signed, with entitlements and usage strings | done, unproven |
 
 The bundle is the phase's real prize: launched from a shell the host borrows
 the terminal's microphone grant (ADR 0019), and only a bundled app gets an

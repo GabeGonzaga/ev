@@ -233,4 +233,22 @@ impl Client {
             }
         }
     }
+
+    /// What E.V. has done, newest first.
+    ///
+    /// A request with an answer: history is asked for when a panel opens, not
+    /// pushed at a client that did not want it.
+    pub fn history(&mut self, limit: u32) -> Result<Value, Error> {
+        let response = self.request(json!({ "type": "history.query", "limit": limit }))?;
+
+        if !response.ok {
+            let why = response
+                .error
+                .map(|error| error.message)
+                .unwrap_or_else(|| "refused".to_string());
+            return Err(Error::Refused(why));
+        }
+
+        serde_json::to_value(response.payload).map_err(|error| Error::Malformed(error.to_string()))
+    }
 }
