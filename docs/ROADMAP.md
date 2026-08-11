@@ -51,9 +51,10 @@ mutates the library and remains a later decision.
 | `make eval` and tier 2 golden cases | done |
 | Model chosen by measurement, not guess | done |
 
-Open, and deliberately not decided here: the model path measures 2.06 s against
-a 900 ms budget on both 8B candidates. Shorter prompt, smaller model, or an
-honest budget — see ADR 0013.
+Open, and deliberately not decided here: the model path measures 1.31 s against
+a 900 ms budget, after ADR 0014 cut it from 2.06 s by stopping the router
+narrating its tool calls. Prompt size was measured and is not the lever. What
+is left is a smaller model or an honest budget.
 
 `make eval` has two specific jobs waiting for it, both from observed behaviour
 rather than theory:

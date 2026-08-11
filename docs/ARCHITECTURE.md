@@ -97,9 +97,9 @@ default (ADR 0013): 17/18 routing, 0/8 inventions, 10/10 arguments accepted.
 
 Two findings hold across four models. Self-reported confidence carries almost
 no information — every model rates its wrong answers 1.00 as readily as its
-right ones (ADR 0012). And **the model path is over budget**: 2.06 s median
-against the 900 ms allotted to the router. That makes every tier 1 hit worth
-~2 s, not the ~900 ms the tiering was justified with.
+right ones (ADR 0012). And **the model path is over budget**: 1.31 s median
+against the 900 ms allotted to the router, after ADR 0014 stopped the router
+narrating its calls. Every tier 1 hit is worth that 1.31 s.
 
 The suite reaches no model at all. An autouse fixture fails any test that would
 open a socket to Ollama, because that test would pass or fail according to
@@ -139,4 +139,4 @@ nothing, because `open(1)` needs nothing.
 | [0010](adr/0010-confidence-has-three-bands.md) | Confidence has three bands; the middle one asks |
 | [0011](adr/0011-generated-text-is-content-typed.md) | Generated text is content-typed; a failed translation returns the original |
 | [0012](adr/0012-what-the-evals-measured.md) | What the evals measured, and what changed because of it |
-| [0013](adr/0013-qwen3-8b-is-the-default-model.md) | qwen3:8b is the default model |
+| [0013](adr/0013-qwen3-8b-is-the-default-model.md) | qwen3:8b is the default model |\n| [0014](adr/0014-the-router-does-not-narrate.md) | The router does not narrate; the prompt was not the problem |

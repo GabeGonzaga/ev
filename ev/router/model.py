@@ -41,7 +41,10 @@ user chose are the arguments.
 - confidence is how certain you are, from 0 to 1. Use 1.0 only when the \
 request plainly matches one tool and every argument is present. Use less than \
 0.5 when you are guessing.
-- response is one short sentence in the same language as the request, or null.
+- response must be null when you are calling a tool. Do not narrate the call: \
+E.V. says what happened after it happens. Write a response only when you are \
+unsure and need to ask the user something, and then write it in the language \
+of the request.
 
 Tools:
 """
