@@ -17,7 +17,7 @@ from typing import Any
 
 import httpx
 
-from ev.infrastructure.ollama.settings import ModelSettings, OllamaSettings
+from ev.infrastructure.ollama.settings import ModelSettings, OllamaSettings, Role
 
 
 class OllamaError(Exception):
@@ -39,6 +39,20 @@ class ModelMissing(OllamaError):
         )
         self.name = name
         self.installed = installed
+
+
+class BoundModel:
+    """One model, ready to be called. Satisfies the router's `Completion` port
+    and the generation path's, so neither imports this module."""
+
+    def __init__(self, client: OllamaClient, model: ModelSettings) -> None:
+        self._client = client
+        self._model = model
+
+    async def complete(
+        self, messages: list[dict[str, str]], *, schema: dict[str, Any] | None = None
+    ) -> str:
+        return await self._client.chat(self._model, messages, schema=schema)
 
 
 class OllamaClient:
@@ -119,3 +133,7 @@ class OllamaClient:
             raise OllamaError("ollama returned a message without text content")
 
         return content
+
+    def bind(self, role: Role) -> BoundModel:
+        """The model configured for a role, as a callable collaborator."""
+        return BoundModel(self, self._settings.for_role(role))
