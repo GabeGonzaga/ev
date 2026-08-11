@@ -343,18 +343,23 @@ here until phase 1 and the guesses were wrong in both directions.
 
 | Stage | Budget | State |
 |---|---|---|
-| STT (whisper small, ~3 s utterance, Metal) | 400 ms | target, not built |
+| STT (whisper small, ~2.5 s utterance, Metal) | 750 ms | **measured 723 ms** |
 | Static router hit | 1 ms | **measured 0.005 ms** |
 | Model router (8B q4 resident, ~24 tokens out) | 1.4 s | **measured 1.31 s** |
 | Tool execution (AppleScript, no app target) | 100 ms | **measured 62 ms** |
 | Tool execution (AppleScript, driving an app) | 300 ms | target, unmeasured |
 | TTS first audio | 200 ms | target, not built |
-| **Deterministic path, total** | **700 ms** | 2 of 3 rows still targets |
-| **Model path, total** | **2.0 s** | dominated by the measured router |
+| **Deterministic path, total** | **1.0 s** | TTS is the last target in it |
+| **Model path, total** | **2.3 s** | router 1.31 s + STT 0.72 s |
 
 Measured on an M2 Pro, `qwen3:8b`, model resident, 18 routing cases.
 Reproduce with `make eval`; the per-stage numbers are in ADR 0012, 0013 and
 0014.
+
+**Half of STT is loading a model that is then discarded**: 362 ms of the
+723 ms. Keeping whisper resident would halve it, and `CLAUDE.md` says not to
+hold the LLM and the STT model resident at once — so spawning per utterance is
+the intended design, and 723 ms is what it costs.
 
 **A cold model costs more than the whole budget.** A reload measured 7.46 s
 against 0.40 s warm, which is why `keep_alive` is 30 minutes and why a second

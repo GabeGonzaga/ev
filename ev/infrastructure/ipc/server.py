@@ -17,10 +17,13 @@ it.
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 import contextlib
 import json
 import os
 import socket
+import tempfile
 import uuid
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -31,6 +34,7 @@ from ev.application.confirmation import ConfirmationRequest
 from ev.domain.results import Clarification, ToolResult
 from protocol.messages import (
     PROTOCOL_VERSION,
+    AudioSubmit,
     ConfirmationRequired,
     ConfirmationRespond,
     Event,
@@ -42,6 +46,7 @@ from protocol.messages import (
     SpeechRequested,
     StateChanged,
     ToolCompleted,
+    TranscriptionPartial,
     UtteranceSubmit,
 )
 
@@ -51,6 +56,16 @@ SUN_PATH_MAX = 100
 trailing NUL. `~/Library/Application Support/EV/ev.sock` is comfortably inside
 it; a deeply nested home directory is not, and that failure deserves a sentence
 naming the path rather than the kernel's bare EINVAL."""
+MAX_LINE = 12 * 1024 * 1024
+"""asyncio caps a line at 64 KiB by default, and audio does not fit in that:
+~2.5 seconds of speech is a ~104 KB line, which killed the connection with
+"chunk exceed the limit" and no explanation. This is the protocol's audio bound
+with room for the JSON around it."""
+
+CLOSE_TIMEOUT = 2.0
+"""A backstop on shutdown. Connections are closed first, so this should never
+be reached; if it is, exiting matters more than exiting tidily."""
+
 CONFIRMATION_TIMEOUT = 120.0
 """A person is being asked a question. Long, but not forever: a client that
 vanished mid-confirmation must not pin a turn open."""
@@ -135,6 +150,9 @@ class SessionConfirmation:
 
 
 Handler = Callable[[str], Awaitable[ToolResult | Clarification | None]]
+Transcriber = Callable[[Path, str], Awaitable[str]]
+"""Audio in, words out. The daemon holds one; what implements it is
+`SpeechRecognizer`, and the daemon never learns which engine that is."""
 
 
 class IpcServer:
@@ -144,16 +162,19 @@ class IpcServer:
         path: Path,
         handle: Handler,
         confirmation: SessionConfirmation,
+        transcribe: Transcriber | None = None,
         on_close: Callable[[], Awaitable[None]] | None = None,
         confirmation_timeout: float = CONFIRMATION_TIMEOUT,
     ) -> None:
         self._path = path
         self._handle = handle
+        self._transcribe = transcribe
         self._confirmation = confirmation
         self._on_close = on_close
         self._confirmation_timeout = confirmation_timeout
         self._turn = asyncio.Lock()
         self._server: asyncio.AbstractServer | None = None
+        self._connections: set[asyncio.StreamWriter] = set()
 
     async def start(self) -> None:
         self._guard_length()
@@ -161,7 +182,7 @@ class IpcServer:
         self._clear_stale()
 
         self._server = await asyncio.start_unix_server(
-            self._connection, path=str(self._path)
+            self._connection, path=str(self._path), limit=MAX_LINE
         )
         # Bind first, then narrow: there is a moment where the socket exists
         # with the process umask, and chmod closes it immediately.
@@ -204,7 +225,19 @@ class IpcServer:
     async def aclose(self) -> None:
         if self._server is not None:
             self._server.close()
-            await self._server.wait_closed()
+
+            # Every connected client is closed first. Since 3.12,
+            # `wait_closed()` waits for open connections as well as for the
+            # listener, so a daemon with a client attached -- which is the
+            # normal state, and will be the permanent state once a UI exists --
+            # would never finish shutting down. It would hang on SIGTERM and
+            # take the unflushed journal with it.
+            for writer in list(self._connections):
+                writer.close()
+
+            with contextlib.suppress(TimeoutError, asyncio.CancelledError):
+                await asyncio.wait_for(self._server.wait_closed(), CLOSE_TIMEOUT)
+
         self._path.unlink(missing_ok=True)
         if self._on_close is not None:
             await self._on_close()
@@ -213,6 +246,7 @@ class IpcServer:
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ) -> None:
         session = Session(writer, timeout=self._confirmation_timeout)
+        self._connections.add(writer)
         # Each line is handled in its own task, and this matters: a turn
         # awaiting a confirmation is blocked inside one of them, and the answer
         # arrives on the next line. Handling lines in sequence would mean the
@@ -225,6 +259,14 @@ class IpcServer:
                 task = asyncio.create_task(self._line(session, line))
                 working.add(task)
                 task.add_done_callback(working.discard)
+        except ValueError:
+            # A line past MAX_LINE. The stream cannot be resynchronised -- the
+            # rest of that line is still coming -- so this connection ends, but
+            # it ends with a reason rather than in silence.
+            with contextlib.suppress(ConnectionError, OSError):
+                await self._refuse(
+                    session, "", "too_large", f"a message exceeded {MAX_LINE} bytes"
+                )
         except (ConnectionResetError, BrokenPipeError):
             pass
         finally:
@@ -232,6 +274,7 @@ class IpcServer:
             session.cancel()
             for task in list(working):
                 task.cancel()
+            self._connections.discard(writer)
             writer.close()
             with contextlib.suppress(ConnectionError, OSError):
                 await writer.wait_closed()
@@ -275,8 +318,62 @@ class IpcServer:
             await session.send(Response(id=request.id, ok=True))
             return
 
+        if isinstance(command, AudioSubmit):
+            await self._audio(session, request.id, command)
+            return
+
         if isinstance(command, UtteranceSubmit):
             await self._utterance(session, request.id, command)
+
+    async def _audio(
+        self, session: Session, request_id: str, command: AudioSubmit
+    ) -> None:
+        """Transcribe, say what was heard, then take the turn.
+
+        The audio reaches disk for as long as whisper needs a file to read and
+        no longer: it is written to a private temporary file and deleted in a
+        finally, because a recording of someone's voice is not something to
+        leave lying around after the sentence has been understood.
+        """
+        if self._transcribe is None:
+            await self._refuse(
+                session, request_id, "no_recognizer", "this daemon cannot transcribe"
+            )
+            return
+
+        try:
+            audio = base64.b64decode(command.audio, validate=True)
+        except (ValueError, binascii.Error):
+            await self._refuse(
+                session, request_id, "malformed_audio", "audio is not valid base64"
+            )
+            return
+
+        handle, name = tempfile.mkstemp(prefix="ev-", suffix=".wav")
+        path = Path(name)
+        try:
+            with os.fdopen(handle, "wb") as file:
+                file.write(audio)
+
+            try:
+                said = await self._transcribe(path, command.locale or "en")
+            except Exception as error:
+                await self._refuse(
+                    session, request_id, "transcription_failed", str(error)
+                )
+                return
+        finally:
+            path.unlink(missing_ok=True)
+
+        # What E.V. heard, before it acts on it. A user who is misheard should
+        # see it in the words, not infer it from the wrong action.
+        await session.emit(TranscriptionPartial(text=said))
+
+        await self._utterance(
+            session,
+            request_id,
+            UtteranceSubmit(text=said, locale=command.locale),
+        )
 
     async def _hello(self, session: Session, request_id: str, hello: Hello) -> None:
         if hello.protocol != PROTOCOL_VERSION:

@@ -76,7 +76,7 @@ fn fake_daemon(listener: UnixListener, script: Vec<Value>) -> thread::JoinHandle
 }
 
 fn accepted() -> Value {
-    json!({"id": "", "ok": true, "payload": {"protocol": "1.0"}})
+    json!({"id": "", "ok": true, "payload": {"protocol": "1.1"}})
 }
 
 #[test]
@@ -90,7 +90,7 @@ fn a_handshake_is_sent_before_anything_else() {
 
     let received = daemon.join().expect("join");
     assert_eq!(received[0]["command"]["type"], json!("hello"));
-    assert_eq!(received[0]["command"]["protocol"], json!("1.0"));
+    assert_eq!(received[0]["command"]["protocol"], json!("1.1"));
     let _ = std::fs::remove_file(&path);
 }
 
@@ -103,13 +103,13 @@ fn a_refused_handshake_is_reported() {
         vec![json!({
             "id": "",
             "ok": false,
-            "error": {"code": "protocol_mismatch", "message": "this daemon speaks 1.0"}
+            "error": {"code": "protocol_mismatch", "message": "this daemon speaks 1.1"}
         })],
     );
 
     let error = Client::connect(&path).expect_err("refusal");
 
-    assert!(matches!(error, Error::Refused(ref why) if why.contains("speaks 1.0")));
+    assert!(matches!(error, Error::Refused(ref why) if why.contains("speaks 1.1")));
     let _ = daemon.join();
     let _ = std::fs::remove_file(&path);
 }

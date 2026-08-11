@@ -58,7 +58,7 @@ satisfy them structurally, which is why neither imports the other.
 
 ## One door per subsystem
 
-Each subsystem has one public port. Today there are five:
+Each subsystem has one public port. Today there are six:
 
 | Port | Owns |
 |---|---|
@@ -66,6 +66,7 @@ Each subsystem has one public port. Today there are five:
 | `AppleScriptClient` | every AppleScript. Constant source, values as `argv` |
 | `OllamaClient` | every model call, both paths. Local HTTP, model from config |
 | `SpeechSynthesizer` | saying things. `say(1)` in development, the host in the app |
+| `SpeechRecognizer` | hearing things. whisper.cpp, spawned per utterance |
 | `IpcServer` | the socket. Handshake, framing, correlation, confirmations |
 
 `AppleScriptClient` goes through `ProcessRunner` rather than around it.
@@ -96,9 +97,9 @@ structure shaped by symmetry rather than by a decision.
 
 ## What does not exist yet
 
-No UI, and no ears. The host speaks -- `speech.requested` becomes `say` with
-the pt-PT voice -- but nothing captures audio yet, so every utterance is still
-typed. No TCC-facing capability is implemented, no Tauri.
+No UI, and nothing captures audio yet: the daemon transcribes what it is
+handed, but nobody is holding a microphone, so every utterance still starts as
+text. No TCC-facing capability is implemented, no Tauri.
 
 Tier 2, the generation path and `make eval` exist. `qwen3:8b` is the measured
 default (ADR 0013): 17/18 routing, 0/8 inventions, 10/10 arguments accepted.

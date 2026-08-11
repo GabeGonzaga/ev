@@ -18,7 +18,7 @@ use crate::protocol::{ConfirmationRequired, Response, SpeechRequested};
 /// The version this host speaks. A mismatch is refused by the daemon, and
 /// refusing is the point: a protocol neither side agrees on is not a
 /// conversation worth having.
-pub const PROTOCOL_VERSION: &str = "1.0";
+pub const PROTOCOL_VERSION: &str = "1.1";
 
 #[derive(Debug)]
 pub enum Error {

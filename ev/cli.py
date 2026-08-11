@@ -58,6 +58,7 @@ from ev.infrastructure.permissions import (
     parse_permission,
     save_grants,
 )
+from ev.infrastructure.speech.recognizer import WhisperCppRecognizer
 from ev.infrastructure.speech.synthesizer import SaySynthesizer, SpeechSynthesizer
 from ev.registry import CallRecord, ConfirmationPort, JournalPort, Registry
 from ev.router.model import Completion, ModelRouter
@@ -425,10 +426,19 @@ async def serve(
     application = build(
         database=database, confirmation=confirmation, model=model, completion=completion
     )
+    # The recogniser is spawned per utterance rather than held resident:
+    # CLAUDE.md does not hold the LLM and the STT model in memory at once, and
+    # the measured cost of that choice is in the latency table.
+    recognizer = WhisperCppRecognizer(ProcessRunner())
+
+    async def transcribe(audio: Path, locale: str) -> str:
+        return await recognizer.transcribe(audio, language=locale)
+
     server = IpcServer(
         path=socket_path(database.parent),
         handle=application.assistant.handle,
         confirmation=confirmation,
+        transcribe=transcribe,
         on_close=application.aclose,
     )
 

@@ -18,6 +18,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from ev.infrastructure.ipc.server import MAX_LINE
 from protocol.messages import (
     PROTOCOL_VERSION,
     ConfirmationRespond,
@@ -65,7 +66,7 @@ class IpcClient:
     async def __aenter__(self) -> IpcClient:
         try:
             self._reader, self._writer = await asyncio.open_unix_connection(
-                str(self._path)
+                str(self._path), limit=MAX_LINE
             )
         except (FileNotFoundError, ConnectionRefusedError) as error:
             raise DaemonUnavailable(self._path) from error

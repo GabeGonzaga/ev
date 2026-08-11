@@ -25,6 +25,7 @@ DerivedData/
 # NUNCA no repositório
 models/*.gguf
 models/*.bin
+models/*.partial
 *.db
 *.db-wal
 *.db-shm

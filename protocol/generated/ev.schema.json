@@ -1,5 +1,48 @@
 {
   "$defs": {
+    "AudioSubmit": {
+      "additionalProperties": false,
+      "description": "Recorded speech, on its way to be transcribed.\n\nThe host captures, because the microphone is a TCC surface and TCC grants\nattach to a code signature. The core transcribes, because that is where\n`SpeechRecognizer` lives and where the engine stays replaceable (ADR 0018).\n\nBase64 rather than a file path: a path means the audio is written to disk\nby one process and read by another, and neither owns deleting it. ~2.5\nseconds of 16 kHz mono is about 100 KB encoded, which is nothing on a local\nsocket.",
+      "properties": {
+        "audio": {
+          "description": "base64 of a mono 16-bit PCM WAV.",
+          "maxLength": 8000000,
+          "title": "Audio",
+          "type": "string"
+        },
+        "locale": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The language to transcribe as. Never 'auto': auto-detect is unreliable on short utterances, and a misdetected language becomes a tool argument.",
+          "title": "Locale"
+        },
+        "sample_rate": {
+          "default": 16000,
+          "maximum": 48000,
+          "minimum": 8000,
+          "title": "Sample Rate",
+          "type": "integer"
+        },
+        "type": {
+          "const": "audio.submit",
+          "default": "audio.submit",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "audio"
+      ],
+      "title": "AudioSubmit",
+      "type": "object"
+    },
     "ConfirmationRequired": {
       "additionalProperties": false,
       "properties": {
@@ -141,6 +184,7 @@
         "command": {
           "discriminator": {
             "mapping": {
+              "audio.submit": "#/$defs/AudioSubmit",
               "confirmation.respond": "#/$defs/ConfirmationRespond",
               "hello": "#/$defs/Hello",
               "session.cancel": "#/$defs/SessionCancel",
@@ -154,6 +198,9 @@
             },
             {
               "$ref": "#/$defs/UtteranceSubmit"
+            },
+            {
+              "$ref": "#/$defs/AudioSubmit"
             },
             {
               "$ref": "#/$defs/ConfirmationRespond"
@@ -489,5 +536,5 @@
   },
   "title": "Envelope",
   "type": "object",
-  "x-ev-protocol-version": "1.0"
+  "x-ev-protocol-version": "1.1"
 }

@@ -54,4 +54,4 @@ select = [
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["ev", "tests", "protocol"]
+files = ["ev", "tests", "protocol", "models"]

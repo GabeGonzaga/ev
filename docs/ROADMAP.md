@@ -80,8 +80,9 @@ rather than theory:
 | | |
 |---|---|
 | `SpeechSynthesizer`, and the host speaking `speech.requested` | done |
-| Audio capture in the host, shipped to the core | |
-| whisper.cpp behind `SpeechRecognizer`, with a language hint | |
+| `audio.submit` at protocol 1.1, transcribed by the core | done |
+| Audio capture in the host | |
+| whisper.cpp behind `SpeechRecognizer`, with a language hint | done |
 | Push-to-talk, then VAD | |
 
 Decided: STT runs in the Python core (ADR 0018). The host captures, because

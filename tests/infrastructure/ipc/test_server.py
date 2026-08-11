@@ -8,6 +8,7 @@ on Linux, which is where CI is.
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import stat
 import tempfile
@@ -26,7 +27,13 @@ from ev.infrastructure.ipc.server import (
     SessionConfirmation,
     socket_path,
 )
-from protocol.messages import PROTOCOL_VERSION, Hello, Request, UtteranceSubmit
+from protocol.messages import (
+    PROTOCOL_VERSION,
+    AudioSubmit,
+    Hello,
+    Request,
+    UtteranceSubmit,
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -311,6 +318,37 @@ async def test_a_declined_confirmation_stops_the_call(state: Path) -> None:
         break
 
 
+async def test_shutdown_does_not_wait_for_a_client_to_leave(state: Path) -> None:
+    """A daemon with a client attached must still be able to exit.
+
+    Since 3.12 `Server.wait_closed()` waits for open connections too, so this
+    hung -- on SIGTERM, in the state that will be permanent once a UI is
+    connected, taking the unflushed journal with it. Connections are closed
+    first now.
+    """
+    core = Core(ToolResult.success("browser.open_url"))
+    server = IpcServer(
+        path=socket_path(state),
+        handle=core.handle,
+        confirmation=SessionConfirmation(),
+    )
+    await server.start()
+    task = asyncio.create_task(server.serve_forever())
+
+    reader, writer = await raw(socket_path(state))
+    await write(
+        writer, Request(id="h", command=Hello(protocol=PROTOCOL_VERSION, client="t"))
+    )
+    await line(reader)
+
+    task.cancel()
+    # The client is still connected on purpose. Two seconds is the backstop;
+    # this should return immediately.
+    await asyncio.wait_for(server.aclose(), 5.0)
+
+    assert not socket_path(state).exists()
+
+
 async def test_a_client_that_never_answers_is_not_consent(state: Path) -> None:
     # The IPC equivalent of a pipe: nobody answered, so nothing runs.
     confirmation = SessionConfirmation()
@@ -379,7 +417,189 @@ async def test_an_unbound_confirmation_declines() -> None:
 async def test_a_refused_handshake_reaches_the_client(state: Path) -> None:
     core = Core()
     async for _ in start(state, core):
-        with pytest.raises(DaemonRefused, match=r"speaks 1\.0"):
+        with pytest.raises(DaemonRefused, match=r"speaks 1\.1"):
             async with IpcClient(socket_path(state), protocol="0.9"):
                 pass
+        break
+
+
+# --- audio ----------------------------------------------------------------
+
+
+async def test_audio_is_transcribed_then_routed(state: Path) -> None:
+    """The path CLAUDE.md describes: the host captures, the core transcribes.
+
+    What was heard is emitted before the turn runs, because a user who is
+    misheard should see it in the words rather than infer it from the wrong
+    action happening.
+    """
+    heard: list[tuple[bytes, str]] = []
+
+    async def transcribe(audio: Path, locale: str) -> str:
+        heard.append((audio.read_bytes(), locale))
+        return "abre example.com"
+
+    core = Core(ToolResult.success("browser.open_url", speech="Opening example.com"))
+    server = IpcServer(
+        path=socket_path(state),
+        handle=core.handle,
+        confirmation=SessionConfirmation(),
+        transcribe=transcribe,
+    )
+    await server.start()
+    task = asyncio.create_task(server.serve_forever())
+
+    try:
+        reader, writer = await raw(socket_path(state))
+        await write(
+            writer,
+            Request(id="h", command=Hello(protocol=PROTOCOL_VERSION, client="t")),
+        )
+        await line(reader)
+        await write(
+            writer,
+            Request(
+                id="1",
+                command=AudioSubmit(
+                    audio=base64.b64encode(b"RIFF....fake wav").decode(),
+                    locale="pt-PT",
+                ),
+            ),
+        )
+
+        first = await line(reader)
+        assert first["type"] == "transcription.partial"
+        assert first["text"] == "abre example.com"
+
+        assert heard == [(b"RIFF....fake wav", "pt-PT")]
+        assert core.utterances == ["abre example.com"]
+    finally:
+        task.cancel()
+        await server.aclose()
+
+
+async def test_the_recording_does_not_outlive_the_sentence(state: Path) -> None:
+    # A recording of someone's voice is not something to leave on disk after
+    # the words have been understood.
+    seen: list[Path] = []
+
+    async def transcribe(audio: Path, locale: str) -> str:
+        seen.append(audio)
+        assert audio.exists()
+        return "abre example.com"
+
+    core = Core(ToolResult.success("browser.open_url"))
+    server = IpcServer(
+        path=socket_path(state),
+        handle=core.handle,
+        confirmation=SessionConfirmation(),
+        transcribe=transcribe,
+    )
+    await server.start()
+    task = asyncio.create_task(server.serve_forever())
+
+    try:
+        reader, writer = await raw(socket_path(state))
+        await write(
+            writer,
+            Request(id="h", command=Hello(protocol=PROTOCOL_VERSION, client="t")),
+        )
+        await line(reader)
+        await write(
+            writer,
+            Request(id="1", command=AudioSubmit(audio=base64.b64encode(b"x").decode())),
+        )
+        await line(reader)
+        await line(reader)
+
+        assert seen and not seen[0].exists()
+    finally:
+        task.cancel()
+        await server.aclose()
+
+
+async def test_audio_larger_than_a_default_stream_line_gets_through(
+    state: Path,
+) -> None:
+    """asyncio caps a line at 64 KiB, and audio does not fit in that.
+
+    ~2.5 seconds of 16 kHz speech is a ~104 KB line. Before the limit was
+    raised this killed the connection with "chunk exceed the limit" and no
+    explanation -- the daemon looked like it had crashed.
+    """
+    payload = base64.b64encode(b"RIFF" + b"\0" * 200_000).decode()
+    assert len(payload) > 64 * 1024
+
+    async def transcribe(audio: Path, locale: str) -> str:
+        return "abre example.com"
+
+    core = Core(ToolResult.success("browser.open_url"))
+    server = IpcServer(
+        path=socket_path(state),
+        handle=core.handle,
+        confirmation=SessionConfirmation(),
+        transcribe=transcribe,
+    )
+    await server.start()
+    task = asyncio.create_task(server.serve_forever())
+
+    try:
+        async with IpcClient(socket_path(state)) as client:
+            await client._write(
+                Request(id="a1", command=AudioSubmit(audio=payload, locale="pt-PT"))
+            )
+            heard = await client._read()
+
+        assert heard["type"] == "transcription.partial"
+        assert core.utterances == ["abre example.com"]
+    finally:
+        task.cancel()
+        await server.aclose()
+
+
+async def test_audio_that_is_not_base64_is_refused(state: Path) -> None:
+    async def transcribe(audio: Path, locale: str) -> str:  # pragma: no cover
+        raise AssertionError("nothing should be transcribed")
+
+    core = Core()
+    server = IpcServer(
+        path=socket_path(state),
+        handle=core.handle,
+        confirmation=SessionConfirmation(),
+        transcribe=transcribe,
+    )
+    await server.start()
+    task = asyncio.create_task(server.serve_forever())
+
+    try:
+        reader, writer = await raw(socket_path(state))
+        await write(
+            writer,
+            Request(id="h", command=Hello(protocol=PROTOCOL_VERSION, client="t")),
+        )
+        await line(reader)
+        await write(
+            writer, Request(id="1", command=AudioSubmit(audio="not base64 at all!!"))
+        )
+
+        answer = await line(reader)
+        assert answer["error"]["code"] == "malformed_audio"
+    finally:
+        task.cancel()
+        await server.aclose()
+
+
+async def test_a_daemon_without_a_recognizer_says_so(state: Path) -> None:
+    core = Core()
+    async for _ in start(state, core):
+        reader, writer = await raw(socket_path(state))
+        await write(
+            writer,
+            Request(id="h", command=Hello(protocol=PROTOCOL_VERSION, client="t")),
+        )
+        await line(reader)
+        await write(writer, Request(id="1", command=AudioSubmit(audio="AAAA")))
+
+        answer = await line(reader)
+        assert answer["error"]["code"] == "no_recognizer"
         break

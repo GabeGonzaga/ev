@@ -29,6 +29,144 @@ pub mod error {
         }
     }
 }
+#[doc = "base64 of a mono 16-bit PCM WAV."]
+#[doc = r""]
+#[doc = r" <details><summary>JSON schema</summary>"]
+#[doc = r""]
+#[doc = r" ```json"]
+#[doc = "{"]
+#[doc = "  \"title\": \"Audio\","]
+#[doc = "  \"description\": \"base64 of a mono 16-bit PCM WAV.\","]
+#[doc = "  \"type\": \"string\","]
+#[doc = "  \"maxLength\": 8000000"]
+#[doc = "}"]
+#[doc = r" ```"]
+#[doc = r" </details>"]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct Audio(::std::string::String);
+impl ::std::ops::Deref for Audio {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<Audio> for ::std::string::String {
+    fn from(value: Audio) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for Audio {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() > 8000000usize {
+            return Err("longer than 8000000 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for Audio {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<&::std::string::String> for Audio {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for Audio {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for Audio {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+#[doc = "Recorded speech, on its way to be transcribed.\n\nThe host captures, because the microphone is a TCC surface and TCC grants\nattach to a code signature. The core transcribes, because that is where\n`SpeechRecognizer` lives and where the engine stays replaceable (ADR 0018).\n\nBase64 rather than a file path: a path means the audio is written to disk\nby one process and read by another, and neither owns deleting it. ~2.5\nseconds of 16 kHz mono is about 100 KB encoded, which is nothing on a local\nsocket."]
+#[doc = r""]
+#[doc = r" <details><summary>JSON schema</summary>"]
+#[doc = r""]
+#[doc = r" ```json"]
+#[doc = "{"]
+#[doc = "  \"title\": \"AudioSubmit\","]
+#[doc = "  \"description\": \"Recorded speech, on its way to be transcribed.\\n\\nThe host captures, because the microphone is a TCC surface and TCC grants\\nattach to a code signature. The core transcribes, because that is where\\n`SpeechRecognizer` lives and where the engine stays replaceable (ADR 0018).\\n\\nBase64 rather than a file path: a path means the audio is written to disk\\nby one process and read by another, and neither owns deleting it. ~2.5\\nseconds of 16 kHz mono is about 100 KB encoded, which is nothing on a local\\nsocket.\","]
+#[doc = "  \"type\": \"object\","]
+#[doc = "  \"required\": ["]
+#[doc = "    \"audio\""]
+#[doc = "  ],"]
+#[doc = "  \"properties\": {"]
+#[doc = "    \"audio\": {"]
+#[doc = "      \"title\": \"Audio\","]
+#[doc = "      \"description\": \"base64 of a mono 16-bit PCM WAV.\","]
+#[doc = "      \"type\": \"string\","]
+#[doc = "      \"maxLength\": 8000000"]
+#[doc = "    },"]
+#[doc = "    \"locale\": {"]
+#[doc = "      \"title\": \"Locale\","]
+#[doc = "      \"description\": \"The language to transcribe as. Never 'auto': auto-detect is unreliable on short utterances, and a misdetected language becomes a tool argument.\","]
+#[doc = "      \"default\": null,"]
+#[doc = "      \"anyOf\": ["]
+#[doc = "        {"]
+#[doc = "          \"type\": \"string\""]
+#[doc = "        },"]
+#[doc = "        {"]
+#[doc = "          \"type\": \"null\""]
+#[doc = "        }"]
+#[doc = "      ]"]
+#[doc = "    },"]
+#[doc = "    \"sample_rate\": {"]
+#[doc = "      \"title\": \"Sample Rate\","]
+#[doc = "      \"default\": 16000,"]
+#[doc = "      \"type\": \"integer\","]
+#[doc = "      \"maximum\": 48000.0,"]
+#[doc = "      \"minimum\": 8000.0"]
+#[doc = "    },"]
+#[doc = "    \"type\": {"]
+#[doc = "      \"title\": \"Type\","]
+#[doc = "      \"default\": \"audio.submit\","]
+#[doc = "      \"type\": \"string\","]
+#[doc = "      \"const\": \"audio.submit\""]
+#[doc = "    }"]
+#[doc = "  },"]
+#[doc = "  \"additionalProperties\": false"]
+#[doc = "}"]
+#[doc = r" ```"]
+#[doc = r" </details>"]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct AudioSubmit {
+    #[doc = "base64 of a mono 16-bit PCM WAV."]
+    pub audio: Audio,
+    #[doc = "The language to transcribe as. Never 'auto': auto-detect is unreliable on short utterances, and a misdetected language becomes a tool argument."]
+    #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+    pub locale: ::std::option::Option<::std::string::String>,
+    #[serde(default = "defaults::default_u64::<i64, 16000>")]
+    pub sample_rate: i64,
+    #[serde(rename = "type", default = "defaults::audio_submit_type")]
+    pub type_: ::std::string::String,
+}
+impl AudioSubmit {
+    pub fn builder() -> builder::AudioSubmit {
+        Default::default()
+    }
+}
 #[doc = "`Command`"]
 #[doc = r""]
 #[doc = r" <details><summary>JSON schema</summary>"]
@@ -44,6 +182,9 @@ pub mod error {
 #[doc = "      \"$ref\": \"#/$defs/UtteranceSubmit\""]
 #[doc = "    },"]
 #[doc = "    {"]
+#[doc = "      \"$ref\": \"#/$defs/AudioSubmit\""]
+#[doc = "    },"]
+#[doc = "    {"]
 #[doc = "      \"$ref\": \"#/$defs/ConfirmationRespond\""]
 #[doc = "    },"]
 #[doc = "    {"]
@@ -52,6 +193,7 @@ pub mod error {
 #[doc = "  ],"]
 #[doc = "  \"discriminator\": {"]
 #[doc = "    \"mapping\": {"]
+#[doc = "      \"audio.submit\": \"#/$defs/AudioSubmit\","]
 #[doc = "      \"confirmation.respond\": \"#/$defs/ConfirmationRespond\","]
 #[doc = "      \"hello\": \"#/$defs/Hello\","]
 #[doc = "      \"session.cancel\": \"#/$defs/SessionCancel\","]
@@ -67,6 +209,7 @@ pub mod error {
 pub enum Command {
     Hello(Hello),
     UtteranceSubmit(UtteranceSubmit),
+    AudioSubmit(AudioSubmit),
     ConfirmationRespond(ConfirmationRespond),
     SessionCancel(SessionCancel),
 }
@@ -78,6 +221,11 @@ impl ::std::convert::From<Hello> for Command {
 impl ::std::convert::From<UtteranceSubmit> for Command {
     fn from(value: UtteranceSubmit) -> Self {
         Self::UtteranceSubmit(value)
+    }
+}
+impl ::std::convert::From<AudioSubmit> for Command {
+    fn from(value: AudioSubmit) -> Self {
+        Self::AudioSubmit(value)
     }
 }
 impl ::std::convert::From<ConfirmationRespond> for Command {
@@ -273,7 +421,7 @@ impl ConfirmationRespond {
 #[doc = "    }"]
 #[doc = "  },"]
 #[doc = "  \"additionalProperties\": false,"]
-#[doc = "  \"x-ev-protocol-version\": \"1.0\""]
+#[doc = "  \"x-ev-protocol-version\": \"1.1\""]
 #[doc = "}"]
 #[doc = r" ```"]
 #[doc = r" </details>"]
@@ -662,6 +810,9 @@ impl ::std::convert::TryFrom<::std::string::String> for PermissionState {
 #[doc = "          \"$ref\": \"#/$defs/UtteranceSubmit\""]
 #[doc = "        },"]
 #[doc = "        {"]
+#[doc = "          \"$ref\": \"#/$defs/AudioSubmit\""]
+#[doc = "        },"]
+#[doc = "        {"]
 #[doc = "          \"$ref\": \"#/$defs/ConfirmationRespond\""]
 #[doc = "        },"]
 #[doc = "        {"]
@@ -670,6 +821,7 @@ impl ::std::convert::TryFrom<::std::string::String> for PermissionState {
 #[doc = "      ],"]
 #[doc = "      \"discriminator\": {"]
 #[doc = "        \"mapping\": {"]
+#[doc = "          \"audio.submit\": \"#/$defs/AudioSubmit\","]
 #[doc = "          \"confirmation.respond\": \"#/$defs/ConfirmationRespond\","]
 #[doc = "          \"hello\": \"#/$defs/Hello\","]
 #[doc = "          \"session.cancel\": \"#/$defs/SessionCancel\","]
@@ -1342,6 +1494,91 @@ impl UtteranceSubmit {
 }
 #[doc = r" Types for composing complex structures."]
 pub mod builder {
+    #[derive(Clone, Debug)]
+    pub struct AudioSubmit {
+        audio: ::std::result::Result<super::Audio, ::std::string::String>,
+        locale: ::std::result::Result<
+            ::std::option::Option<::std::string::String>,
+            ::std::string::String,
+        >,
+        sample_rate: ::std::result::Result<i64, ::std::string::String>,
+        type_: ::std::result::Result<::std::string::String, ::std::string::String>,
+    }
+    impl ::std::default::Default for AudioSubmit {
+        fn default() -> Self {
+            Self {
+                audio: Err("no value supplied for audio".to_string()),
+                locale: Ok(Default::default()),
+                sample_rate: Ok(super::defaults::default_u64::<i64, 16000>()),
+                type_: Ok(super::defaults::audio_submit_type()),
+            }
+        }
+    }
+    impl AudioSubmit {
+        pub fn audio<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<super::Audio>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.audio = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for audio: {e}"));
+            self
+        }
+        pub fn locale<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<::std::option::Option<::std::string::String>>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.locale = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for locale: {e}"));
+            self
+        }
+        pub fn sample_rate<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<i64>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.sample_rate = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for sample_rate: {e}"));
+            self
+        }
+        pub fn type_<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<::std::string::String>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.type_ = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for type_: {e}"));
+            self
+        }
+    }
+    impl ::std::convert::TryFrom<AudioSubmit> for super::AudioSubmit {
+        type Error = super::error::ConversionError;
+        fn try_from(
+            value: AudioSubmit,
+        ) -> ::std::result::Result<Self, super::error::ConversionError> {
+            Ok(Self {
+                audio: value.audio?,
+                locale: value.locale?,
+                sample_rate: value.sample_rate?,
+                type_: value.type_?,
+            })
+        }
+    }
+    impl ::std::convert::From<super::AudioSubmit> for AudioSubmit {
+        fn from(value: super::AudioSubmit) -> Self {
+            Self {
+                audio: Ok(value.audio),
+                locale: Ok(value.locale),
+                sample_rate: Ok(value.sample_rate),
+                type_: Ok(value.type_),
+            }
+        }
+    }
     #[derive(Clone, Debug)]
     pub struct ConfirmationRequired {
         arguments: ::std::result::Result<
@@ -2316,6 +2553,16 @@ pub mod builder {
 }
 #[doc = r" Generation of default values for serde."]
 pub mod defaults {
+    pub(super) fn default_u64<T, const V: u64>() -> T
+    where
+        T: ::std::convert::TryFrom<u64>,
+        <T as ::std::convert::TryFrom<u64>>::Error: ::std::fmt::Debug,
+    {
+        T::try_from(V).unwrap()
+    }
+    pub(super) fn audio_submit_type() -> ::std::string::String {
+        "audio.submit".to_string()
+    }
     pub(super) fn confirmation_required_type() -> ::std::string::String {
         "confirmation.required".to_string()
     }

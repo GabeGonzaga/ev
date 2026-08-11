@@ -30,9 +30,17 @@ from pydantic import BaseModel, ConfigDict, Field
 from ev.domain.permissions import Permission, PermissionState
 from ev.domain.risk import RiskLevel
 
-PROTOCOL_VERSION = "1.0"
+MAX_AUDIO_BASE64 = 8_000_000
+"""About three minutes of 16 kHz mono, encoded. A bound rather than a target:
+push-to-talk utterances are seconds long, and an unbounded field on a socket is
+a promise to buffer whatever arrives."""
+
+PROTOCOL_VERSION = "1.1"
 """Major.minor. The handshake compares it exactly: a mismatch refuses the
 connection rather than degrading into a conversation neither side understands.
+
+1.1 added `audio.submit`. A client that only knows 1.0 is refused rather than
+served a subset, because "some of the protocol" is not a protocol.
 """
 
 
@@ -62,6 +70,33 @@ class UtteranceSubmit(Message):
     )
 
 
+class AudioSubmit(Message):
+    """Recorded speech, on its way to be transcribed.
+
+    The host captures, because the microphone is a TCC surface and TCC grants
+    attach to a code signature. The core transcribes, because that is where
+    `SpeechRecognizer` lives and where the engine stays replaceable (ADR 0018).
+
+    Base64 rather than a file path: a path means the audio is written to disk
+    by one process and read by another, and neither owns deleting it. ~2.5
+    seconds of 16 kHz mono is about 100 KB encoded, which is nothing on a local
+    socket.
+    """
+
+    type: Literal["audio.submit"] = "audio.submit"
+    audio: str = Field(
+        max_length=MAX_AUDIO_BASE64,
+        description="base64 of a mono 16-bit PCM WAV.",
+    )
+    sample_rate: int = Field(default=16000, ge=8000, le=48000)
+    locale: str | None = Field(
+        default=None,
+        description="The language to transcribe as. Never 'auto': auto-detect "
+        "is unreliable on short utterances, and a misdetected language becomes "
+        "a tool argument.",
+    )
+
+
 class ConfirmationRespond(Message):
     type: Literal["confirmation.respond"] = "confirmation.respond"
     request: str = Field(description="The id of the confirmation.required event.")
@@ -73,7 +108,7 @@ class SessionCancel(Message):
 
 
 Command = Annotated[
-    Hello | UtteranceSubmit | ConfirmationRespond | SessionCancel,
+    Hello | UtteranceSubmit | AudioSubmit | ConfirmationRespond | SessionCancel,
     Field(discriminator="type"),
 ]
 

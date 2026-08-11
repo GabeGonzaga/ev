@@ -1,7 +1,7 @@
 PY ?= $(shell [ -x .venv/bin/python ] && echo .venv/bin/python || echo python3)
 
 .DEFAULT_GOAL := help
-.PHONY: help test lint format install eval protocol protocol-check rust sign
+.PHONY: help test lint format install eval protocol protocol-check rust sign models
 
 help:
 	@echo "test     run the suite (must pass on Linux and macOS alike)"
@@ -13,6 +13,7 @@ help:
 	@echo "protocol regenerate protocol/generated/ from protocol/messages.py"
 	@echo "rust     fmt, clippy, test and build the native host. Needs cargo"
 	@echo "sign     code-sign the host with your Apple Development identity"
+	@echo "models   download model weights and verify their checksums"
 
 test:
 	$(PY) -m pytest
@@ -23,6 +24,12 @@ eval:
 
 CARGO ?= $(shell command -v cargo 2>/dev/null || echo $(HOME)/.cargo/bin/cargo)
 HOST := native/target/release/ev-host
+
+models:
+	$(PY) models/download.py
+
+models-check:
+	$(PY) models/download.py --check
 
 protocol:
 	$(PY) -m protocol.export
