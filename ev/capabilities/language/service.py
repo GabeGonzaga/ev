@@ -28,12 +28,20 @@ spelling.
 exactly as they are.
 - Keep the formatting, the line breaks and the punctuation of the original.
 - If the text is already in the target language, return it unchanged.
+- Also report `source`: the language the original is written in, as one of \
+pt-PT, en, es, fr, de, it, or other.
 """
 
 SCHEMA: dict[str, Any] = {
     "type": "object",
-    "properties": {"text": {"type": "string"}},
-    "required": ["text"],
+    "properties": {
+        "text": {"type": "string"},
+        # Asked for in the same call, never a second one. It is what makes an
+        # echo detectable: text unchanged is legitimate when the source is
+        # already the target, and a silent failure when it is not.
+        "source": {"type": "string"},
+    },
+    "required": ["text", "source"],
 }
 
 NAMES = {
@@ -75,9 +83,21 @@ class LanguageService:
                 ],
                 schema=SCHEMA,
             )
-            translated = json.loads(content)["text"]
+            payload = json.loads(content)
+            translated = payload["text"]
             if not isinstance(translated, str) or not translated.strip():
                 raise ValueError("the model returned no text")
+
+            source = str(payload.get("source", "")).casefold()
+            if translated.strip() == args.text.strip() and source != args.to.casefold():
+                # Measured on two models: both hand back the input unchanged on
+                # some inputs, and without this the caller cannot tell that
+                # from a legitimate no-op. Reporting success here would be the
+                # failure that looks like a success.
+                raise ValueError(
+                    f"the model returned the text unchanged, and reports it is "
+                    f"written in {source or 'an unknown language'}"
+                )
         except Exception as error:
             # Caught here rather than left to the registry, because the
             # contract is specific: a translation failure gives back what the

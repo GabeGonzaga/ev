@@ -17,5 +17,14 @@ class OpenUrlArgs(BaseModel):
     url: HttpUrl = Field(
         # The description reaches the model in the generated spec; the type is
         # what enforces it. Both come from this one declaration.
-        description="An http or https URL. Other schemes are refused.",
+        #
+        # The scheme sentence is there because of a measurement: a model that
+        # routed "look at example.com/pricing in my browser" perfectly still
+        # wrote the bare domain, which HttpUrl refuses, so a correct routing
+        # died as INVALID_ARGUMENTS. See `make eval`.
+        description=(
+            "A full http or https URL, including the scheme, "
+            "for example https://example.com/pricing. Other schemes are "
+            "refused, and a bare domain without https:// is refused."
+        ),
     )

@@ -21,6 +21,27 @@ decision someone made, not a surprise.
 must fall through to the model router rather than being answered by a regex
 that happened to fit.
 
-Cases in this directory are deterministic and run in `make test`. Model
-routing evals — tier 2, non-deterministic, needing weights — are `make eval`
-and are not in CI.
+Cases in `routing/` are deterministic and run in `make test`.
+
+## Model evals — `make eval`
+
+Not in CI: they need weights and are not deterministic.
+
+    make eval                                    # the configured model
+    make eval ARGS='--model qwen3:8b --model llama3.1:8b'
+    make eval ARGS='--only translation'
+
+| Directory | Measures |
+|---|---|
+| `model/routing.jsonl` | tier 2: does it pick the right tool, decline when it should, and produce arguments the tool accepts |
+| `translation/cases.jsonl` | does it translate, keep identifiers, and stay in pt-PT rather than drifting to pt-BR |
+
+Two columns are worth reading before the totals:
+
+* **invented a tool** — how often it answered when it should have declined.
+* **echoed AND claimed** — input returned unchanged and reported as done. This
+  is the failure that looks like a success, and it must be zero.
+
+The threshold sweep prints, for every candidate confidence threshold, how many
+correct answers it would refuse and how many wrong ones it would run. See
+ADR 0012 for what the first runs showed.

@@ -1,0 +1,18 @@
+{"id": "play-album-natural", "locale": "en", "utterance": "put on Blonde by Frank Ocean", "tool": "music.play", "arguments": {"name": "Blonde"}}
+{"id": "play-album-natural", "locale": "pt-PT", "utterance": "quero ouvir o Blonde do Frank Ocean", "tool": "music.play", "arguments": {"name": "Blonde"}}
+{"id": "play-named-playlist", "locale": "en", "utterance": "start my Focus playlist", "tool": "music.play", "arguments": {"name": "Focus", "kind": "playlist"}}
+{"id": "play-named-playlist", "locale": "pt-PT", "utterance": "começa a minha playlist Focus", "tool": "music.play", "arguments": {"name": "Focus", "kind": "playlist"}}
+{"id": "open-site-descriptive", "locale": "en", "utterance": "take me to the github website", "tool": "browser.open_url", "arguments": {"url": "github.com"}}
+{"id": "open-site-descriptive", "locale": "pt-PT", "utterance": "leva-me ao site do github", "tool": "browser.open_url", "arguments": {"url": "github.com"}}
+{"id": "open-url-in-a-sentence", "locale": "en", "utterance": "I need to look at example.com/pricing in my browser", "tool": "browser.open_url", "arguments": {"url": "example.com/pricing"}}
+{"id": "open-url-in-a-sentence", "locale": "pt-PT", "utterance": "preciso de ver o example.com/pricing no browser", "tool": "browser.open_url", "arguments": {"url": "example.com/pricing"}}
+{"id": "translate-unquoted", "locale": "en", "utterance": "how do I say good morning in Portuguese", "tool": "language.translate", "arguments": {"to": "pt-PT"}}
+{"id": "translate-unquoted", "locale": "pt-PT", "utterance": "como se diz bom dia em inglês", "tool": "language.translate", "arguments": {"to": "en"}}
+{"id": "decline-general-knowledge", "locale": "en", "utterance": "what is the capital of Portugal", "tool": null, "arguments": {}}
+{"id": "decline-general-knowledge", "locale": "pt-PT", "utterance": "qual é a capital de Portugal", "tool": null, "arguments": {}}
+{"id": "decline-no-such-tool", "locale": "en", "utterance": "empty the trash and restart the machine", "tool": null, "arguments": {}}
+{"id": "decline-no-such-tool", "locale": "pt-PT", "utterance": "esvazia o lixo e reinicia o computador", "tool": null, "arguments": {}}
+{"id": "decline-chitchat", "locale": "en", "utterance": "thanks, that was helpful", "tool": null, "arguments": {}}
+{"id": "decline-chitchat", "locale": "pt-PT", "utterance": "obrigado, ajudou muito", "tool": null, "arguments": {}}
+{"id": "decline-time", "locale": "en", "utterance": "what time is it", "tool": null, "arguments": {}}
+{"id": "decline-time", "locale": "pt-PT", "utterance": "que horas são", "tool": null, "arguments": {}}

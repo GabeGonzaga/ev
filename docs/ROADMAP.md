@@ -48,7 +48,7 @@ mutates the library and remains a later decision.
 | Tier 2 routing with structured output | done |
 | Confidence policy, wired into the turn | done |
 | Translation capability | done |
-| `make eval` and tier 2 golden cases | |
+| `make eval` and tier 2 golden cases | done |
 
 `make eval` has two specific jobs waiting for it, both from observed behaviour
 rather than theory:

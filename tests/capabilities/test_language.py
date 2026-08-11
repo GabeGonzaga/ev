@@ -38,8 +38,8 @@ class Failing:
         raise self.error
 
 
-def translating(text: str) -> FakeModel:
-    return FakeModel(json.dumps({"text": text}))
+def translating(text: str, source: str = "other") -> FakeModel:
+    return FakeModel(json.dumps({"text": text, "source": source}))
 
 
 class CollectingJournal:
@@ -168,6 +168,48 @@ async def test_unparseable_output_is_a_failure_not_a_guess() -> None:
 
     assert not result.ok
     assert result.data["text"] == "Good morning"
+
+
+@pytest.mark.asyncio
+async def test_an_echo_is_a_failure_not_a_translation() -> None:
+    # Measured on two models: both hand back the input unchanged on some
+    # inputs. Reported as a success it is undetectable, so the source language
+    # is asked for in the same call and used to tell the two cases apart.
+    registry = build(translating("Bom dia, tudo bem?", source="pt-PT"))
+
+    result = await registry.call(
+        "language.translate", {"text": "Bom dia, tudo bem?", "to": "en"}
+    )
+
+    assert not result.ok
+    assert result.error is not None
+    assert "unchanged" in result.error.message
+    assert result.data == {"text": "Bom dia, tudo bem?", "translated": False}
+
+
+@pytest.mark.asyncio
+async def test_text_already_in_the_target_language_is_not_an_echo() -> None:
+    # The legitimate no-op. Nothing to translate, and saying so is correct.
+    registry = build(translating("Bom dia", source="pt-PT"))
+
+    result = await registry.call(
+        "language.translate", {"text": "Bom dia", "to": "pt-PT"}
+    )
+
+    assert result.ok
+    assert result.data["text"] == "Bom dia"
+
+
+@pytest.mark.asyncio
+async def test_the_source_language_costs_no_extra_call() -> None:
+    # Same request, one more field. CLAUDE.md: do not add an LLM call that an
+    # existing call could have covered.
+    model = translating("Good morning", source="pt-PT")
+    service = LanguageService(model)
+
+    await service.translate(TranslateArgs(text="Bom dia", to="en"))
+
+    assert len(model.messages) == 2
 
 
 @pytest.mark.asyncio

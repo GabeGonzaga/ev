@@ -90,8 +90,11 @@ structure shaped by symmetry rather than by a decision.
 
 ## What does not exist yet
 
-No voice, no native host, no UI. Tier 2 and the generation path exist;
-`make eval` does not, so nothing here is measured yet.
+No voice, no native host, no UI.
+
+Tier 2, the generation path and `make eval` exist. What the first measurements
+showed is ADR 0012 — including that self-reported confidence carried almost no
+information, and that a routing call took 3.5 s against a 900 ms budget.
 
 The suite reaches no model at all. An autouse fixture fails any test that would
 open a socket to Ollama, because that test would pass or fail according to
@@ -130,3 +133,4 @@ nothing, because `open(1)` needs nothing.
 | [0009](adr/0009-the-model-is-configuration.md) | The model is configuration; the client is httpx |
 | [0010](adr/0010-confidence-has-three-bands.md) | Confidence has three bands; the middle one asks |
 | [0011](adr/0011-generated-text-is-content-typed.md) | Generated text is content-typed; a failed translation returns the original |
+| [0012](adr/0012-what-the-evals-measured.md) | What the evals measured, and what changed because of it |
