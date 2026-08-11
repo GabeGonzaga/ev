@@ -75,6 +75,22 @@ rather than theory:
 | TypeScript generation | with the UI, phase 3 |
 | Signed native host skeleton | done |
 
+## Phase 2
+
+| | |
+|---|---|
+| `SpeechSynthesizer`, and the host speaking `speech.requested` | done |
+| Audio capture in the host, shipped to the core | |
+| whisper.cpp behind `SpeechRecognizer`, with a language hint | |
+| Push-to-talk, then VAD | |
+
+Decided: STT runs in the Python core (ADR 0018). The host captures, because
+the microphone is a TCC surface and TCC belongs to the signed process.
+
+Audible gap, now that it speaks: tool responses are composed in English, so a
+pt-PT voice reads English words. Locale-aware responses need session context,
+which is not built.
+
 ## What each phase is waiting for
 
 **Phase 1** needs the tier 2 seam, which exists: `StaticRouter.resolve()`

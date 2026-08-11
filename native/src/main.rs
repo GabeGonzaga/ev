@@ -34,7 +34,7 @@ mod protocol;
 
 use std::io::{self, Write};
 use std::path::PathBuf;
-use std::process::ExitCode;
+use std::process::{Command, ExitCode};
 
 use serde_json::Value;
 
@@ -71,14 +71,45 @@ fn ask(event: &Value) -> bool {
     )
 }
 
-fn run(socket: PathBuf, utterance: String) -> Result<u8, Error> {
+/// The pt-PT voice. Without naming her, macOS reads a Portuguese sentence
+/// with whatever the system default is, which is usually Brazilian or English.
+fn voice_for(locale: &str) -> Option<&'static str> {
+    match locale {
+        "pt-PT" => Some("Joana"),
+        _ => None,
+    }
+}
+
+/// Speaking is the host's job because the audio device is the host's. `say` is
+/// the development engine; AVSpeechSynthesizer replaces it in the application,
+/// and nothing on the Python side changes when it does.
+fn speak(text: &str, locale: &str) {
+    let mut command = Command::new("say");
+    if let Some(voice) = voice_for(locale) {
+        command.arg("-v").arg(voice);
+    }
+    // "--" ends option parsing: a sentence starting with "-" is a sentence.
+    command.arg("--").arg(text);
+
+    if let Err(error) = command.status() {
+        // Failing to speak is not a reason to fail a turn that already
+        // happened. The words are on screen either way.
+        eprintln!("could not speak: {error}");
+    }
+}
+
+fn run(socket: PathBuf, utterance: String, aloud: bool) -> Result<u8, Error> {
     let mut client = Client::connect(&socket)?;
     let turn = client.submit(&utterance, None, &mut ask)?;
 
     for spoken in &turn.speech {
         // speech.requested is the daemon asking for a sentence to be spoken.
-        // A terminal speaks by printing; the audio device arrives in phase 2.
+        // It crosses as intent -- a sentence and a voice -- and the host turns
+        // it into sound.
         println!("{}", spoken.text);
+        if aloud {
+            speak(&spoken.text, &spoken.voice);
+        }
     }
 
     let payload = &turn.response.payload;
@@ -97,9 +128,11 @@ fn main() -> ExitCode {
     let mut arguments = std::env::args().skip(1);
     let mut socket = default_socket();
     let mut words: Vec<String> = Vec::new();
+    let mut aloud = false;
 
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
+            "--speak" => aloud = true,
             "--socket" => match arguments.next() {
                 Some(path) => socket = PathBuf::from(path),
                 None => {
@@ -112,12 +145,12 @@ fn main() -> ExitCode {
     }
 
     if words.is_empty() {
-        eprintln!("usage: ev-host [--socket PATH] <utterance>");
+        eprintln!("usage: ev-host [--socket PATH] [--speak] <utterance>");
         return ExitCode::from(EXIT_NOT_UNDERSTOOD);
     }
 
     let _ = io::stdout().flush();
-    match run(socket, words.join(" ")) {
+    match run(socket, words.join(" "), aloud) {
         Ok(code) => ExitCode::from(code),
         Err(error @ Error::Unavailable(_)) => {
             eprintln!("{error}");

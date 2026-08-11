@@ -58,13 +58,14 @@ satisfy them structurally, which is why neither imports the other.
 
 ## One door per subsystem
 
-Each subsystem has one public port. Today there are four:
+Each subsystem has one public port. Today there are five:
 
 | Port | Owns |
 |---|---|
 | `ProcessRunner` | every subprocess. argv only — no shell, no `cwd`, no `env` |
 | `AppleScriptClient` | every AppleScript. Constant source, values as `argv` |
 | `OllamaClient` | every model call, both paths. Local HTTP, model from config |
+| `SpeechSynthesizer` | saying things. `say(1)` in development, the host in the app |
 | `IpcServer` | the socket. Handshake, framing, correlation, confirmations |
 
 `AppleScriptClient` goes through `ProcessRunner` rather than around it.
@@ -95,8 +96,9 @@ structure shaped by symmetry rather than by a decision.
 
 ## What does not exist yet
 
-No voice, no UI. The native host exists as a signed binary that speaks the
-protocol and nothing else: no audio, no TCC-facing capability, no Tauri.
+No UI, and no ears. The host speaks -- `speech.requested` becomes `say` with
+the pt-PT voice -- but nothing captures audio yet, so every utterance is still
+typed. No TCC-facing capability is implemented, no Tauri.
 
 Tier 2, the generation path and `make eval` exist. `qwen3:8b` is the measured
 default (ADR 0013): 17/18 routing, 0/8 inventions, 10/10 arguments accepted.
@@ -149,3 +151,4 @@ nothing, because `open(1)` needs nothing.
 | [0015](adr/0015-the-protocol-is-authored-in-pydantic.md) | The protocol is authored in Pydantic and shipped as JSON Schema |
 | [0016](adr/0016-the-daemon-and-why-not-for-the-reason-given.md) | The daemon, and not for the reason I gave |
 | [0017](adr/0017-the-native-host-skeleton.md) | The native host skeleton, and what a second language found |
+| [0018](adr/0018-where-speech-happens.md) | Where speech happens: capture is native, transcription is core |

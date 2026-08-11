@@ -295,6 +295,43 @@ def test_the_model_flag_repoints_every_role(tmp_path: Path) -> None:
     assert application.settings.models() == ["llama3.1:8b"]
 
 
+def test_speak_says_the_answer_out_loud(tmp_path: Path, fake_bin: FakeBin) -> None:
+    database = tmp_path / "ev.db"
+
+    assert main(["--database", str(database), "--speak", "abre example.com"]) == EXIT_OK
+
+    # Two processes ran: open(1) did the work, say(1) reported it.
+    runs = fake_bin.runs()
+    assert [run[0] for run in runs] == ["open", "say"]
+    assert runs[1][1:] == ["--", "Opening example.com"]
+
+
+def test_the_locale_chooses_the_voice(tmp_path: Path, fake_bin: FakeBin) -> None:
+    # Known gap, audible now that it speaks: the sentence is composed in
+    # English by the tool, so Joana reads English. Locale-aware responses need
+    # session context, which does not exist yet.
+    main(
+        [
+            "--database",
+            str(tmp_path / "ev.db"),
+            "--speak",
+            "--locale",
+            "pt-PT",
+            "abre example.com",
+        ]
+    )
+
+    assert fake_bin.runs()[1] == ["say", "-v", "Joana", "--", "Opening example.com"]
+
+
+def test_without_speak_nothing_is_said(tmp_path: Path, fake_bin: FakeBin) -> None:
+    # Speaking is opt-in on the CLI. A terminal that talks unbidden is a
+    # surprise, and the native host is what speaks in the application.
+    main(["--database", str(tmp_path / "ev.db"), "abre example.com"])
+
+    assert [run[0] for run in fake_bin.runs()] == ["open"]
+
+
 # --- confirmation ---------------------------------------------------------
 
 

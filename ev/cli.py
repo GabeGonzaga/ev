@@ -58,6 +58,7 @@ from ev.infrastructure.permissions import (
     parse_permission,
     save_grants,
 )
+from ev.infrastructure.speech.synthesizer import SaySynthesizer, SpeechSynthesizer
 from ev.registry import CallRecord, ConfirmationPort, JournalPort, Registry
 from ev.router.model import Completion, ModelRouter
 from ev.router.static import StaticRouter
@@ -252,7 +253,12 @@ def render(result: ToolResult) -> str:
     return result.error.message if result.error else f"failed: {result.tool}"
 
 
-async def turn(application: Application, utterance: str) -> int:
+async def turn(
+    application: Application,
+    utterance: str,
+    voice: SpeechSynthesizer | None = None,
+    locale: str | None = None,
+) -> int:
     try:
         outcome = await application.assistant.handle(utterance)
     except OllamaError as error:
@@ -265,8 +271,15 @@ async def turn(application: Application, utterance: str) -> int:
         return EXIT_NOT_UNDERSTOOD
 
     if isinstance(outcome, Clarification):
-        print(render_clarification(outcome), file=sys.stderr)
+        spoken = render_clarification(outcome)
+        print(spoken, file=sys.stderr)
+        if voice is not None:
+            # A question is worth hearing; it is the one the user must answer.
+            await voice.speak(outcome.response or spoken, voice=locale)
         return EXIT_UNSURE
+
+    if voice is not None and outcome.speech:
+        await voice.speak(outcome.speech, voice=locale)
 
     if outcome.ok:
         print(render(outcome))
@@ -276,7 +289,11 @@ async def turn(application: Application, utterance: str) -> int:
     return EXIT_FAILED
 
 
-async def repl(application: Application) -> int:
+async def repl(
+    application: Application,
+    voice: SpeechSynthesizer | None = None,
+    locale: str | None = None,
+) -> int:
     while True:
         try:
             utterance = input("ev> ").strip()
@@ -289,7 +306,7 @@ async def repl(application: Application) -> int:
                 return EXIT_OK
             continue
 
-        await turn(application, utterance)
+        await turn(application, utterance, voice, locale)
 
 
 def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
@@ -323,6 +340,20 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         default=[],
         metavar="PERMISSION",
         help="undo a --grant. Repeatable.",
+    )
+    parser.add_argument(
+        "--locale",
+        default=None,
+        metavar="TAG",
+        help="the session locale, e.g. pt-PT. It chooses the voice and is "
+        "carried to the daemon. It never touches the utterance: translating "
+        "before routing would mistranslate the arguments.",
+    )
+    parser.add_argument(
+        "--speak",
+        action="store_true",
+        help="say the answer out loud, with the pt-PT voice when the locale "
+        "asks for it. Development TTS: the native host speaks in the app.",
     )
     parser.add_argument(
         "--serve",
@@ -367,16 +398,17 @@ async def run(args: argparse.Namespace, completion: Completion | None = None) ->
         return await serve(database=database, model=args.model, completion=completion)
 
     application = build(database=database, model=args.model, completion=completion)
+    voice = SaySynthesizer(ProcessRunner()) if args.speak else None
     try:
         if args.repl:
-            return await repl(application)
+            return await repl(application, voice, args.locale)
 
         utterance = " ".join(args.utterance).strip()
         if not utterance:
             print("nothing to do. Try --repl or an utterance.", file=sys.stderr)
             return EXIT_NOT_UNDERSTOOD
 
-        return await turn(application, utterance)
+        return await turn(application, utterance, voice, args.locale)
     finally:
         await application.aclose()
 
@@ -457,7 +489,9 @@ async def connected(state_dir: Path, args: argparse.Namespace) -> int:
 
     try:
         async with IpcClient(socket_path(state_dir)) as client:
-            response, events = await client.submit(utterance, ask=_ask_on_terminal)
+            response, events = await client.submit(
+                utterance, locale=args.locale, ask=_ask_on_terminal
+            )
     except (DaemonUnavailable, DaemonRefused) as error:
         print(str(error), file=sys.stderr)
         return EXIT_UNAVAILABLE
