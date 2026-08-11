@@ -56,6 +56,7 @@ Each subsystem has one public port. Today there is one:
 |---|---|
 | `ProcessRunner` | every subprocess. argv only — no shell, no `cwd`, no `env` |
 | `AppleScriptClient` | every AppleScript. Constant source, values as `argv` |
+| `OllamaClient` | every model call, both paths. Local HTTP, model from config |
 
 `AppleScriptClient` goes through `ProcessRunner` rather than around it.
 
@@ -75,6 +76,7 @@ structure shaped by symmetry rather than by a decision.
 | `ev/router/` gains a module | tier 2 arrives (phase 1) |
 | `PolicyDecision` gains `REQUEST_PERMISSION` | a native host exists that can service it |
 | A journal read API | something reads history — the CLI or phase 3 |
+| Streaming model responses | something can render a partial answer |
 | `sqlite-vec`, FTS5 | retrieval actually lands (phase 4) |
 | `protocol/` | phase 1.5 |
 | A second resident model | never on the interactive path |
@@ -115,3 +117,4 @@ nothing, because `open(1)` needs nothing.
 | [0006](adr/0006-the-static-router-escalates-rather-than-guesses.md) | The static router escalates rather than guesses |
 | [0007](adr/0007-asserted-permissions-until-a-host-reports-them.md) | The user may assert a permission until a host reports it |
 | [0008](adr/0008-applescript-values-travel-as-argv.md) | AppleScript values travel as argv; albums start at a track |
+| [0009](adr/0009-the-model-is-configuration.md) | The model is configuration; the client is httpx |

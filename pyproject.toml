@@ -5,6 +5,9 @@ description = "Local-first personal assistant for macOS"
 requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.13,<3",
+    # Talks to Ollama on 127.0.0.1 and nothing else. Its MockTransport is what
+    # keeps the suite hermetic: no Ollama, no network, green on CI Linux.
+    "httpx>=0.28,<0.29",
 ]
 
 [project.optional-dependencies]
