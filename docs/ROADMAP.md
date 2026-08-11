@@ -51,10 +51,10 @@ mutates the library and remains a later decision.
 | `make eval` and tier 2 golden cases | done |
 | Model chosen by measurement, not guess | done |
 
-Open, and deliberately not decided here: the model path measures 1.31 s against
-a 900 ms budget, after ADR 0014 cut it from 2.06 s by stopping the router
-narrating its tool calls. Prompt size was measured and is not the lever. What
-is left is a smaller model or an honest budget.
+The latency table in `CLAUDE.md` now records measurements rather than guesses,
+and marks which rows are still targets. The model path is 2.0 s against an
+original 1.8 s; the remaining gap is generation, so the levers are a smaller
+model or fewer output tokens.
 
 `make eval` has two specific jobs waiting for it, both from observed behaviour
 rather than theory:

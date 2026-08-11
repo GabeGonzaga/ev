@@ -337,27 +337,44 @@ scaffolded.
 
 ## Latency budget
 
-Measured from push-to-talk release to first audio out. These are targets to be
-verified, not assumptions.
+Measured from push-to-talk release to first audio out. Every row says whether
+it is a measurement or still a guess, because the two were indistinguishable
+here until phase 1 and the guesses were wrong in both directions.
 
-| Stage | Budget |
-|---|---|
-| STT (whisper small, ~3 s utterance, Metal) | 400 ms |
-| Static router hit | 5 ms |
-| Model router (8B q4 resident, ~60 tokens) | 900 ms |
-| Tool execution (AppleScript) | 300 ms |
-| TTS first audio | 200 ms |
-| **Deterministic path, total** | **700 ms** |
-| **Model path, total** | **1.8 s** |
+| Stage | Budget | State |
+|---|---|---|
+| STT (whisper small, ~3 s utterance, Metal) | 400 ms | target, not built |
+| Static router hit | 1 ms | **measured 0.005 ms** |
+| Model router (8B q4 resident, ~24 tokens out) | 1.4 s | **measured 1.31 s** |
+| Tool execution (AppleScript, no app target) | 100 ms | **measured 62 ms** |
+| Tool execution (AppleScript, driving an app) | 300 ms | target, unmeasured |
+| TTS first audio | 200 ms | target, not built |
+| **Deterministic path, total** | **700 ms** | 2 of 3 rows still targets |
+| **Model path, total** | **2.0 s** | dominated by the measured router |
+
+Measured on an M2 Pro, `qwen3:8b`, model resident, 18 routing cases.
+Reproduce with `make eval`; the per-stage numbers are in ADR 0012, 0013 and
+0014.
+
+**A cold model costs more than the whole budget.** A reload measured 7.46 s
+against 0.40 s warm, which is why `keep_alive` is 30 minutes and why a second
+resident model is a decision rather than a detail.
 
 Consequences that are already rules:
 
-- Deterministic commands use the static router and never invoke Ollama.
+- Deterministic commands use the static router and never invoke Ollama. This is
+  worth more than it looked: the real ratio is 0.005 ms against 1.31 s.
 - Stream model responses where it shortens perceived latency.
 - Do not add an LLM call that an existing call could have covered.
-- Voice responses are concise by default.
+- Voice responses are concise by default, **and so is the router**: it fills
+  `response` only to ask a question, never to narrate a tool call. Not doing so
+  cost 0.75 s per turn (ADR 0014).
 - Do not hold the LLM, STT model, vision model and neural TTS resident
   simultaneously. Load the vision model on capture, unload after.
+
+The model path is over its original 1.8 s. What remains is generation, so the
+levers are a smaller model or fewer output tokens; prompt size was measured and
+is not one.
 
 ---
 
