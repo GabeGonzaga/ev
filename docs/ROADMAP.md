@@ -70,7 +70,7 @@ rather than theory:
 | | |
 |---|---|
 | `protocol/`: message types, versioned handshake, committed JSON Schema | done |
-| `ev/infrastructure/ipc/`: the Unix socket daemon | |
+| `ev/infrastructure/ipc/`: the Unix socket daemon, with the CLI as its client | done |
 | Rust and TypeScript generation from the artifact | with the host |
 | Signed native host skeleton | |
 

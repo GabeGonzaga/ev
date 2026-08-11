@@ -9,18 +9,23 @@ fake confirmation surface.
     python -m ev.cli --repl
     python -m ev.cli --specs
     python -m ev.cli --manifest
+    python -m ev.cli --serve                       the daemon
+    python -m ev.cli --connect "abre example.com"  a turn through it
 """
 
 from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
+import signal
 import sqlite3
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from ev.application.assistant import Assistant
 from ev.application.confirmation import ConfirmationRequest
@@ -37,6 +42,8 @@ from ev.domain.results import Clarification, ToolResult
 from ev.infrastructure.database.connection import connect, default_database_path
 from ev.infrastructure.database.journal import SqliteJournal
 from ev.infrastructure.database.migrations import migrate
+from ev.infrastructure.ipc.client import DaemonRefused, DaemonUnavailable, IpcClient
+from ev.infrastructure.ipc.server import IpcServer, SessionConfirmation, socket_path
 from ev.infrastructure.macos.applescript import AppleScriptClient
 from ev.infrastructure.macos.processes import ProcessRunner
 from ev.infrastructure.ollama.client import OllamaClient, OllamaError
@@ -318,6 +325,17 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         help="undo a --grant. Repeatable.",
     )
     parser.add_argument(
+        "--serve",
+        action="store_true",
+        help="run the daemon: one warm core, several clients, on a Unix socket "
+        "beside the journal. A cold model costs 7.5 s; this pays it once.",
+    )
+    parser.add_argument(
+        "--connect",
+        action="store_true",
+        help="send the utterance to a running daemon instead of starting a core",
+    )
+    parser.add_argument(
         "--model",
         default=None,
         metavar="NAME",
@@ -342,6 +360,12 @@ async def run(args: argparse.Namespace, completion: Completion | None = None) ->
     if args.grant or args.revoke:
         return update_grants(database.parent, args.grant, args.revoke)
 
+    if args.connect:
+        return await connected(database.parent, args)
+
+    if args.serve:
+        return await serve(database=database, model=args.model, completion=completion)
+
     application = build(database=database, model=args.model, completion=completion)
     try:
         if args.repl:
@@ -355,6 +379,104 @@ async def run(args: argparse.Namespace, completion: Completion | None = None) ->
         return await turn(application, utterance)
     finally:
         await application.aclose()
+
+
+async def serve(
+    *, database: Path, model: str | None, completion: Completion | None
+) -> int:
+    """Run until interrupted.
+
+    The registry is built once and outlives every client, so its confirmation
+    port follows whoever is currently asking rather than being a terminal.
+    """
+    confirmation = SessionConfirmation()
+    application = build(
+        database=database, confirmation=confirmation, model=model, completion=completion
+    )
+    server = IpcServer(
+        path=socket_path(database.parent),
+        handle=application.assistant.handle,
+        confirmation=confirmation,
+        on_close=application.aclose,
+    )
+
+    try:
+        await server.start()
+    except OSError as error:
+        print(str(error), file=sys.stderr)
+        await application.aclose()
+        return EXIT_FAILED
+
+    print(f"listening on {socket_path(database.parent)}", file=sys.stderr)
+
+    # A daemon is stopped by a signal, not by Ctrl-C in a terminal. Without
+    # this, SIGTERM kills the process between a turn and the journal flush,
+    # and the action that just ran is never recorded -- which ADR 0004 calls a
+    # defect rather than an inconvenience.
+    loop = asyncio.get_running_loop()
+    stopping = asyncio.Event()
+    for name in (signal.SIGINT, signal.SIGTERM):
+        with contextlib.suppress(NotImplementedError):
+            loop.add_signal_handler(name, stopping.set)
+
+    serving = asyncio.create_task(server.serve_forever())
+    try:
+        await asyncio.wait(
+            [serving, asyncio.create_task(stopping.wait())],
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        pass
+    finally:
+        serving.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await serving
+        await server.aclose()
+
+    return EXIT_OK
+
+
+def _ask_on_terminal(event: dict[str, Any]) -> bool:
+    arguments = dict(event.get("arguments", {}))
+    detail = ", ".join(f"{key}={value}" for key, value in arguments.items())
+    print(f"{event['tool']} ({event['risk']}) {detail}", file=sys.stderr)
+
+    if not sys.stdin.isatty():
+        print("declined: not a terminal", file=sys.stderr)
+        return False
+
+    return input("run it? [y/N] ").strip().casefold() in {"y", "yes", "s", "sim"}
+
+
+async def connected(state_dir: Path, args: argparse.Namespace) -> int:
+    """One turn through a running daemon, which already has the model loaded."""
+    utterance = " ".join(args.utterance).strip()
+    if not utterance:
+        print("nothing to do. Try an utterance.", file=sys.stderr)
+        return EXIT_NOT_UNDERSTOOD
+
+    try:
+        async with IpcClient(socket_path(state_dir)) as client:
+            response, events = await client.submit(utterance, ask=_ask_on_terminal)
+    except (DaemonUnavailable, DaemonRefused) as error:
+        print(str(error), file=sys.stderr)
+        return EXIT_UNAVAILABLE
+
+    for event in events:
+        # speech.requested is the daemon asking for a sentence to be spoken.
+        # On a terminal, printing it is what speaking means.
+        if event.get("type") == "speech.requested":
+            print(event["text"])
+
+    payload = dict(response.get("payload", {}))
+    outcome = payload.get("outcome")
+
+    if outcome == "not_understood":
+        print("I did not understand that.", file=sys.stderr)
+        return EXIT_NOT_UNDERSTOOD
+    if outcome == "unsure":
+        return EXIT_UNSURE
+    return EXIT_OK if payload.get("ok") else EXIT_FAILED
 
 
 def main(

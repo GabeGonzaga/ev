@@ -57,13 +57,14 @@ satisfy them structurally, which is why neither imports the other.
 
 ## One door per subsystem
 
-Each subsystem has one public port. Today there are three:
+Each subsystem has one public port. Today there are four:
 
 | Port | Owns |
 |---|---|
 | `ProcessRunner` | every subprocess. argv only — no shell, no `cwd`, no `env` |
 | `AppleScriptClient` | every AppleScript. Constant source, values as `argv` |
 | `OllamaClient` | every model call, both paths. Local HTTP, model from config |
+| `IpcServer` | the socket. Handshake, framing, correlation, confirmations |
 
 `AppleScriptClient` goes through `ProcessRunner` rather than around it.
 
@@ -142,3 +143,4 @@ nothing, because `open(1)` needs nothing.
 | [0012](adr/0012-what-the-evals-measured.md) | What the evals measured, and what changed because of it |
 | [0013](adr/0013-qwen3-8b-is-the-default-model.md) | qwen3:8b is the default model |\n| [0014](adr/0014-the-router-does-not-narrate.md) | The router does not narrate; the prompt was not the problem |
 | [0015](adr/0015-the-protocol-is-authored-in-pydantic.md) | The protocol is authored in Pydantic and shipped as JSON Schema |
+| [0016](adr/0016-the-daemon-and-why-not-for-the-reason-given.md) | The daemon, and not for the reason I gave |
