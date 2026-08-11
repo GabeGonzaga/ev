@@ -1,0 +1,493 @@
+{
+  "$defs": {
+    "ConfirmationRequired": {
+      "additionalProperties": false,
+      "properties": {
+        "arguments": {
+          "additionalProperties": true,
+          "title": "Arguments",
+          "type": "object"
+        },
+        "id": {
+          "description": "Echoed back in confirmation.respond.",
+          "title": "Id",
+          "type": "string"
+        },
+        "risk": {
+          "$ref": "#/$defs/RiskLevel"
+        },
+        "tool": {
+          "title": "Tool",
+          "type": "string"
+        },
+        "type": {
+          "const": "confirmation.required",
+          "default": "confirmation.required",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "tool",
+        "risk"
+      ],
+      "title": "ConfirmationRequired",
+      "type": "object"
+    },
+    "ConfirmationRespond": {
+      "additionalProperties": false,
+      "properties": {
+        "granted": {
+          "title": "Granted",
+          "type": "boolean"
+        },
+        "request": {
+          "description": "The id of the confirmation.required event.",
+          "title": "Request",
+          "type": "string"
+        },
+        "type": {
+          "const": "confirmation.respond",
+          "default": "confirmation.respond",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "request",
+        "granted"
+      ],
+      "title": "ConfirmationRespond",
+      "type": "object"
+    },
+    "Hello": {
+      "additionalProperties": false,
+      "description": "First message on every connection. Nothing else is served until it is\naccepted.",
+      "properties": {
+        "client": {
+          "description": "Who is connecting, for the log.",
+          "title": "Client",
+          "type": "string"
+        },
+        "protocol": {
+          "description": "The protocol version the client speaks.",
+          "title": "Protocol",
+          "type": "string"
+        },
+        "type": {
+          "const": "hello",
+          "default": "hello",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "protocol",
+        "client"
+      ],
+      "title": "Hello",
+      "type": "object"
+    },
+    "Permission": {
+      "description": "A capability macOS gates behind TCC.",
+      "enum": [
+        "microphone",
+        "camera",
+        "accessibility",
+        "apple_events"
+      ],
+      "title": "Permission",
+      "type": "string"
+    },
+    "PermissionChanged": {
+      "additionalProperties": false,
+      "description": "The native host reporting what macOS says. The Python core never infers\nthis (invariant 7); it only ever learns it here.",
+      "properties": {
+        "permission": {
+          "$ref": "#/$defs/Permission"
+        },
+        "state": {
+          "$ref": "#/$defs/PermissionState"
+        },
+        "type": {
+          "const": "permission.changed",
+          "default": "permission.changed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "permission",
+        "state"
+      ],
+      "title": "PermissionChanged",
+      "type": "object"
+    },
+    "PermissionState": {
+      "description": "What the host last reported for a permission.",
+      "enum": [
+        "granted",
+        "denied",
+        "undetermined"
+      ],
+      "title": "PermissionState",
+      "type": "string"
+    },
+    "Request": {
+      "additionalProperties": false,
+      "description": "A command with an id. Exactly one `Response` carries the same id back.",
+      "properties": {
+        "command": {
+          "discriminator": {
+            "mapping": {
+              "confirmation.respond": "#/$defs/ConfirmationRespond",
+              "hello": "#/$defs/Hello",
+              "session.cancel": "#/$defs/SessionCancel",
+              "utterance.submit": "#/$defs/UtteranceSubmit"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Hello"
+            },
+            {
+              "$ref": "#/$defs/UtteranceSubmit"
+            },
+            {
+              "$ref": "#/$defs/ConfirmationRespond"
+            },
+            {
+              "$ref": "#/$defs/SessionCancel"
+            }
+          ],
+          "title": "Command"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "command"
+      ],
+      "title": "Request",
+      "type": "object"
+    },
+    "Response": {
+      "additionalProperties": false,
+      "properties": {
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResponseError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "ok": {
+          "title": "Ok",
+          "type": "boolean"
+        },
+        "payload": {
+          "additionalProperties": true,
+          "title": "Payload",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "ok"
+      ],
+      "title": "Response",
+      "type": "object"
+    },
+    "ResponseError": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "ResponseError",
+      "type": "object"
+    },
+    "RiskLevel": {
+      "description": "Declared per tool in `tools.py`, never inferred from the arguments.",
+      "enum": [
+        "safe",
+        "sensitive",
+        "destructive"
+      ],
+      "title": "RiskLevel",
+      "type": "string"
+    },
+    "SessionCancel": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "session.cancel",
+          "default": "session.cancel",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "title": "SessionCancel",
+      "type": "object"
+    },
+    "SpeechRequested": {
+      "additionalProperties": false,
+      "description": "Intent, not audio. The native layer owns the device.",
+      "properties": {
+        "interrupt": {
+          "default": false,
+          "title": "Interrupt",
+          "type": "boolean"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "type": {
+          "const": "speech.requested",
+          "default": "speech.requested",
+          "title": "Type",
+          "type": "string"
+        },
+        "voice": {
+          "description": "A locale, e.g. pt-PT.",
+          "title": "Voice",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "voice"
+      ],
+      "title": "SpeechRequested",
+      "type": "object"
+    },
+    "StateChanged": {
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "enum": [
+            "idle",
+            "listening",
+            "thinking",
+            "acting",
+            "speaking"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "type": {
+          "const": "state.changed",
+          "default": "state.changed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "state"
+      ],
+      "title": "StateChanged",
+      "type": "object"
+    },
+    "ToolCompleted": {
+      "additionalProperties": false,
+      "properties": {
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "ok": {
+          "title": "Ok",
+          "type": "boolean"
+        },
+        "speech": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Speech"
+        },
+        "tool": {
+          "title": "Tool",
+          "type": "string"
+        },
+        "type": {
+          "const": "tool.completed",
+          "default": "tool.completed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool",
+        "ok"
+      ],
+      "title": "ToolCompleted",
+      "type": "object"
+    },
+    "TranscriptionPartial": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "type": {
+          "const": "transcription.partial",
+          "default": "transcription.partial",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "TranscriptionPartial",
+      "type": "object"
+    },
+    "UtteranceSubmit": {
+      "additionalProperties": false,
+      "properties": {
+        "locale": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The session locale, e.g. pt-PT. Carried, never used to translate the utterance before routing.",
+          "title": "Locale"
+        },
+        "text": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "type": {
+          "const": "utterance.submit",
+          "default": "utterance.submit",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "UtteranceSubmit",
+      "type": "object"
+    }
+  },
+  "$id": "https://ev.local/protocol/ev.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Everything that crosses the socket, for the generated schema's benefit.\n\nEach line on the wire is one of these, so a generator emits one type per\nlanguage rather than three unrelated roots.",
+  "properties": {
+    "event": {
+      "anyOf": [
+        {
+          "discriminator": {
+            "mapping": {
+              "confirmation.required": "#/$defs/ConfirmationRequired",
+              "permission.changed": "#/$defs/PermissionChanged",
+              "speech.requested": "#/$defs/SpeechRequested",
+              "state.changed": "#/$defs/StateChanged",
+              "tool.completed": "#/$defs/ToolCompleted",
+              "transcription.partial": "#/$defs/TranscriptionPartial"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/TranscriptionPartial"
+            },
+            {
+              "$ref": "#/$defs/SpeechRequested"
+            },
+            {
+              "$ref": "#/$defs/ConfirmationRequired"
+            },
+            {
+              "$ref": "#/$defs/ToolCompleted"
+            },
+            {
+              "$ref": "#/$defs/StateChanged"
+            },
+            {
+              "$ref": "#/$defs/PermissionChanged"
+            }
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Event"
+    },
+    "request": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Request"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "response": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Response"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "title": "Envelope",
+  "type": "object",
+  "x-ev-protocol-version": "1.0"
+}

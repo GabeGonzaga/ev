@@ -1,7 +1,7 @@
 PY ?= $(shell [ -x .venv/bin/python ] && echo .venv/bin/python || echo python3)
 
 .DEFAULT_GOAL := help
-.PHONY: help test lint format install eval
+.PHONY: help test lint format install eval protocol protocol-check
 
 help:
 	@echo "test     run the suite (must pass on Linux and macOS alike)"
@@ -10,6 +10,7 @@ help:
 	@echo "install  install dev dependencies into the active environment"
 	@echo "eval     golden routing and translation evals. Needs Ollama. NOT in CI"
 	@echo "         make eval ARGS='--model qwen3:8b --model llama3.1:8b'"
+	@echo "protocol regenerate protocol/generated/ from protocol/messages.py"
 
 test:
 	$(PY) -m pytest
@@ -18,7 +19,14 @@ test:
 eval:
 	$(PY) -m evals.run $(ARGS)
 
-lint:
+protocol:
+	$(PY) -m protocol.export
+
+# Part of lint, so a stale artifact fails the build rather than the handshake.
+protocol-check:
+	$(PY) -m protocol.export --check
+
+lint: protocol-check
 	$(PY) -m ruff check .
 	$(PY) -m ruff format --check .
 	$(PY) -m mypy

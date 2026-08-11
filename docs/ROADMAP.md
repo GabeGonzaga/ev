@@ -7,7 +7,7 @@ is right.
 |---|---|---|
 | 0 | Headless core: registry, journal, migrations, tools, CLI | done |
 | 1 | Ollama tier 2, structured output, evals, confidence policy, translation capability | current |
-| 1.5 | Typed IPC protocol + signed native host skeleton | |
+| 1.5 | Typed IPC protocol + signed native host skeleton | current |
 | 2 | Push-to-talk, VAD, whisper.cpp, AVSpeechSynthesizer | |
 | 3 | Tauri, menu bar, NSPanel, settings, history | |
 | 4 | JSON macros, more adapters, retrieval | |
@@ -64,6 +64,15 @@ rather than theory:
 * A translation model returned its input unchanged and E.V. reported success.
   An echo is indistinguishable from a legitimate no-op without measurement, so
   evals must count it as a miss, in both directions, per model.
+
+## Phase 1.5
+
+| | |
+|---|---|
+| `protocol/`: message types, versioned handshake, committed JSON Schema | done |
+| `ev/infrastructure/ipc/`: the Unix socket daemon | |
+| Rust and TypeScript generation from the artifact | with the host |
+| Signed native host skeleton | |
 
 ## What each phase is waiting for
 

@@ -41,6 +41,7 @@ nothing below it takes a `dict` — a handler receives its validated args model.
 | Layer | May depend on | May not |
 |---|---|---|
 | `ev/domain/` | nothing | everything |
+| `protocol/` | domain | everything else |
 | `ev/application/` | domain | infrastructure, capabilities |
 | `ev/router/` | domain | everything else |
 | `ev/registry.py` | domain, application | infrastructure, capabilities |
@@ -85,7 +86,7 @@ structure shaped by symmetry rather than by a decision.
 | Enforcing the `Content` marker | tools feed each other — macros, phase 4 |
 | Streaming model responses | something can render a partial answer |
 | `sqlite-vec`, FTS5 | retrieval actually lands (phase 4) |
-| `protocol/` | phase 1.5 |
+| Rust / TypeScript generation from `ev.schema.json` | the native host that consumes them exists |
 | A second resident model | never on the interactive path |
 
 ## What does not exist yet
@@ -140,3 +141,4 @@ nothing, because `open(1)` needs nothing.
 | [0011](adr/0011-generated-text-is-content-typed.md) | Generated text is content-typed; a failed translation returns the original |
 | [0012](adr/0012-what-the-evals-measured.md) | What the evals measured, and what changed because of it |
 | [0013](adr/0013-qwen3-8b-is-the-default-model.md) | qwen3:8b is the default model |\n| [0014](adr/0014-the-router-does-not-narrate.md) | The router does not narrate; the prompt was not the problem |
+| [0015](adr/0015-the-protocol-is-authored-in-pydantic.md) | The protocol is authored in Pydantic and shipped as JSON Schema |

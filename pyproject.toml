@@ -23,7 +23,7 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["ev*"]
+include = ["ev*", "protocol*"]
 
 # The suite runs from the repository root without installing the package.
 [tool.pytest.ini_options]
@@ -54,4 +54,4 @@ select = [
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["ev", "tests"]
+files = ["ev", "tests", "protocol"]
