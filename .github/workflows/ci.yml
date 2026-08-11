@@ -50,6 +50,13 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: ALSA headers
+        # cpal builds against ALSA on Linux. Small, and the alternative is
+        # feature-gating audio out of the one platform that proves the rest of
+        # the crate is portable.
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+
       - uses: actions/cache@v4
         with:
           # cargo-typify is compiled from source; without this every run pays
@@ -73,6 +80,12 @@ jobs:
 
       - name: Gate
         run: make rust
+
+      - name: The app, on the platform it is for
+        # A menu bar, a panel, TCC and Apple Events. On Linux this would test
+        # GTK and WebKit rather than anything this project wrote.
+        if: runner.os == 'macOS'
+        run: make app-check
 
   panel:
     # The UI is typechecked and built, not run: a webview in CI would test the

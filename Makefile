@@ -1,7 +1,7 @@
 PY ?= $(shell [ -x .venv/bin/python ] && echo .venv/bin/python || echo python3)
 
 .DEFAULT_GOAL := help
-.PHONY: help test lint format install eval protocol protocol-check rust sign models ui app
+.PHONY: help test lint format install eval protocol protocol-check rust app-check sign models ui app
 
 help:
 	@echo "test     run the suite (must pass on Linux and macOS alike)"
@@ -80,11 +80,20 @@ app:
 		--sign "$(IDENTITY)" $(APP)
 	codesign --verify --verbose=2 $(APP)
 
+# The host, which is portable: its protocol client is plain Rust and its
+# capture is cpal, so it builds anywhere ALSA headers exist. Linux is where
+# nothing macOS-specific can hide, which is why it is worth building at all.
 rust: protocol-check-rust
 	cd native && $(CARGO) fmt --check
-	cd native && $(CARGO) clippy --all-targets -- -D warnings
-	cd native && $(CARGO) test
-	cd native && $(CARGO) build --release
+	cd native && $(CARGO) clippy -p ev-host --all-targets -- -D warnings
+	cd native && $(CARGO) test -p ev-host
+	cd native && $(CARGO) build -p ev-host --release
+
+# The app is a macOS app: a menu bar, a panel, TCC, Apple Events. Building it
+# on Linux would prove nothing and needs GTK and WebKit to prove it.
+app-check:
+	cd native && $(CARGO) clippy -p ev-app --all-targets -- -D warnings
+	cd native && $(CARGO) build -p ev-app --release
 
 # Local only. TCC keys its grants to a code signature, so an unsigned host is
 # re-prompted on every rebuild. Signing identities do not belong in CI.

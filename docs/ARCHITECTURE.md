@@ -140,6 +140,11 @@ nothing, because `open(1)` needs nothing.
   macOS boundary is behind a port. CI runs `make test` and `make lint` on
   `ubuntu-latest` and `macos-latest`; a test that passes only on the Mac means
   a boundary escaped its port.
+- The Rust gate splits by what is portable. `make rust` builds and tests the
+  host on both platforms, because its protocol client is plain Rust and that is
+  where portability is worth proving. `make app-check` builds the app on macOS
+  only: a menu bar, a panel, TCC and Apple Events are not portable, and
+  building them on Linux would test GTK and WebKit instead.
 
 ## Decisions
 
