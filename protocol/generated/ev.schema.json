@@ -132,6 +132,131 @@
       "title": "Hello",
       "type": "object"
     },
+    "HistoryPage": {
+      "additionalProperties": false,
+      "description": "What a `history.query` answers with, inside the response payload.",
+      "properties": {
+        "entries": {
+          "items": {
+            "$ref": "#/$defs/JournalEntry"
+          },
+          "title": "Entries",
+          "type": "array"
+        }
+      },
+      "title": "HistoryPage",
+      "type": "object"
+    },
+    "HistoryQuery": {
+      "additionalProperties": false,
+      "description": "What E.V. has done, newest first.\n\nA request rather than an event: history is asked for, not pushed. The\nanswer arrives in the response payload as `entries`, shaped like\n`JournalEntry` below.",
+      "properties": {
+        "before": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Only entries older than this id. For paging.",
+          "title": "Before"
+        },
+        "limit": {
+          "default": 20,
+          "maximum": 500,
+          "minimum": 1,
+          "title": "Limit",
+          "type": "integer"
+        },
+        "type": {
+          "const": "history.query",
+          "default": "history.query",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "title": "HistoryQuery",
+      "type": "object"
+    },
+    "JournalEntry": {
+      "additionalProperties": false,
+      "description": "What E.V. did, once.",
+      "properties": {
+        "arguments": {
+          "additionalProperties": true,
+          "title": "Arguments",
+          "type": "object"
+        },
+        "error_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Code"
+        },
+        "error_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Message"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "ok": {
+          "title": "Ok",
+          "type": "boolean"
+        },
+        "recorded_at": {
+          "description": "ISO 8601, UTC, stamped when it happened.",
+          "title": "Recorded At",
+          "type": "string"
+        },
+        "risk": {
+          "$ref": "#/$defs/RiskLevel"
+        },
+        "speech": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Speech"
+        },
+        "tool": {
+          "title": "Tool",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "recorded_at",
+        "tool",
+        "risk",
+        "ok"
+      ],
+      "title": "JournalEntry",
+      "type": "object"
+    },
     "Permission": {
       "description": "A capability macOS gates behind TCC.",
       "enum": [
@@ -187,6 +312,7 @@
               "audio.submit": "#/$defs/AudioSubmit",
               "confirmation.respond": "#/$defs/ConfirmationRespond",
               "hello": "#/$defs/Hello",
+              "history.query": "#/$defs/HistoryQuery",
               "session.cancel": "#/$defs/SessionCancel",
               "utterance.submit": "#/$defs/UtteranceSubmit"
             },
@@ -204,6 +330,9 @@
             },
             {
               "$ref": "#/$defs/ConfirmationRespond"
+            },
+            {
+              "$ref": "#/$defs/HistoryQuery"
             },
             {
               "$ref": "#/$defs/SessionCancel"
@@ -511,6 +640,17 @@
       "default": null,
       "title": "Event"
     },
+    "page": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/HistoryPage"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
     "request": {
       "anyOf": [
         {
@@ -536,5 +676,5 @@
   },
   "title": "Envelope",
   "type": "object",
-  "x-ev-protocol-version": "1.1"
+  "x-ev-protocol-version": "1.2"
 }

@@ -193,3 +193,60 @@ async def test_a_failed_write_keeps_the_records_pending(
     await journal.flush()
 
     assert len(rows(connection)) == 1
+
+
+async def test_history_reads_back_newest_first(connection: sqlite3.Connection) -> None:
+    journal = SqliteJournal(connection, clock=Clock())
+    await journal.record(call(tool="browser.open_url"))
+    await journal.record(call(tool="music.play", risk=RiskLevel.SENSITIVE))
+
+    entries = await journal.recent()
+
+    assert [entry.tool for entry in entries] == ["music.play", "browser.open_url"]
+    assert entries[0].risk is RiskLevel.SENSITIVE
+    assert entries[0].arguments == {"url": "https://a.test"}
+    assert entries[0].speech == "Opening it"
+
+
+async def test_history_flushes_before_it_reads(
+    connection: sqlite3.Connection,
+) -> None:
+    # The batch exists so the voice path does not commit per turn. It would be
+    # a strange history that omitted what just happened.
+    journal = SqliteJournal(connection, batch_size=100)
+    await journal.record(call())
+
+    assert rows(connection) == []
+    assert len(await journal.recent()) == 1
+
+
+async def test_history_pages_backwards(connection: sqlite3.Connection) -> None:
+    journal = SqliteJournal(connection)
+    for index in range(5):
+        await journal.record(call(tool=f"a.b{index}"))
+    await journal.flush()
+
+    newest = await journal.recent(limit=2)
+    older = await journal.recent(limit=2, before=newest[-1].id)
+
+    assert [entry.tool for entry in newest] == ["a.b4", "a.b3"]
+    assert [entry.tool for entry in older] == ["a.b2", "a.b1"]
+
+
+async def test_a_failure_keeps_its_reason_in_the_trail(
+    connection: sqlite3.Connection,
+) -> None:
+    journal = SqliteJournal(connection)
+    await journal.record(
+        call(
+            result=ToolResult.failure(
+                "music.play", ToolErrorCode.PERMISSION_DENIED, "needs apple_events"
+            )
+        )
+    )
+
+    (entry,) = await journal.recent()
+
+    assert entry.ok is False
+    assert entry.error_code == "permission_denied"
+    assert entry.error_message == "needs apple_events"

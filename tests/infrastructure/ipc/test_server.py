@@ -417,7 +417,7 @@ async def test_an_unbound_confirmation_declines() -> None:
 async def test_a_refused_handshake_reaches_the_client(state: Path) -> None:
     core = Core()
     async for _ in start(state, core):
-        with pytest.raises(DaemonRefused, match=r"speaks 1\.1"):
+        with pytest.raises(DaemonRefused, match=r"speaks 1\.2"):
             async with IpcClient(socket_path(state), protocol="0.9"):
                 pass
         break
@@ -602,4 +602,62 @@ async def test_a_daemon_without_a_recognizer_says_so(state: Path) -> None:
 
         answer = await line(reader)
         assert answer["error"]["code"] == "no_recognizer"
+        break
+
+
+async def test_history_is_asked_for_not_pushed(state: Path) -> None:
+    """History is a request with an answer, not an event stream.
+
+    The UI asks when it opens a panel; nothing pushes the whole trail at a
+    client that did not want it.
+    """
+    from ev.domain.journal import JournalEntry
+    from protocol.messages import HistoryQuery
+
+    async def history(limit: int, before: int | None) -> list[JournalEntry]:
+        return [
+            JournalEntry(
+                id=2,
+                recorded_at="2026-08-11T09:00:00+00:00",
+                tool="browser.open_url",
+                risk=RiskLevel.SAFE,
+                ok=True,
+                arguments={"url": "https://a.test"},
+                speech="Opening a.test",
+            )
+        ][:limit]
+
+    core = Core()
+    server = IpcServer(
+        path=socket_path(state),
+        handle=core.handle,
+        confirmation=SessionConfirmation(),
+        history=history,
+    )
+    await server.start()
+    task = asyncio.create_task(server.serve_forever())
+
+    try:
+        async with IpcClient(socket_path(state)) as client:
+            answer = await client._send(HistoryQuery(limit=5))
+
+        assert answer["ok"] is True
+        (entry,) = answer["payload"]["entries"]
+        assert entry["tool"] == "browser.open_url"
+        assert entry["risk"] == "safe"
+        assert entry["speech"] == "Opening a.test"
+    finally:
+        task.cancel()
+        await server.aclose()
+
+
+async def test_a_daemon_with_no_journal_says_so(state: Path) -> None:
+    from protocol.messages import HistoryQuery
+
+    core = Core()
+    async for _ in start(state, core):
+        async with IpcClient(socket_path(state)) as client:
+            answer = await client._send(HistoryQuery())
+
+        assert answer["error"]["code"] == "no_history"
         break

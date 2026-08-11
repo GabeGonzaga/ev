@@ -27,6 +27,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ev.domain.journal import JournalEntry
 from ev.domain.permissions import Permission, PermissionState
 from ev.domain.risk import RiskLevel
 
@@ -35,12 +36,13 @@ MAX_AUDIO_BASE64 = 8_000_000
 push-to-talk utterances are seconds long, and an unbounded field on a socket is
 a promise to buffer whatever arrives."""
 
-PROTOCOL_VERSION = "1.1"
+PROTOCOL_VERSION = "1.2"
 """Major.minor. The handshake compares it exactly: a mismatch refuses the
 connection rather than degrading into a conversation neither side understands.
 
-1.1 added `audio.submit`. A client that only knows 1.0 is refused rather than
-served a subset, because "some of the protocol" is not a protocol.
+1.1 added `audio.submit`; 1.2 added `history.query`. A client that knows an
+earlier version is refused rather than served a subset, because "some of the
+protocol" is not a protocol.
 """
 
 
@@ -103,12 +105,32 @@ class ConfirmationRespond(Message):
     granted: bool
 
 
+class HistoryQuery(Message):
+    """What E.V. has done, newest first.
+
+    A request rather than an event: history is asked for, not pushed. The
+    answer arrives in the response payload as `entries`, shaped like
+    `JournalEntry` below.
+    """
+
+    type: Literal["history.query"] = "history.query"
+    limit: int = Field(default=20, ge=1, le=500)
+    before: int | None = Field(
+        default=None, description="Only entries older than this id. For paging."
+    )
+
+
 class SessionCancel(Message):
     type: Literal["session.cancel"] = "session.cancel"
 
 
 Command = Annotated[
-    Hello | UtteranceSubmit | AudioSubmit | ConfirmationRespond | SessionCancel,
+    Hello
+    | UtteranceSubmit
+    | AudioSubmit
+    | ConfirmationRespond
+    | HistoryQuery
+    | SessionCancel,
     Field(discriminator="type"),
 ]
 
@@ -190,6 +212,14 @@ Event = Annotated[
 ]
 
 
+class HistoryPage(BaseModel):
+    """What a `history.query` answers with, inside the response payload."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    entries: list[JournalEntry] = Field(default_factory=list)
+
+
 class Envelope(BaseModel):
     """Everything that crosses the socket, for the generated schema's benefit.
 
@@ -202,3 +232,9 @@ class Envelope(BaseModel):
     request: Request | None = None
     response: Response | None = None
     event: Event | None = None
+
+    # Not a line on the wire: a response payload is an untyped object, and
+    # this is how the shape inside one reaches the generated Rust and
+    # TypeScript. A catalogue entry, and the comment is here so nobody
+    # mistakes it for a message.
+    page: HistoryPage | None = None

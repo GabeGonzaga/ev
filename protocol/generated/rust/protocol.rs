@@ -188,6 +188,9 @@ impl AudioSubmit {
 #[doc = "      \"$ref\": \"#/$defs/ConfirmationRespond\""]
 #[doc = "    },"]
 #[doc = "    {"]
+#[doc = "      \"$ref\": \"#/$defs/HistoryQuery\""]
+#[doc = "    },"]
+#[doc = "    {"]
 #[doc = "      \"$ref\": \"#/$defs/SessionCancel\""]
 #[doc = "    }"]
 #[doc = "  ],"]
@@ -196,6 +199,7 @@ impl AudioSubmit {
 #[doc = "      \"audio.submit\": \"#/$defs/AudioSubmit\","]
 #[doc = "      \"confirmation.respond\": \"#/$defs/ConfirmationRespond\","]
 #[doc = "      \"hello\": \"#/$defs/Hello\","]
+#[doc = "      \"history.query\": \"#/$defs/HistoryQuery\","]
 #[doc = "      \"session.cancel\": \"#/$defs/SessionCancel\","]
 #[doc = "      \"utterance.submit\": \"#/$defs/UtteranceSubmit\""]
 #[doc = "    },"]
@@ -211,6 +215,7 @@ pub enum Command {
     UtteranceSubmit(UtteranceSubmit),
     AudioSubmit(AudioSubmit),
     ConfirmationRespond(ConfirmationRespond),
+    HistoryQuery(HistoryQuery),
     SessionCancel(SessionCancel),
 }
 impl ::std::convert::From<Hello> for Command {
@@ -231,6 +236,11 @@ impl ::std::convert::From<AudioSubmit> for Command {
 impl ::std::convert::From<ConfirmationRespond> for Command {
     fn from(value: ConfirmationRespond) -> Self {
         Self::ConfirmationRespond(value)
+    }
+}
+impl ::std::convert::From<HistoryQuery> for Command {
+    fn from(value: HistoryQuery) -> Self {
+        Self::HistoryQuery(value)
     }
 }
 impl ::std::convert::From<SessionCancel> for Command {
@@ -397,6 +407,17 @@ impl ConfirmationRespond {
 #[doc = "        }"]
 #[doc = "      ]"]
 #[doc = "    },"]
+#[doc = "    \"page\": {"]
+#[doc = "      \"default\": null,"]
+#[doc = "      \"anyOf\": ["]
+#[doc = "        {"]
+#[doc = "          \"$ref\": \"#/$defs/HistoryPage\""]
+#[doc = "        },"]
+#[doc = "        {"]
+#[doc = "          \"type\": \"null\""]
+#[doc = "        }"]
+#[doc = "      ]"]
+#[doc = "    },"]
 #[doc = "    \"request\": {"]
 #[doc = "      \"default\": null,"]
 #[doc = "      \"anyOf\": ["]
@@ -421,7 +442,7 @@ impl ConfirmationRespond {
 #[doc = "    }"]
 #[doc = "  },"]
 #[doc = "  \"additionalProperties\": false,"]
-#[doc = "  \"x-ev-protocol-version\": \"1.1\""]
+#[doc = "  \"x-ev-protocol-version\": \"1.2\""]
 #[doc = "}"]
 #[doc = r" ```"]
 #[doc = r" </details>"]
@@ -431,6 +452,8 @@ pub struct Envelope {
     #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
     pub event: ::std::option::Option<EnvelopeEvent>,
     #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+    pub page: ::std::option::Option<HistoryPage>,
+    #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
     pub request: ::std::option::Option<Request>,
     #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
     pub response: ::std::option::Option<Response>,
@@ -439,6 +462,7 @@ impl ::std::default::Default for Envelope {
     fn default() -> Self {
         Self {
             event: Default::default(),
+            page: Default::default(),
             request: Default::default(),
             response: Default::default(),
         }
@@ -576,6 +600,218 @@ pub struct Hello {
 }
 impl Hello {
     pub fn builder() -> builder::Hello {
+        Default::default()
+    }
+}
+#[doc = "What a `history.query` answers with, inside the response payload."]
+#[doc = r""]
+#[doc = r" <details><summary>JSON schema</summary>"]
+#[doc = r""]
+#[doc = r" ```json"]
+#[doc = "{"]
+#[doc = "  \"title\": \"HistoryPage\","]
+#[doc = "  \"description\": \"What a `history.query` answers with, inside the response payload.\","]
+#[doc = "  \"type\": \"object\","]
+#[doc = "  \"properties\": {"]
+#[doc = "    \"entries\": {"]
+#[doc = "      \"title\": \"Entries\","]
+#[doc = "      \"type\": \"array\","]
+#[doc = "      \"items\": {"]
+#[doc = "        \"$ref\": \"#/$defs/JournalEntry\""]
+#[doc = "      }"]
+#[doc = "    }"]
+#[doc = "  },"]
+#[doc = "  \"additionalProperties\": false"]
+#[doc = "}"]
+#[doc = r" ```"]
+#[doc = r" </details>"]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct HistoryPage {
+    #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+    pub entries: ::std::vec::Vec<JournalEntry>,
+}
+impl ::std::default::Default for HistoryPage {
+    fn default() -> Self {
+        Self {
+            entries: Default::default(),
+        }
+    }
+}
+impl HistoryPage {
+    pub fn builder() -> builder::HistoryPage {
+        Default::default()
+    }
+}
+#[doc = "What E.V. has done, newest first.\n\nA request rather than an event: history is asked for, not pushed. The\nanswer arrives in the response payload as `entries`, shaped like\n`JournalEntry` below."]
+#[doc = r""]
+#[doc = r" <details><summary>JSON schema</summary>"]
+#[doc = r""]
+#[doc = r" ```json"]
+#[doc = "{"]
+#[doc = "  \"title\": \"HistoryQuery\","]
+#[doc = "  \"description\": \"What E.V. has done, newest first.\\n\\nA request rather than an event: history is asked for, not pushed. The\\nanswer arrives in the response payload as `entries`, shaped like\\n`JournalEntry` below.\","]
+#[doc = "  \"type\": \"object\","]
+#[doc = "  \"properties\": {"]
+#[doc = "    \"before\": {"]
+#[doc = "      \"title\": \"Before\","]
+#[doc = "      \"description\": \"Only entries older than this id. For paging.\","]
+#[doc = "      \"default\": null,"]
+#[doc = "      \"anyOf\": ["]
+#[doc = "        {"]
+#[doc = "          \"type\": \"integer\""]
+#[doc = "        },"]
+#[doc = "        {"]
+#[doc = "          \"type\": \"null\""]
+#[doc = "        }"]
+#[doc = "      ]"]
+#[doc = "    },"]
+#[doc = "    \"limit\": {"]
+#[doc = "      \"title\": \"Limit\","]
+#[doc = "      \"default\": 20,"]
+#[doc = "      \"type\": \"integer\","]
+#[doc = "      \"maximum\": 500.0,"]
+#[doc = "      \"minimum\": 1.0"]
+#[doc = "    },"]
+#[doc = "    \"type\": {"]
+#[doc = "      \"title\": \"Type\","]
+#[doc = "      \"default\": \"history.query\","]
+#[doc = "      \"type\": \"string\","]
+#[doc = "      \"const\": \"history.query\""]
+#[doc = "    }"]
+#[doc = "  },"]
+#[doc = "  \"additionalProperties\": false"]
+#[doc = "}"]
+#[doc = r" ```"]
+#[doc = r" </details>"]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct HistoryQuery {
+    #[doc = "Only entries older than this id. For paging."]
+    #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+    pub before: ::std::option::Option<i64>,
+    #[serde(default = "defaults::default_nzu64::<::std::num::NonZeroU64, 20>")]
+    pub limit: ::std::num::NonZeroU64,
+    #[serde(rename = "type", default = "defaults::history_query_type")]
+    pub type_: ::std::string::String,
+}
+impl ::std::default::Default for HistoryQuery {
+    fn default() -> Self {
+        Self {
+            before: Default::default(),
+            limit: defaults::default_nzu64::<::std::num::NonZeroU64, 20>(),
+            type_: defaults::history_query_type(),
+        }
+    }
+}
+impl HistoryQuery {
+    pub fn builder() -> builder::HistoryQuery {
+        Default::default()
+    }
+}
+#[doc = "What E.V. did, once."]
+#[doc = r""]
+#[doc = r" <details><summary>JSON schema</summary>"]
+#[doc = r""]
+#[doc = r" ```json"]
+#[doc = "{"]
+#[doc = "  \"title\": \"JournalEntry\","]
+#[doc = "  \"description\": \"What E.V. did, once.\","]
+#[doc = "  \"type\": \"object\","]
+#[doc = "  \"required\": ["]
+#[doc = "    \"id\","]
+#[doc = "    \"ok\","]
+#[doc = "    \"recorded_at\","]
+#[doc = "    \"risk\","]
+#[doc = "    \"tool\""]
+#[doc = "  ],"]
+#[doc = "  \"properties\": {"]
+#[doc = "    \"arguments\": {"]
+#[doc = "      \"title\": \"Arguments\","]
+#[doc = "      \"type\": \"object\","]
+#[doc = "      \"additionalProperties\": true"]
+#[doc = "    },"]
+#[doc = "    \"error_code\": {"]
+#[doc = "      \"title\": \"Error Code\","]
+#[doc = "      \"default\": null,"]
+#[doc = "      \"anyOf\": ["]
+#[doc = "        {"]
+#[doc = "          \"type\": \"string\""]
+#[doc = "        },"]
+#[doc = "        {"]
+#[doc = "          \"type\": \"null\""]
+#[doc = "        }"]
+#[doc = "      ]"]
+#[doc = "    },"]
+#[doc = "    \"error_message\": {"]
+#[doc = "      \"title\": \"Error Message\","]
+#[doc = "      \"default\": null,"]
+#[doc = "      \"anyOf\": ["]
+#[doc = "        {"]
+#[doc = "          \"type\": \"string\""]
+#[doc = "        },"]
+#[doc = "        {"]
+#[doc = "          \"type\": \"null\""]
+#[doc = "        }"]
+#[doc = "      ]"]
+#[doc = "    },"]
+#[doc = "    \"id\": {"]
+#[doc = "      \"title\": \"Id\","]
+#[doc = "      \"type\": \"integer\""]
+#[doc = "    },"]
+#[doc = "    \"ok\": {"]
+#[doc = "      \"title\": \"Ok\","]
+#[doc = "      \"type\": \"boolean\""]
+#[doc = "    },"]
+#[doc = "    \"recorded_at\": {"]
+#[doc = "      \"title\": \"Recorded At\","]
+#[doc = "      \"description\": \"ISO 8601, UTC, stamped when it happened.\","]
+#[doc = "      \"type\": \"string\""]
+#[doc = "    },"]
+#[doc = "    \"risk\": {"]
+#[doc = "      \"$ref\": \"#/$defs/RiskLevel\""]
+#[doc = "    },"]
+#[doc = "    \"speech\": {"]
+#[doc = "      \"title\": \"Speech\","]
+#[doc = "      \"default\": null,"]
+#[doc = "      \"anyOf\": ["]
+#[doc = "        {"]
+#[doc = "          \"type\": \"string\""]
+#[doc = "        },"]
+#[doc = "        {"]
+#[doc = "          \"type\": \"null\""]
+#[doc = "        }"]
+#[doc = "      ]"]
+#[doc = "    },"]
+#[doc = "    \"tool\": {"]
+#[doc = "      \"title\": \"Tool\","]
+#[doc = "      \"type\": \"string\""]
+#[doc = "    }"]
+#[doc = "  },"]
+#[doc = "  \"additionalProperties\": false"]
+#[doc = "}"]
+#[doc = r" ```"]
+#[doc = r" </details>"]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct JournalEntry {
+    #[serde(default, skip_serializing_if = "::serde_json::Map::is_empty")]
+    pub arguments: ::serde_json::Map<::std::string::String, ::serde_json::Value>,
+    #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+    pub error_code: ::std::option::Option<::std::string::String>,
+    #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+    pub error_message: ::std::option::Option<::std::string::String>,
+    pub id: i64,
+    pub ok: bool,
+    #[doc = "ISO 8601, UTC, stamped when it happened."]
+    pub recorded_at: ::std::string::String,
+    pub risk: RiskLevel,
+    #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+    pub speech: ::std::option::Option<::std::string::String>,
+    pub tool: ::std::string::String,
+}
+impl JournalEntry {
+    pub fn builder() -> builder::JournalEntry {
         Default::default()
     }
 }
@@ -816,6 +1052,9 @@ impl ::std::convert::TryFrom<::std::string::String> for PermissionState {
 #[doc = "          \"$ref\": \"#/$defs/ConfirmationRespond\""]
 #[doc = "        },"]
 #[doc = "        {"]
+#[doc = "          \"$ref\": \"#/$defs/HistoryQuery\""]
+#[doc = "        },"]
+#[doc = "        {"]
 #[doc = "          \"$ref\": \"#/$defs/SessionCancel\""]
 #[doc = "        }"]
 #[doc = "      ],"]
@@ -824,6 +1063,7 @@ impl ::std::convert::TryFrom<::std::string::String> for PermissionState {
 #[doc = "          \"audio.submit\": \"#/$defs/AudioSubmit\","]
 #[doc = "          \"confirmation.respond\": \"#/$defs/ConfirmationRespond\","]
 #[doc = "          \"hello\": \"#/$defs/Hello\","]
+#[doc = "          \"history.query\": \"#/$defs/HistoryQuery\","]
 #[doc = "          \"session.cancel\": \"#/$defs/SessionCancel\","]
 #[doc = "          \"utterance.submit\": \"#/$defs/UtteranceSubmit\""]
 #[doc = "        },"]
@@ -1754,6 +1994,8 @@ pub mod builder {
             ::std::option::Option<super::EnvelopeEvent>,
             ::std::string::String,
         >,
+        page:
+            ::std::result::Result<::std::option::Option<super::HistoryPage>, ::std::string::String>,
         request:
             ::std::result::Result<::std::option::Option<super::Request>, ::std::string::String>,
         response:
@@ -1763,6 +2005,7 @@ pub mod builder {
         fn default() -> Self {
             Self {
                 event: Ok(Default::default()),
+                page: Ok(Default::default()),
                 request: Ok(Default::default()),
                 response: Ok(Default::default()),
             }
@@ -1777,6 +2020,16 @@ pub mod builder {
             self.event = value
                 .try_into()
                 .map_err(|e| format!("error converting supplied value for event: {e}"));
+            self
+        }
+        pub fn page<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<::std::option::Option<super::HistoryPage>>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.page = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for page: {e}"));
             self
         }
         pub fn request<T>(mut self, value: T) -> Self
@@ -1805,6 +2058,7 @@ pub mod builder {
         fn try_from(value: Envelope) -> ::std::result::Result<Self, super::error::ConversionError> {
             Ok(Self {
                 event: value.event?,
+                page: value.page?,
                 request: value.request?,
                 response: value.response?,
             })
@@ -1814,6 +2068,7 @@ pub mod builder {
         fn from(value: super::Envelope) -> Self {
             Self {
                 event: Ok(value.event),
+                page: Ok(value.page),
                 request: Ok(value.request),
                 response: Ok(value.response),
             }
@@ -1882,6 +2137,280 @@ pub mod builder {
                 client: Ok(value.client),
                 protocol: Ok(value.protocol),
                 type_: Ok(value.type_),
+            }
+        }
+    }
+    #[derive(Clone, Debug)]
+    pub struct HistoryPage {
+        entries: ::std::result::Result<::std::vec::Vec<super::JournalEntry>, ::std::string::String>,
+    }
+    impl ::std::default::Default for HistoryPage {
+        fn default() -> Self {
+            Self {
+                entries: Ok(Default::default()),
+            }
+        }
+    }
+    impl HistoryPage {
+        pub fn entries<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<::std::vec::Vec<super::JournalEntry>>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.entries = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for entries: {e}"));
+            self
+        }
+    }
+    impl ::std::convert::TryFrom<HistoryPage> for super::HistoryPage {
+        type Error = super::error::ConversionError;
+        fn try_from(
+            value: HistoryPage,
+        ) -> ::std::result::Result<Self, super::error::ConversionError> {
+            Ok(Self {
+                entries: value.entries?,
+            })
+        }
+    }
+    impl ::std::convert::From<super::HistoryPage> for HistoryPage {
+        fn from(value: super::HistoryPage) -> Self {
+            Self {
+                entries: Ok(value.entries),
+            }
+        }
+    }
+    #[derive(Clone, Debug)]
+    pub struct HistoryQuery {
+        before: ::std::result::Result<::std::option::Option<i64>, ::std::string::String>,
+        limit: ::std::result::Result<::std::num::NonZeroU64, ::std::string::String>,
+        type_: ::std::result::Result<::std::string::String, ::std::string::String>,
+    }
+    impl ::std::default::Default for HistoryQuery {
+        fn default() -> Self {
+            Self {
+                before: Ok(Default::default()),
+                limit: Ok(super::defaults::default_nzu64::<::std::num::NonZeroU64, 20>()),
+                type_: Ok(super::defaults::history_query_type()),
+            }
+        }
+    }
+    impl HistoryQuery {
+        pub fn before<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<::std::option::Option<i64>>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.before = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for before: {e}"));
+            self
+        }
+        pub fn limit<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<::std::num::NonZeroU64>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.limit = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for limit: {e}"));
+            self
+        }
+        pub fn type_<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<::std::string::String>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.type_ = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for type_: {e}"));
+            self
+        }
+    }
+    impl ::std::convert::TryFrom<HistoryQuery> for super::HistoryQuery {
+        type Error = super::error::ConversionError;
+        fn try_from(
+            value: HistoryQuery,
+        ) -> ::std::result::Result<Self, super::error::ConversionError> {
+            Ok(Self {
+                before: value.before?,
+                limit: value.limit?,
+                type_: value.type_?,
+            })
+        }
+    }
+    impl ::std::convert::From<super::HistoryQuery> for HistoryQuery {
+        fn from(value: super::HistoryQuery) -> Self {
+            Self {
+                before: Ok(value.before),
+                limit: Ok(value.limit),
+                type_: Ok(value.type_),
+            }
+        }
+    }
+    #[derive(Clone, Debug)]
+    pub struct JournalEntry {
+        arguments: ::std::result::Result<
+            ::serde_json::Map<::std::string::String, ::serde_json::Value>,
+            ::std::string::String,
+        >,
+        error_code: ::std::result::Result<
+            ::std::option::Option<::std::string::String>,
+            ::std::string::String,
+        >,
+        error_message: ::std::result::Result<
+            ::std::option::Option<::std::string::String>,
+            ::std::string::String,
+        >,
+        id: ::std::result::Result<i64, ::std::string::String>,
+        ok: ::std::result::Result<bool, ::std::string::String>,
+        recorded_at: ::std::result::Result<::std::string::String, ::std::string::String>,
+        risk: ::std::result::Result<super::RiskLevel, ::std::string::String>,
+        speech: ::std::result::Result<
+            ::std::option::Option<::std::string::String>,
+            ::std::string::String,
+        >,
+        tool: ::std::result::Result<::std::string::String, ::std::string::String>,
+    }
+    impl ::std::default::Default for JournalEntry {
+        fn default() -> Self {
+            Self {
+                arguments: Ok(Default::default()),
+                error_code: Ok(Default::default()),
+                error_message: Ok(Default::default()),
+                id: Err("no value supplied for id".to_string()),
+                ok: Err("no value supplied for ok".to_string()),
+                recorded_at: Err("no value supplied for recorded_at".to_string()),
+                risk: Err("no value supplied for risk".to_string()),
+                speech: Ok(Default::default()),
+                tool: Err("no value supplied for tool".to_string()),
+            }
+        }
+    }
+    impl JournalEntry {
+        pub fn arguments<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<
+                ::serde_json::Map<::std::string::String, ::serde_json::Value>,
+            >,
+            T::Error: ::std::fmt::Display,
+        {
+            self.arguments = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for arguments: {e}"));
+            self
+        }
+        pub fn error_code<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<::std::option::Option<::std::string::String>>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.error_code = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for error_code: {e}"));
+            self
+        }
+        pub fn error_message<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<::std::option::Option<::std::string::String>>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.error_message = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for error_message: {e}"));
+            self
+        }
+        pub fn id<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<i64>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.id = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for id: {e}"));
+            self
+        }
+        pub fn ok<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<bool>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.ok = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for ok: {e}"));
+            self
+        }
+        pub fn recorded_at<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<::std::string::String>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.recorded_at = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for recorded_at: {e}"));
+            self
+        }
+        pub fn risk<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<super::RiskLevel>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.risk = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for risk: {e}"));
+            self
+        }
+        pub fn speech<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<::std::option::Option<::std::string::String>>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.speech = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for speech: {e}"));
+            self
+        }
+        pub fn tool<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<::std::string::String>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.tool = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for tool: {e}"));
+            self
+        }
+    }
+    impl ::std::convert::TryFrom<JournalEntry> for super::JournalEntry {
+        type Error = super::error::ConversionError;
+        fn try_from(
+            value: JournalEntry,
+        ) -> ::std::result::Result<Self, super::error::ConversionError> {
+            Ok(Self {
+                arguments: value.arguments?,
+                error_code: value.error_code?,
+                error_message: value.error_message?,
+                id: value.id?,
+                ok: value.ok?,
+                recorded_at: value.recorded_at?,
+                risk: value.risk?,
+                speech: value.speech?,
+                tool: value.tool?,
+            })
+        }
+    }
+    impl ::std::convert::From<super::JournalEntry> for JournalEntry {
+        fn from(value: super::JournalEntry) -> Self {
+            Self {
+                arguments: Ok(value.arguments),
+                error_code: Ok(value.error_code),
+                error_message: Ok(value.error_message),
+                id: Ok(value.id),
+                ok: Ok(value.ok),
+                recorded_at: Ok(value.recorded_at),
+                risk: Ok(value.risk),
+                speech: Ok(value.speech),
+                tool: Ok(value.tool),
             }
         }
     }
@@ -2560,6 +3089,13 @@ pub mod defaults {
     {
         T::try_from(V).unwrap()
     }
+    pub(super) fn default_nzu64<T, const V: u64>() -> T
+    where
+        T: ::std::convert::TryFrom<::std::num::NonZeroU64>,
+        <T as ::std::convert::TryFrom<::std::num::NonZeroU64>>::Error: ::std::fmt::Debug,
+    {
+        T::try_from(::std::num::NonZeroU64::try_from(V).unwrap()).unwrap()
+    }
     pub(super) fn audio_submit_type() -> ::std::string::String {
         "audio.submit".to_string()
     }
@@ -2571,6 +3107,9 @@ pub mod defaults {
     }
     pub(super) fn hello_type() -> ::std::string::String {
         "hello".to_string()
+    }
+    pub(super) fn history_query_type() -> ::std::string::String {
+        "history.query".to_string()
     }
     pub(super) fn permission_changed_type() -> ::std::string::String {
         "permission.changed".to_string()

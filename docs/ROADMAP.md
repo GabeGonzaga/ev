@@ -9,7 +9,7 @@ is right.
 | 1 | Ollama tier 2, structured output, evals, confidence policy, translation capability | current |
 | 1.5 | Typed IPC protocol + signed native host skeleton | done |
 | 2 | Push-to-talk, VAD, whisper.cpp, AVSpeechSynthesizer | current |
-| 3 | Tauri, menu bar, NSPanel, settings, history | |
+| 3 | Tauri, menu bar, NSPanel, settings, history | current |
 | 4 | JSON macros, more adapters, retrieval | |
 | 5 | Camera and vision | |
 | 6 | Wake word, continuous interaction | |
@@ -97,6 +97,20 @@ person who talks to it.
 Audible gap, now that it speaks: tool responses are composed in English, so a
 pt-PT voice reads English words. Locale-aware responses need session context,
 which is not built.
+
+## Phase 3
+
+| | |
+|---|---|
+| Journal read API, `history.query` at protocol 1.2, `--history` | done |
+| TypeScript generated from the schema | |
+| Tauri shell: menu bar, NSPanel | |
+| Settings and history views | |
+| App bundle with `Info.plist`, and its own TCC identity | |
+
+The bundle is the phase's real prize: launched from a shell the host borrows
+the terminal's microphone grant (ADR 0019), and only a bundled app gets an
+identity macOS decides about.
 
 ## What each phase is waiting for
 

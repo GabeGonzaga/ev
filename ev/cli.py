@@ -38,6 +38,7 @@ from ev.capabilities.language.tools import language_tools
 from ev.capabilities.music.adapters import MusicAdapter
 from ev.capabilities.music.service import MusicService
 from ev.capabilities.music.tools import music_tools
+from ev.domain.journal import JournalEntry
 from ev.domain.results import Clarification, ToolResult
 from ev.infrastructure.database.connection import connect, default_database_path
 from ev.infrastructure.database.journal import SqliteJournal
@@ -343,6 +344,15 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         help="undo a --grant. Repeatable.",
     )
     parser.add_argument(
+        "--history",
+        nargs="?",
+        type=int,
+        const=20,
+        default=None,
+        metavar="N",
+        help="what E.V. has done, newest first",
+    )
+    parser.add_argument(
         "--locale",
         default=None,
         metavar="TAG",
@@ -392,6 +402,9 @@ async def run(args: argparse.Namespace, completion: Completion | None = None) ->
     if args.grant or args.revoke:
         return update_grants(database.parent, args.grant, args.revoke)
 
+    if args.history is not None:
+        return await show_history(database, args.history)
+
     if args.connect:
         return await connected(database.parent, args)
 
@@ -414,6 +427,38 @@ async def run(args: argparse.Namespace, completion: Completion | None = None) ->
         await application.aclose()
 
 
+async def show_history(database: Path, limit: int) -> int:
+    """The trail, read back. The same rows the UI will show in phase 3."""
+    application = build(database=database, completion=_NoModel())
+    try:
+        journal = application.journal
+        if not isinstance(journal, SqliteJournal):  # pragma: no cover
+            return EXIT_FAILED
+
+        entries = await journal.recent(limit=limit)
+        if not entries:
+            print("nothing yet.", file=sys.stderr)
+            return EXIT_OK
+
+        for entry in entries:
+            mark = "ok " if entry.ok else "FAIL"
+            detail = entry.speech or (entry.error_message or "")
+            print(f"{entry.recorded_at}  {mark}  {entry.tool:<20} {detail}")
+        return EXIT_OK
+    finally:
+        await application.aclose()
+
+
+class _NoModel:
+    """Reading history asks nothing of a model, so nothing here should reach
+    one -- and if something does, it should say so rather than start Ollama."""
+
+    async def complete(
+        self, messages: list[dict[str, str]], *, schema: dict[str, Any]
+    ) -> str:  # pragma: no cover
+        raise AssertionError("reading history must not call a model")
+
+
 async def serve(
     *, database: Path, model: str | None, completion: Completion | None
 ) -> int:
@@ -434,11 +479,18 @@ async def serve(
     async def transcribe(audio: Path, locale: str) -> str:
         return await recognizer.transcribe(audio, language=locale)
 
+    async def history(limit: int, before: int | None) -> list[JournalEntry]:
+        journal = application.journal
+        if not isinstance(journal, SqliteJournal):  # pragma: no cover
+            return []
+        return await journal.recent(limit=limit, before=before)
+
     server = IpcServer(
         path=socket_path(database.parent),
         handle=application.assistant.handle,
         confirmation=confirmation,
         transcribe=transcribe,
+        history=history,
         on_close=application.aclose,
     )
 

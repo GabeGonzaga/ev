@@ -31,6 +31,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from ev.application.confirmation import ConfirmationRequest
+from ev.domain.journal import JournalEntry
 from ev.domain.results import Clarification, ToolResult
 from protocol.messages import (
     PROTOCOL_VERSION,
@@ -39,6 +40,8 @@ from protocol.messages import (
     ConfirmationRespond,
     Event,
     Hello,
+    HistoryPage,
+    HistoryQuery,
     Request,
     Response,
     ResponseError,
@@ -150,6 +153,10 @@ class SessionConfirmation:
 
 
 Handler = Callable[[str], Awaitable[ToolResult | Clarification | None]]
+History = Callable[[int, int | None], Awaitable[list[JournalEntry]]]
+"""How the daemon reads the trail back. The journal owns the storage; this is
+the only shape the socket knows about."""
+
 Transcriber = Callable[[Path, str], Awaitable[str]]
 """Audio in, words out. The daemon holds one; what implements it is
 `SpeechRecognizer`, and the daemon never learns which engine that is."""
@@ -163,12 +170,14 @@ class IpcServer:
         handle: Handler,
         confirmation: SessionConfirmation,
         transcribe: Transcriber | None = None,
+        history: History | None = None,
         on_close: Callable[[], Awaitable[None]] | None = None,
         confirmation_timeout: float = CONFIRMATION_TIMEOUT,
     ) -> None:
         self._path = path
         self._handle = handle
         self._transcribe = transcribe
+        self._history = history
         self._confirmation = confirmation
         self._on_close = on_close
         self._confirmation_timeout = confirmation_timeout
@@ -318,6 +327,10 @@ class IpcServer:
             await session.send(Response(id=request.id, ok=True))
             return
 
+        if isinstance(command, HistoryQuery):
+            await self._history_query(session, request.id, command)
+            return
+
         if isinstance(command, AudioSubmit):
             await self._audio(session, request.id, command)
             return
@@ -373,6 +386,21 @@ class IpcServer:
             session,
             request_id,
             UtteranceSubmit(text=said, locale=command.locale),
+        )
+
+    async def _history_query(
+        self, session: Session, request_id: str, command: HistoryQuery
+    ) -> None:
+        if self._history is None:
+            await self._refuse(
+                session, request_id, "no_history", "this daemon keeps no journal"
+            )
+            return
+
+        entries = await self._history(command.limit, command.before)
+        page = HistoryPage(entries=entries)
+        await session.send(
+            Response(id=request_id, ok=True, payload=json.loads(page.model_dump_json()))
         )
 
     async def _hello(self, session: Session, request_id: str, hello: Hello) -> None:

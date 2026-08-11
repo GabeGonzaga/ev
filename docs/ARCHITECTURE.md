@@ -86,11 +86,10 @@ structure shaped by symmetry rather than by a decision.
 | A new capability directory | its first tool lands |
 | `ev/router/` gains a module | tier 2 arrives (phase 1) |
 | `PolicyDecision` gains `REQUEST_PERMISSION` | a native host exists that can service it |
-| A journal read API | something reads history — the CLI or phase 3 |
 | Enforcing the `Content` marker | tools feed each other — macros, phase 4 |
 | Streaming model responses | something can render a partial answer |
 | `sqlite-vec`, FTS5 | retrieval actually lands (phase 4) |
-| TypeScript generation from `ev.schema.json` | the UI that consumes it exists (phase 3) |
+| TypeScript generation from `ev.schema.json` | the UI that consumes it exists |
 | Tauri, npm, a webview | phase 3. The host is a plain binary until then |
 | A model-based VAD | a measurement showing energy is not enough |
 | A global hotkey (event tap, Accessibility) | phase 3, with the app bundle |
