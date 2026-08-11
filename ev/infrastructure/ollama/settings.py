@@ -17,7 +17,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 SETTINGS_FILE = "models.json"
 
@@ -43,10 +43,30 @@ class ModelSettings(BaseModel):
     timeout: float = 30.0
 
 
+class RoutingSettings(BaseModel):
+    """How much of the model's self-assessment to believe.
+
+    Defaults, not findings. A model rating an invented call at 0.5 is exactly
+    what these numbers exist to catch, and `make eval` is what moves them.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    accept_at: float = Field(default=0.7, ge=0.0, le=1.0)
+    clarify_at: float = Field(default=0.4, ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def _ordered(self) -> Self:
+        if self.clarify_at > self.accept_at:
+            raise ValueError("clarify_at must not exceed accept_at")
+        return self
+
+
 class OllamaSettings(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     host: str = DEFAULT_HOST
+    routing: RoutingSettings = Field(default_factory=RoutingSettings)
     router: ModelSettings = Field(
         default_factory=lambda: ModelSettings(name=DEFAULT_MODEL)
     )

@@ -36,6 +36,23 @@ class ToolError(BaseModel):
     """For the log and the user. Never parsed."""
 
 
+class Clarification(BaseModel):
+    """Understood, but not confidently enough to act.
+
+    Carries what E.V. thinks it heard so the user can confirm or correct it.
+    No wording lives here: the phrasing belongs to whatever is talking to the
+    user, and it has to be in the language they used.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    tool: str
+    arguments: dict[str, object] = Field(default_factory=dict)
+    confidence: float
+    response: str | None = None
+    """The model's own line, in the language of the request, when it gave one."""
+
+
 class ToolResult(BaseModel):
     """The outcome of one `Registry.call()`."""
 

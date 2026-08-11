@@ -40,6 +40,19 @@ first track and lets Music continue in library order, because Music's `play`
 takes a single item. Exact album playback needs a temporary playlist, which
 mutates the library and remains a later decision.
 
+## Phase 1
+
+| | |
+|---|---|
+| Ollama client, model as configuration | done |
+| Tier 2 routing with structured output | done |
+| Confidence policy, wired into the turn | done |
+| Translation capability | |
+| `make eval` and tier 2 golden cases | |
+
+The thresholds in `models.json` are defaults, not findings. Moving them is what
+`make eval` is for: a model has been seen inventing a call and rating it 0.6.
+
 ## What each phase is waiting for
 
 **Phase 1** needs the tier 2 seam, which exists: `StaticRouter.resolve()`

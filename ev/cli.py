@@ -24,19 +24,25 @@ from pathlib import Path
 
 from ev.application.assistant import Assistant
 from ev.application.confirmation import ConfirmationRequest
-from ev.application.policy import PermissionLedger, PermissionPolicy
+from ev.application.policy import ConfidencePolicy, PermissionLedger, PermissionPolicy
 from ev.capabilities.browser.adapters import OpenAdapter
 from ev.capabilities.browser.service import BrowserService
 from ev.capabilities.browser.tools import browser_tools
 from ev.capabilities.music.adapters import MusicAdapter
 from ev.capabilities.music.service import MusicService
 from ev.capabilities.music.tools import music_tools
-from ev.domain.results import ToolResult
+from ev.domain.results import Clarification, ToolResult
 from ev.infrastructure.database.connection import connect, default_database_path
 from ev.infrastructure.database.journal import SqliteJournal
 from ev.infrastructure.database.migrations import migrate
 from ev.infrastructure.macos.applescript import AppleScriptClient
 from ev.infrastructure.macos.processes import ProcessRunner
+from ev.infrastructure.ollama.client import OllamaClient, OllamaError
+from ev.infrastructure.ollama.settings import (
+    OllamaSettings,
+    load_settings,
+    settings_path,
+)
 from ev.infrastructure.permissions import (
     grants_path,
     load_grants,
@@ -44,11 +50,17 @@ from ev.infrastructure.permissions import (
     save_grants,
 )
 from ev.registry import CallRecord, ConfirmationPort, JournalPort, Registry
+from ev.router.model import Completion, ModelRouter
 from ev.router.static import StaticRouter
 
 EXIT_OK = 0
 EXIT_FAILED = 1
 EXIT_NOT_UNDERSTOOD = 2
+EXIT_UNSURE = 3
+"""A guess E.V. would not act on. Distinct from 2: something was understood."""
+
+EXIT_UNAVAILABLE = 4
+"""Ollama is not answering. An operational fault, not a failure to understand."""
 
 
 class ConsoleConfirmation:
@@ -89,6 +101,7 @@ class Application:
     journal: JournalPort
     connection: sqlite3.Connection | None
     ledger: PermissionLedger
+    settings: OllamaSettings
 
     async def aclose(self) -> None:
         # The journal batches, so the pending tail is only durable once this
@@ -119,10 +132,15 @@ def build_registry(
 
 
 def build(
-    *, database: Path | None, confirmation: ConfirmationPort | None = None
+    *,
+    database: Path | None,
+    confirmation: ConfirmationPort | None = None,
+    model: str | None = None,
+    completion: Completion | None = None,
 ) -> Application:
     connection: sqlite3.Connection | None = None
     journal: JournalPort
+    settings = OllamaSettings()
 
     if database is None:
         journal = RefusingJournal()
@@ -131,9 +149,13 @@ def build(
         connection = connect(database)
         migrate(connection)
         journal = SqliteJournal(connection)
-        # E.V. keeps its state in one directory; the grants sit beside the
-        # journal rather than behind a second path flag.
+        # E.V. keeps its state in one directory; the grants and the model
+        # settings sit beside the journal rather than behind more path flags.
         ledger = PermissionLedger(load_grants(grants_path(database.parent)))
+        settings = load_settings(settings_path(database.parent))
+
+    if model is not None:
+        settings = settings.with_model(model)
 
     registry = build_registry(
         journal=journal,
@@ -141,12 +163,24 @@ def build(
         ledger=ledger,
     )
 
+    # Injected in tests; otherwise the configured router model.
+    router_model = completion or OllamaClient(settings).bind("router")
+
     return Application(
-        assistant=Assistant(StaticRouter(), registry),
+        assistant=Assistant(
+            StaticRouter(),
+            registry,
+            model_router=ModelRouter(router_model, registry.specs()),
+            confidence=ConfidencePolicy(
+                accept_at=settings.routing.accept_at,
+                clarify_at=settings.routing.clarify_at,
+            ),
+        ),
         registry=registry,
         journal=journal,
         connection=connection,
         ledger=ledger,
+        settings=settings,
     )
 
 
@@ -175,6 +209,23 @@ def update_grants(
     return EXIT_OK
 
 
+def render_clarification(clarification: Clarification) -> str:
+    """Ask rather than act.
+
+    The model's own line is preferred when it gave one, because it is in the
+    language of the request. The fallback is English, which is a gap the
+    language capability closes.
+    """
+    detail = ", ".join(
+        f"{key}={value}" for key, value in clarification.arguments.items()
+    )
+    guess = f"{clarification.tool}({detail})" if detail else clarification.tool
+
+    if clarification.response:
+        return f"{clarification.response} [{guess}, {clarification.confidence:.2f}]"
+    return f"Did you mean {guess}? I am only {clarification.confidence:.0%} sure."
+
+
 def render(result: ToolResult) -> str:
     if result.speech:
         return result.speech
@@ -184,17 +235,26 @@ def render(result: ToolResult) -> str:
 
 
 async def turn(application: Application, utterance: str) -> int:
-    result = await application.assistant.handle(utterance)
+    try:
+        outcome = await application.assistant.handle(utterance)
+    except OllamaError as error:
+        # Not a failure to understand: nothing was asked of the model at all.
+        print(str(error), file=sys.stderr)
+        return EXIT_UNAVAILABLE
 
-    if result is None:
+    if outcome is None:
         print("I did not understand that.", file=sys.stderr)
         return EXIT_NOT_UNDERSTOOD
 
-    if result.ok:
-        print(render(result))
+    if isinstance(outcome, Clarification):
+        print(render_clarification(outcome), file=sys.stderr)
+        return EXIT_UNSURE
+
+    if outcome.ok:
+        print(render(outcome))
         return EXIT_OK
 
-    print(render(result), file=sys.stderr)
+    print(render(outcome), file=sys.stderr)
     return EXIT_FAILED
 
 
@@ -246,10 +306,17 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         metavar="PERMISSION",
         help="undo a --grant. Repeatable.",
     )
+    parser.add_argument(
+        "--model",
+        default=None,
+        metavar="NAME",
+        help="use this model for every role, for this run only. Overrides "
+        "models.json, which is where a lasting choice belongs.",
+    )
     return parser.parse_args(argv)
 
 
-async def run(args: argparse.Namespace) -> int:
+async def run(args: argparse.Namespace, completion: Completion | None = None) -> int:
     if args.specs or args.manifest:
         # No database: these read the registry and execute nothing.
         registry = build(database=None).registry
@@ -264,7 +331,7 @@ async def run(args: argparse.Namespace) -> int:
     if args.grant or args.revoke:
         return update_grants(database.parent, args.grant, args.revoke)
 
-    application = build(database=database)
+    application = build(database=database, model=args.model, completion=completion)
     try:
         if args.repl:
             return await repl(application)
@@ -279,8 +346,12 @@ async def run(args: argparse.Namespace) -> int:
         await application.aclose()
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    return asyncio.run(run(parse_args(argv)))
+def main(
+    argv: Sequence[str] | None = None, completion: Completion | None = None
+) -> int:
+    # `completion` is the composition root's job: the suite supplies a fake
+    # model so no test ever reaches a real one.
+    return asyncio.run(run(parse_args(argv), completion))
 
 
 if __name__ == "__main__":

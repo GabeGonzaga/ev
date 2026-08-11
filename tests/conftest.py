@@ -12,7 +12,10 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
+import httpx
 import pytest
+
+from ev.infrastructure.ollama.client import OllamaClient
 
 FAKE_BIN = Path(__file__).parent / "fakes" / "bin"
 
@@ -52,6 +55,32 @@ class FakeBin:
 
     def was_run(self) -> bool:
         return bool(self.runs())
+
+
+@pytest.fixture(autouse=True)
+def no_real_ollama(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The suite must never reach a model.
+
+    This caught a real one: wiring tier 2 into the CLI made every unrouted
+    utterance in the tests call the Ollama running on the developer's machine,
+    so the suite passed or failed depending on whose laptop it was.
+
+    A client with an injected transport is fine -- that is `MockTransport`.
+    One without would open a socket, so it fails here with the fix in the
+    message. Reaching into `_client` is deliberate: it is the single point
+    every request passes through.
+    """
+    original = OllamaClient._client
+
+    def guarded(self: OllamaClient, timeout: float) -> httpx.AsyncClient:
+        if self._transport is None:
+            raise AssertionError(
+                "this test reached the real Ollama. Pass completion= to "
+                "main()/build(), or construct the client with MockTransport."
+            )
+        return original(self, timeout)
+
+    monkeypatch.setattr(OllamaClient, "_client", guarded)
 
 
 @pytest.fixture

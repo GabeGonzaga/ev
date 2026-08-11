@@ -19,6 +19,7 @@ from typing import Protocol, Self
 from pydantic import BaseModel, ConfigDict
 
 from ev.domain.permissions import Permission, PermissionState
+from ev.domain.resolution import Resolution
 from ev.domain.risk import RiskLevel
 
 
@@ -49,6 +50,38 @@ class PolicyVerdict(BaseModel):
     @classmethod
     def confirm(cls, reason: str) -> Self:
         return cls(decision=PolicyDecision.CONFIRM, reason=reason)
+
+
+class ConfidenceDecision(StrEnum):
+    ACCEPT = "accept"
+    CLARIFY = "clarify"
+    """Understood something, but not well enough to act on it unasked."""
+
+    REFUSE = "refuse"
+
+
+class ConfidencePolicy:
+    """What to do with a proposal the model is not sure about.
+
+    Tier 0 and tier 1 answer at 1.0 and sail through. This exists for tier 2,
+    where confidence is the model's own opinion of itself -- which is worth
+    something and is not worth trusting alone. A model asked something no tool
+    can do has been observed inventing a plausible call and rating it 0.5, so
+    the middle band asks rather than acts.
+    """
+
+    def __init__(self, *, accept_at: float = 0.7, clarify_at: float = 0.4) -> None:
+        if clarify_at > accept_at:
+            raise ValueError("clarify_at must not exceed accept_at")
+        self._accept_at = accept_at
+        self._clarify_at = clarify_at
+
+    def decide(self, resolution: Resolution) -> ConfidenceDecision:
+        if resolution.confidence >= self._accept_at:
+            return ConfidenceDecision.ACCEPT
+        if resolution.confidence >= self._clarify_at:
+            return ConfidenceDecision.CLARIFY
+        return ConfidenceDecision.REFUSE
 
 
 class Guarded(Protocol):

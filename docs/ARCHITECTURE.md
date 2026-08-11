@@ -10,9 +10,15 @@ utterance (verbatim, any language)
     │
     ▼
 StaticRouter.resolve()          tier 0 learned phrases, tier 1 regex
-    │   Resolution | None       None means "not mine": phase 1 hands it to tier 2
+    │   Resolution | None       None means "not mine"
     ▼
-Assistant.handle()
+ModelRouter.resolve()           tier 2, only on a static miss
+    │   Resolution | None       tool is an enum, or null to decline
+    ▼
+ConfidencePolicy                >= 0.7 act · >= 0.4 ask · below, refuse
+    │
+    ▼
+Assistant.handle()              ToolResult | Clarification | None
     │
     ▼
 Registry.call()                 the single door
@@ -50,7 +56,7 @@ satisfy them structurally, which is why neither imports the other.
 
 ## One door per subsystem
 
-Each subsystem has one public port. Today there is one:
+Each subsystem has one public port. Today there are three:
 
 | Port | Owns |
 |---|---|
@@ -81,11 +87,14 @@ structure shaped by symmetry rather than by a decision.
 | `protocol/` | phase 1.5 |
 | A second resident model | never on the interactive path |
 
-## What phase 0 does not have
+## What does not exist yet
 
-No voice, no native host, no UI, no model. `ev/router/model.py` was deleted
-rather than left empty: an empty module advertises a contract nobody has
-decided.
+No voice, no native host, no UI. Tier 2 exists; the translation capability and
+`make eval` do not.
+
+The suite reaches no model at all. An autouse fixture fails any test that would
+open a socket to Ollama, because that test would pass or fail according to
+whose machine ran it.
 
 A tool declaring a TCC permission is denied until the user asserts the grant
 (`--grant`, ADR 0007) or, from phase 1.5, a host reports it. `music.play`
@@ -118,3 +127,4 @@ nothing, because `open(1)` needs nothing.
 | [0007](adr/0007-asserted-permissions-until-a-host-reports-them.md) | The user may assert a permission until a host reports it |
 | [0008](adr/0008-applescript-values-travel-as-argv.md) | AppleScript values travel as argv; albums start at a track |
 | [0009](adr/0009-the-model-is-configuration.md) | The model is configuration; the client is httpx |
+| [0010](adr/0010-confidence-has-three-bands.md) | Confidence has three bands; the middle one asks |
