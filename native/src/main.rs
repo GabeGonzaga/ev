@@ -102,12 +102,17 @@ fn speak(text: &str, locale: &str) {
 /// Push-to-talk, as a terminal can express it: recording starts, and the
 /// keypress that ends it is the release. A global hotkey needs an event tap
 /// and an Accessibility grant, which is phase 3's problem.
-fn listen(locale: Option<&str>) -> Result<Vec<u8>, audio::Error> {
-    eprintln!("listening... press Enter to stop");
-    let samples = audio::record(|| {
-        let mut line = String::new();
-        let _ = io::stdin().read_line(&mut line);
-    })?;
+fn listen(locale: Option<&str>, vad: bool) -> Result<Vec<u8>, audio::Error> {
+    let samples = if vad {
+        eprintln!("listening... speak, and stop when you are done");
+        audio::record_until_silence(audio::Vad::default())?
+    } else {
+        eprintln!("listening... press Enter to stop");
+        audio::record(|| {
+            let mut line = String::new();
+            let _ = io::stdin().read_line(&mut line);
+        })?
+    };
 
     let seconds = samples.len() as f32 / audio::TARGET_RATE as f32;
     eprintln!("heard {seconds:.1}s");
@@ -120,12 +125,13 @@ fn run(
     utterance: String,
     aloud: bool,
     listening: bool,
+    vad: bool,
     locale: Option<String>,
 ) -> Result<u8, Error> {
     let mut client = Client::connect(&socket)?;
 
     let turn = if listening {
-        let wav = match listen(locale.as_deref()) {
+        let wav = match listen(locale.as_deref(), vad) {
             Ok(wav) => wav,
             Err(error) => {
                 eprintln!("{error}");
@@ -178,12 +184,19 @@ fn main() -> ExitCode {
     let mut words: Vec<String> = Vec::new();
     let mut aloud = false;
     let mut listening = false;
+    let mut vad = false;
     let mut locale: Option<String> = None;
 
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
             "--speak" => aloud = true,
             "--listen" => listening = true,
+            // Push-to-talk first, VAD second: CLAUDE.md's order, and the
+            // keypress stays because it is the one that always works.
+            "--vad" => {
+                listening = true;
+                vad = true;
+            }
             "--locale" => locale = arguments.next(),
             "--socket" => match arguments.next() {
                 Some(path) => socket = PathBuf::from(path),
@@ -199,13 +212,13 @@ fn main() -> ExitCode {
     if words.is_empty() && !listening {
         eprintln!(
             "usage: ev-host [--socket PATH] [--locale TAG] [--speak] \
-             [--listen | <utterance>]"
+             [--listen | --vad | <utterance>]"
         );
         return ExitCode::from(EXIT_NOT_UNDERSTOOD);
     }
 
     let _ = io::stdout().flush();
-    match run(socket, words.join(" "), aloud, listening, locale) {
+    match run(socket, words.join(" "), aloud, listening, vad, locale) {
         Ok(code) => ExitCode::from(code),
         Err(error @ Error::Unavailable(_)) => {
             eprintln!("{error}");

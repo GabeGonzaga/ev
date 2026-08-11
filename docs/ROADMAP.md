@@ -84,10 +84,15 @@ rather than theory:
 | Audio capture in the host, 16 kHz mono | done |
 | whisper.cpp behind `SpeechRecognizer`, with a language hint | done |
 | Push-to-talk (a keypress; a hotkey needs phase 3) | done |
-| VAD | |
+| VAD, energy-based and relative to the room | done |
 
 Decided: STT runs in the Python core (ADR 0018). The host captures, because
 the microphone is a TCC surface and TCC belongs to the signed process.
+
+Nothing here has heard a real voice yet: capture was verified with an immediate
+stop, transcription with synthesised speech. Whether 800 ms is the right pause
+and four times the noise floor the right threshold are questions for the first
+person who talks to it.
 
 Audible gap, now that it speaks: tool responses are composed in English, so a
 pt-PT voice reads English words. Locale-aware responses need session context,
