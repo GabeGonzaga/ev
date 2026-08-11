@@ -47,11 +47,17 @@ mutates the library and remains a later decision.
 | Ollama client, model as configuration | done |
 | Tier 2 routing with structured output | done |
 | Confidence policy, wired into the turn | done |
-| Translation capability | |
+| Translation capability | done |
 | `make eval` and tier 2 golden cases | |
 
-The thresholds in `models.json` are defaults, not findings. Moving them is what
-`make eval` is for: a model has been seen inventing a call and rating it 0.6.
+`make eval` has two specific jobs waiting for it, both from observed behaviour
+rather than theory:
+
+* The thresholds in `models.json` are defaults. A model has been seen inventing
+  a call and rating it 0.6.
+* A translation model returned its input unchanged and E.V. reported success.
+  An echo is indistinguishable from a legitimate no-op without measurement, so
+  evals must count it as a miss, in both directions, per model.
 
 ## What each phase is waiting for
 

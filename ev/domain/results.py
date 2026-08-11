@@ -90,11 +90,15 @@ class ToolResult(BaseModel):
         code: ToolErrorCode,
         message: str,
         *,
+        data: dict[str, object] | None = None,
         speech: str | None = None,
     ) -> Self:
+        # A failure may still carry data. Translation uses this to hand back
+        # the original text, because the alternative is losing it.
         return cls(
             ok=False,
             tool=tool,
+            data=data or {},
             error=ToolError(code=code, message=message),
             speech=speech,
         )

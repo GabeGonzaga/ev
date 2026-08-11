@@ -111,6 +111,39 @@ def _play(groups: Mapping[str, str]) -> dict[str, object] | None:
     return {"name": groups["name"].strip(), "kind": kind}
 
 
+_LANGUAGES = {
+    "portuguese": "pt-PT",
+    "português": "pt-PT",
+    "portugues": "pt-PT",
+    "english": "en",
+    "inglês": "en",
+    "ingles": "en",
+    "spanish": "es",
+    "espanhol": "es",
+    "french": "fr",
+    "francês": "fr",
+    "frances": "fr",
+    "german": "de",
+    "alemão": "de",
+    "alemao": "de",
+    "italian": "it",
+    "italiano": "it",
+}
+_LANGUAGE = "|".join(sorted(_LANGUAGES, key=len, reverse=True))
+
+
+def _translate(groups: Mapping[str, str]) -> dict[str, object] | None:
+    language = _LANGUAGES.get(groups["language"].casefold())
+    if language is None:
+        return None
+
+    text = groups["text"].strip()
+    if not text:
+        return None
+
+    return {"text": text, "to": language}
+
+
 @dataclass(frozen=True, slots=True)
 class Rule:
     tool: str
@@ -150,6 +183,21 @@ RULES: tuple[Rule, ...] = (
         rf"^(?:por\s+favor\s+)?(?:toca|tocar|põe|poe|coloca|pôe)\s+"
         rf"(?:o\s+|a\s+)?(?P<kind>{_KIND})\s+(?P<name>.+)$",
         _play,
+    ),
+    # Quoted only. Without quotation marks there is no way to tell where the
+    # text to translate ends and the instruction resumes, and guessing would
+    # send half a sentence to the model as if it were the whole of it.
+    _rule(
+        "language.translate",
+        rf"^(?:please\s+)?translate\s+[\"'“](?P<text>.+)[\"'”]\s+"
+        rf"(?:in)?to\s+(?P<language>{_LANGUAGE})$",
+        _translate,
+    ),
+    _rule(
+        "language.translate",
+        rf"^(?:por\s+favor\s+)?(?:traduz|traduzir|traduza)\s+[\"'“](?P<text>.+)[\"'”]\s+"
+        rf"(?:para|em)\s+(?:o\s+|a\s+)?(?P<language>{_LANGUAGE})$",
+        _translate,
     ),
 )
 

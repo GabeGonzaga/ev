@@ -82,6 +82,7 @@ structure shaped by symmetry rather than by a decision.
 | `ev/router/` gains a module | tier 2 arrives (phase 1) |
 | `PolicyDecision` gains `REQUEST_PERMISSION` | a native host exists that can service it |
 | A journal read API | something reads history — the CLI or phase 3 |
+| Enforcing the `Content` marker | tools feed each other — macros, phase 4 |
 | Streaming model responses | something can render a partial answer |
 | `sqlite-vec`, FTS5 | retrieval actually lands (phase 4) |
 | `protocol/` | phase 1.5 |
@@ -89,8 +90,8 @@ structure shaped by symmetry rather than by a decision.
 
 ## What does not exist yet
 
-No voice, no native host, no UI. Tier 2 exists; the translation capability and
-`make eval` do not.
+No voice, no native host, no UI. Tier 2 and the generation path exist;
+`make eval` does not, so nothing here is measured yet.
 
 The suite reaches no model at all. An autouse fixture fails any test that would
 open a socket to Ollama, because that test would pass or fail according to
@@ -128,3 +129,4 @@ nothing, because `open(1)` needs nothing.
 | [0008](adr/0008-applescript-values-travel-as-argv.md) | AppleScript values travel as argv; albums start at a track |
 | [0009](adr/0009-the-model-is-configuration.md) | The model is configuration; the client is httpx |
 | [0010](adr/0010-confidence-has-three-bands.md) | Confidence has three bands; the middle one asks |
+| [0011](adr/0011-generated-text-is-content-typed.md) | Generated text is content-typed; a failed translation returns the original |

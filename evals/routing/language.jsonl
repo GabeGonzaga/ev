@@ -1,0 +1,10 @@
+{"id": "translate-to-portuguese", "locale": "en", "utterance": "translate \"good morning\" to Portuguese", "tool": "language.translate", "arguments": {"text": "good morning", "to": "pt-PT"}}
+{"id": "translate-to-portuguese", "locale": "pt-PT", "utterance": "traduz \"good morning\" para português", "tool": "language.translate", "arguments": {"text": "good morning", "to": "pt-PT"}}
+{"id": "translate-to-english", "locale": "en", "utterance": "translate \"bom dia\" into English", "tool": "language.translate", "arguments": {"text": "bom dia", "to": "en"}}
+{"id": "translate-to-english", "locale": "pt-PT", "utterance": "traduz \"bom dia\" para inglês", "tool": "language.translate", "arguments": {"text": "bom dia", "to": "en"}}
+{"id": "translate-keeps-the-text-verbatim", "locale": "en", "utterance": "translate \"Olá, tudo bem? Vamos ao Porto.\" to French", "tool": "language.translate", "arguments": {"text": "Olá, tudo bem? Vamos ao Porto.", "to": "fr"}}
+{"id": "translate-keeps-the-text-verbatim", "locale": "pt-PT", "utterance": "traduz \"Olá, tudo bem? Vamos ao Porto.\" para francês", "tool": "language.translate", "arguments": {"text": "Olá, tudo bem? Vamos ao Porto.", "to": "fr"}}
+{"id": "escalate-unquoted-translation", "locale": "en", "utterance": "translate good morning to Portuguese", "tool": null, "arguments": {}}
+{"id": "escalate-unquoted-translation", "locale": "pt-PT", "utterance": "traduz bom dia para português", "tool": null, "arguments": {}}
+{"id": "escalate-unsupported-language", "locale": "en", "utterance": "translate \"good morning\" to Klingon", "tool": null, "arguments": {}}
+{"id": "escalate-unsupported-language", "locale": "pt-PT", "utterance": "traduz \"bom dia\" para klingon", "tool": null, "arguments": {}}

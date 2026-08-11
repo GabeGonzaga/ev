@@ -28,6 +28,8 @@ from ev.application.policy import ConfidencePolicy, PermissionLedger, Permission
 from ev.capabilities.browser.adapters import OpenAdapter
 from ev.capabilities.browser.service import BrowserService
 from ev.capabilities.browser.tools import browser_tools
+from ev.capabilities.language.service import LanguageService
+from ev.capabilities.language.tools import language_tools
 from ev.capabilities.music.adapters import MusicAdapter
 from ev.capabilities.music.service import MusicService
 from ev.capabilities.music.tools import music_tools
@@ -113,7 +115,11 @@ class Application:
 
 
 def build_registry(
-    *, journal: JournalPort, confirmation: ConfirmationPort, ledger: PermissionLedger
+    *,
+    journal: JournalPort,
+    confirmation: ConfirmationPort,
+    ledger: PermissionLedger,
+    generation: Completion,
 ) -> Registry:
     registry = Registry(
         policy=PermissionPolicy(ledger), confirmation=confirmation, journal=journal
@@ -125,6 +131,7 @@ def build_registry(
     for spec in (
         *browser_tools(BrowserService(OpenAdapter(processes))),
         *music_tools(MusicService(MusicAdapter(applescript))),
+        *language_tools(LanguageService(generation)),
     ):
         registry.register(spec)
 
@@ -157,14 +164,18 @@ def build(
     if model is not None:
         settings = settings.with_model(model)
 
+    # Injected in tests; otherwise the model configured for each role. One
+    # client, both paths, as CLAUDE.md requires.
+    client = None if completion is not None else OllamaClient(settings)
+    router_model: Completion = completion or client.bind("router")  # type: ignore[union-attr]
+    generation_model: Completion = completion or client.bind("generation")  # type: ignore[union-attr]
+
     registry = build_registry(
         journal=journal,
         confirmation=confirmation or ConsoleConfirmation(),
         ledger=ledger,
+        generation=generation_model,
     )
-
-    # Injected in tests; otherwise the configured router model.
-    router_model = completion or OllamaClient(settings).bind("router")
 
     return Application(
         assistant=Assistant(
