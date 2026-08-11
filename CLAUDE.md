@@ -21,6 +21,10 @@ Four parts, four responsibilities:
 | **Rust/Swift native host** | The nervous system: TCC-facing capabilities, audio, camera, NSPanel, global hotkeys |
 | **Ollama** | Proposes intent and generates content. Never receives authority over the machine |
 
+Three surfaces, one core: a CLI, a menu bar app, and a page served to this
+machine's browser. None of them executes anything — they all speak to the core,
+and the core owns the door.
+
 Target hardware: Apple M2 Pro, 32 GB. One 7B–9B quantized model resident on
 the interactive path. A larger model may exist for non-interactive work; it is
 never the voice brain.
@@ -79,9 +83,13 @@ enables.
 
 ### Interface boundary
 
-6. **The UI never executes tools and never invokes shell commands.** It sends
-   typed commands to the application core over IPC. Only `Registry.call()`
-   authorizes execution.
+6. **No UI executes tools or invokes shell commands** — not the panel, not the
+   browser page, not anything added later. A UI sends typed commands to the
+   application core and only `Registry.call()` authorizes execution.
+6a. **Every surface binds to this machine.** The IPC socket is a Unix socket;
+   the web surface binds `127.0.0.1` and never `0.0.0.0`. E.V. acts on the
+   machine it runs on, so reaching it from another one is not a feature to be
+   secured — it is a different product.
 7. **The signed native host owns TCC-facing capabilities**: microphone,
    camera, Accessibility, Apple Events. Permission state is reported to the
    Python core through typed events, never inferred.
@@ -192,8 +200,9 @@ title is not.
 Tauri 2 / Vue 3          menu bar · NSPanel · settings · history
         │ Tauri commands
 Native macOS host        TCC · signing · audio · camera · hotkeys
-        │ Unix socket, typed JSON
+        │ Unix socket, typed JSON        ┌── browser (same Vue app)
 Python core              assistant · router · policy · registry · journal
+                         ▲ loopback HTTP, token, off by default ──┘
         │
 Capabilities             browser · music · shortcuts · system · language
         │
@@ -387,8 +396,13 @@ is not one.
 
 Transport: Unix domain socket at
 `~/Library/Application Support/EV/ev.sock`, mode `0600`, newline-delimited
-JSON. **No HTTP, no localhost port.** A port is reachable by every process on
-the machine, including a browser tab.
+JSON. **The socket is the privileged channel and stays one.** It is reachable
+by this user's processes and by nothing else — no port to find, no origin to
+forge, nothing a web page can address.
+
+The browser surface below is deliberately *not* this. It is a second, weaker
+door with its own rules, and it does not replace the socket: the app and the
+CLI keep using the socket, and the web surface is off unless asked for.
 
 Two asymmetric message families, two schemas:
 
@@ -401,6 +415,50 @@ Two asymmetric message families, two schemas:
 Schemas live in `protocol/` and are the single source of truth for three
 languages. `protocol/generated/` **is committed**, and CI regenerates and fails
 on any diff — otherwise the Python, Rust and TypeScript views drift.
+
+---
+
+## The local web surface
+
+E.V. has three faces and one core: the CLI, the menu bar app, and a page in
+this machine's browser. The page exists so E.V. is usable without building a
+Rust app — the same panel, in a browser tab, on the machine it acts upon.
+
+**It adds; it removes nothing.** The CLI and the app keep talking over the
+socket and are unaffected by whether this is running. Nothing here is a
+migration, and the socket does not become legacy: it stays the channel the
+signed host uses, because it is the one a web page cannot address.
+
+It is the weakest of the three doors and is written down as such. A Unix socket
+cannot be addressed by a web page at all; a loopback port can be addressed by
+every tab you have open, and a hostile page will try. These are not
+suggestions:
+
+- **Loopback only.** Bind `127.0.0.1`. Binding `0.0.0.0` is a defect, not a
+  configuration.
+- **Off by default.** It runs only when asked for (`--web`). A surface that
+  exists by default is a surface an attacker can rely on existing.
+- **A token on every request.** Generated per daemon run, stored `0600` beside
+  the journal, never logged and never journalled. No token, no answer — not
+  even a helpful error naming what would have worked.
+- **`Host` and `Origin` are validated on every request**, and anything else is
+  refused. This is what stops DNS rebinding turning "localhost only" into
+  "any site you happened to visit".
+- **No CORS.** The page is served by the same origin it talks to. There is no
+  legitimate cross-origin caller.
+- **The page executes nothing.** It posts commands; `Registry.call()`
+  authorizes. Invariant 6 covers it exactly as it covers the panel.
+- **Confirmation happens in the page**, as an event and an answer, and a
+  question nobody answers is a decline — the same rule as the terminal and the
+  socket.
+- **The browser owns the microphone here.** `getUserMedia` asks in the
+  browser's name, not E.V.'s, and the audio takes the same `audio.submit` path.
+  The signed host remains the only TCC-facing capability holder; the page is
+  not one, and must not pretend to be.
+
+One UI, two shells: the same Vue application is served by the daemon and
+embedded in the app, differing only in how it reaches the core — `fetch` in a
+browser, Tauri commands in the panel.
 
 The Tauri host spawns the Python daemon as a sidecar and owns its lifetime.
 Handshake carries a protocol version; a mismatch refuses to start rather than
@@ -463,8 +521,10 @@ pipeline is stable.
 Do not introduce, and push back if asked:
 
 - LangChain or any agent framework. The registry is the framework.
-- Electron. A browser tab as the final interface.
-- Nuxt, Astro, SSR. The UI is Vite + Vue 3 + Pinia, SPA, inside Tauri.
+- Electron, and any browser tab reachable from another machine. A local page
+  served on loopback is a supported surface; a shipped web application is not.
+- Nuxt, Astro, SSR. The UI is Vite + Vue 3 + Pinia, SPA — one application,
+  embedded in the Tauri app and served by the daemon to a local browser.
 - Chroma, Qdrant, pgvector. Retrieval is FTS5 + `sqlite-vec` in the same file.
 - Models above ~9B on the interactive path.
 - A generic app controller driven by Accessibility.
@@ -480,10 +540,10 @@ Do not introduce, and push back if asked:
 | Phase | Scope | State |
 |---|---|---|
 | 0 | Headless core: registry, journal, migrations, tools, CLI | done |
-| 1 | Ollama tier 2, structured output, evals, confidence policy, translation capability | current |
-| 1.5 | Typed IPC protocol + signed native host skeleton | |
-| 2 | Push-to-talk, VAD, whisper.cpp, AVSpeechSynthesizer | |
-| 3 | Tauri, menu bar, NSPanel, settings, history | |
+| 1 | Ollama tier 2, structured output, evals, confidence policy, translation capability | done |
+| 1.5 | Typed IPC protocol + signed native host skeleton | done |
+| 2 | Push-to-talk, VAD, whisper.cpp, AVSpeechSynthesizer | done |
+| 3 | Tauri, menu bar, NSPanel, settings, history, local web surface | current |
 | 4 | JSON macros, more adapters, retrieval | |
 | 5 | Camera and vision | |
 | 6 | Wake word, continuous interaction | |

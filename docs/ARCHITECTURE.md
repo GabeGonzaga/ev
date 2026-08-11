@@ -168,4 +168,4 @@ nothing, because `open(1)` needs nothing.
 | [0017](adr/0017-the-native-host-skeleton.md) | The native host skeleton, and what a second language found |
 | [0018](adr/0018-where-speech-happens.md) | Where speech happens: capture is native, transcription is core |
 | [0019](adr/0019-capture-in-the-host.md) | Capture in the host, and what the microphone actually asked |
-| [0020](adr/0020-vad-is-energy-based-and-relative-to-the-room.md) | VAD is energy-based, and relative to the room |\n| [0021](adr/0021-the-app-is-the-tcc-subject.md) | The app is the TCC subject; the panel executes nothing |
+| [0020](adr/0020-vad-is-energy-based-and-relative-to-the-room.md) | VAD is energy-based, and relative to the room |\n| [0021](adr/0021-the-app-is-the-tcc-subject.md) | The app is the TCC subject; the panel executes nothing |\n| [0022](adr/0022-a-local-web-surface-beside-the-socket.md) | A local web surface, beside the socket and not instead of it |
