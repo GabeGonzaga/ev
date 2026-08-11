@@ -108,3 +108,4 @@ needs no permission — is the capability that proves the chain.
 | [0004](adr/0004-sqlite-is-synchronous-and-the-journal-batches.md) | SQLite is synchronous; the journal batches |
 | [0005](adr/0005-adapters-receive-argv-and-a-constrained-type.md) | Adapters receive argv and constrained types |
 | [0006](adr/0006-the-static-router-escalates-rather-than-guesses.md) | The static router escalates rather than guesses |
+| [0007](adr/0007-asserted-permissions-until-a-host-reports-them.md) | The user may assert a permission until a host reports it |

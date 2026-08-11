@@ -29,7 +29,7 @@ chain testable on Linux.
 | First capability end to end: `browser.open_url` | done |
 | Static router, tier 0 and tier 1, golden cases in PT and EN | done |
 | CLI: one-shot, `--repl`, `--specs`, `--manifest` | done |
-| Seeded permission ledger, so AppleScript tools are reachable before the host exists | |
+| Asserted permissions, so AppleScript tools are reachable before the host exists | done |
 | `music.play` over AppleScript | |
 
 Phase 0 is not finished while every AppleScript tool is unreachable. ADR 0003

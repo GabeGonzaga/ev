@@ -33,6 +33,12 @@ from ev.infrastructure.database.connection import connect, default_database_path
 from ev.infrastructure.database.journal import SqliteJournal
 from ev.infrastructure.database.migrations import migrate
 from ev.infrastructure.macos.processes import ProcessRunner
+from ev.infrastructure.permissions import (
+    grants_path,
+    load_grants,
+    parse_permission,
+    save_grants,
+)
 from ev.registry import CallRecord, ConfirmationPort, JournalPort, Registry
 from ev.router.static import StaticRouter
 
@@ -78,6 +84,7 @@ class Application:
     registry: Registry
     journal: JournalPort
     connection: sqlite3.Connection | None
+    ledger: PermissionLedger
 
     async def aclose(self) -> None:
         # The journal batches, so the pending tail is only durable once this
@@ -110,15 +117,19 @@ def build(
 
     if database is None:
         journal = RefusingJournal()
+        ledger = PermissionLedger()
     else:
         connection = connect(database)
         migrate(connection)
         journal = SqliteJournal(connection)
+        # E.V. keeps its state in one directory; the grants sit beside the
+        # journal rather than behind a second path flag.
+        ledger = PermissionLedger(load_grants(grants_path(database.parent)))
 
     registry = build_registry(
         journal=journal,
         confirmation=confirmation or ConsoleConfirmation(),
-        ledger=PermissionLedger(),
+        ledger=ledger,
     )
 
     return Application(
@@ -126,7 +137,33 @@ def build(
         registry=registry,
         journal=journal,
         connection=connection,
+        ledger=ledger,
     )
+
+
+def update_grants(
+    state_dir: Path, granting: Sequence[str], revoking: Sequence[str]
+) -> int:
+    path = grants_path(state_dir)
+
+    try:
+        granted = set(load_grants(path))
+        granted |= {parse_permission(name) for name in granting}
+        granted -= {parse_permission(name) for name in revoking}
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return EXIT_FAILED
+
+    save_grants(path, granted)
+
+    print(", ".join(sorted(item.value for item in granted)) or "(none)")
+    # Said plainly, because the word "grant" invites the wrong conclusion.
+    print(
+        f"recorded in {path}. This grants nothing: macOS still prompts and can "
+        "still refuse. It only stops E.V. refusing first.",
+        file=sys.stderr,
+    )
+    return EXIT_OK
 
 
 def render(result: ToolResult) -> str:
@@ -184,6 +221,22 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         default=None,
         help=f"journal database (default: {default_database_path()})",
     )
+    parser.add_argument(
+        "--grant",
+        action="append",
+        default=[],
+        metavar="PERMISSION",
+        help="record that you have granted a TCC permission to E.V. in System "
+        "Settings. This grants nothing by itself; it stops E.V. refusing "
+        "before macOS is asked. Repeatable.",
+    )
+    parser.add_argument(
+        "--revoke",
+        action="append",
+        default=[],
+        metavar="PERMISSION",
+        help="undo a --grant. Repeatable.",
+    )
     return parser.parse_args(argv)
 
 
@@ -197,7 +250,12 @@ async def run(args: argparse.Namespace) -> int:
         print(json.dumps(payload, indent=2, ensure_ascii=False))
         return EXIT_OK
 
-    application = build(database=args.database or default_database_path())
+    database = args.database or default_database_path()
+
+    if args.grant or args.revoke:
+        return update_grants(database.parent, args.grant, args.revoke)
+
+    application = build(database=database)
     try:
         if args.repl:
             return await repl(application)

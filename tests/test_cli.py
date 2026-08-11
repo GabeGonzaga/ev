@@ -11,8 +11,10 @@ from ev.cli import (
     EXIT_NOT_UNDERSTOOD,
     EXIT_OK,
     ConsoleConfirmation,
+    build,
     main,
 )
+from ev.domain.permissions import Permission, PermissionState
 from tests.conftest import FakeBin
 
 
@@ -201,3 +203,59 @@ async def test_a_non_interactive_stdin_declines(
     )
 
     assert granted is False
+
+
+# --- asserted permissions -------------------------------------------------
+
+
+def test_grant_records_the_permission_and_says_what_it_does_not_do(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code = main(["--database", str(tmp_path / "ev.db"), "--grant", "apple_events"])
+
+    captured = capsys.readouterr()
+    assert code == EXIT_OK
+    assert captured.out.strip() == "apple_events"
+    assert "grants nothing" in captured.err
+    assert json.loads((tmp_path / "permissions.json").read_text()) == {
+        "granted": ["apple_events"]
+    }
+
+
+def test_a_grant_is_loaded_on_the_next_run(tmp_path: Path) -> None:
+    database = tmp_path / "ev.db"
+    main(["--database", str(database), "--grant", "apple_events"])
+
+    application = build(database=database)
+
+    assert application.ledger.state(Permission.APPLE_EVENTS) is PermissionState.GRANTED
+    assert application.ledger.state(Permission.CAMERA) is PermissionState.UNDETERMINED
+
+
+def test_revoke_undoes_a_grant(tmp_path: Path) -> None:
+    database = tmp_path / "ev.db"
+    main(["--database", str(database), "--grant", "apple_events"])
+    main(["--database", str(database), "--revoke", "apple_events"])
+
+    application = build(database=database)
+
+    assert (
+        application.ledger.state(Permission.APPLE_EVENTS)
+        is PermissionState.UNDETERMINED
+    )
+
+
+def test_an_unknown_permission_is_refused_with_the_known_ones(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code = main(["--database", str(tmp_path / "ev.db"), "--grant", "mic"])
+
+    assert code == EXIT_FAILED
+    assert "microphone" in capsys.readouterr().err
+    assert not (tmp_path / "permissions.json").exists()
+
+
+def test_granting_runs_no_tool(tmp_path: Path, fake_bin: FakeBin) -> None:
+    main(["--database", str(tmp_path / "ev.db"), "--grant", "apple_events"])
+
+    assert not fake_bin.was_run()
