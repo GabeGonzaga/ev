@@ -99,7 +99,9 @@ nothing, because `open(1)` needs nothing.
 - Database tests run against a real file, not `:memory:` — WAL is a no-op in
   memory.
 - The suite runs on Linux. That is the fast feedback loop, and it is why every
-  macOS boundary is behind a port.
+  macOS boundary is behind a port. CI runs `make test` and `make lint` on
+  `ubuntu-latest` and `macos-latest`; a test that passes only on the Mac means
+  a boundary escaped its port.
 
 ## Decisions
 
