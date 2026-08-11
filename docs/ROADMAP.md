@@ -81,9 +81,10 @@ rather than theory:
 |---|---|
 | `SpeechSynthesizer`, and the host speaking `speech.requested` | done |
 | `audio.submit` at protocol 1.1, transcribed by the core | done |
-| Audio capture in the host | |
+| Audio capture in the host, 16 kHz mono | done |
 | whisper.cpp behind `SpeechRecognizer`, with a language hint | done |
-| Push-to-talk, then VAD | |
+| Push-to-talk (a keypress; a hotkey needs phase 3) | done |
+| VAD | |
 
 Decided: STT runs in the Python core (ADR 0018). The host captures, because
 the microphone is a TCC surface and TCC belongs to the signed process.

@@ -12,6 +12,7 @@
 //!     ev-host "abre example.com"
 //!     ev-host --socket /tmp/ev/ev.sock "open github.com"
 
+mod audio;
 mod client;
 
 /// The generated view of the contract, produced from
@@ -98,9 +99,49 @@ fn speak(text: &str, locale: &str) {
     }
 }
 
-fn run(socket: PathBuf, utterance: String, aloud: bool) -> Result<u8, Error> {
+/// Push-to-talk, as a terminal can express it: recording starts, and the
+/// keypress that ends it is the release. A global hotkey needs an event tap
+/// and an Accessibility grant, which is phase 3's problem.
+fn listen(locale: Option<&str>) -> Result<Vec<u8>, audio::Error> {
+    eprintln!("listening... press Enter to stop");
+    let samples = audio::record(|| {
+        let mut line = String::new();
+        let _ = io::stdin().read_line(&mut line);
+    })?;
+
+    let seconds = samples.len() as f32 / audio::TARGET_RATE as f32;
+    eprintln!("heard {seconds:.1}s");
+    let _ = locale;
+    audio::to_wav(&samples)
+}
+
+fn run(
+    socket: PathBuf,
+    utterance: String,
+    aloud: bool,
+    listening: bool,
+    locale: Option<String>,
+) -> Result<u8, Error> {
     let mut client = Client::connect(&socket)?;
-    let turn = client.submit(&utterance, None, &mut ask)?;
+
+    let turn = if listening {
+        let wav = match listen(locale.as_deref()) {
+            Ok(wav) => wav,
+            Err(error) => {
+                eprintln!("{error}");
+                return Ok(EXIT_FAILED);
+            }
+        };
+        client.submit_audio(&wav, locale.as_deref(), &mut ask)?
+    } else {
+        client.submit(&utterance, locale.as_deref(), &mut ask)?
+    };
+
+    if let Some(heard) = &turn.heard {
+        // Printed even when it is right: being misheard should be visible in
+        // the words, not inferred from the wrong thing happening.
+        eprintln!("heard: {heard}");
+    }
 
     for spoken in &turn.speech {
         // speech.requested is the daemon asking for a sentence to be spoken.
@@ -110,6 +151,13 @@ fn run(socket: PathBuf, utterance: String, aloud: bool) -> Result<u8, Error> {
         if aloud {
             speak(&spoken.text, &spoken.voice);
         }
+    }
+
+    // A refusal from the daemon -- nothing was said, transcription failed, a
+    // tool was denied -- has a reason. Printing the exit code alone and
+    // swallowing the sentence is how a failure becomes a mystery.
+    if let Some(error) = &turn.response.error {
+        eprintln!("{}", error.message);
     }
 
     let payload = &turn.response.payload;
@@ -129,10 +177,14 @@ fn main() -> ExitCode {
     let mut socket = default_socket();
     let mut words: Vec<String> = Vec::new();
     let mut aloud = false;
+    let mut listening = false;
+    let mut locale: Option<String> = None;
 
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
             "--speak" => aloud = true,
+            "--listen" => listening = true,
+            "--locale" => locale = arguments.next(),
             "--socket" => match arguments.next() {
                 Some(path) => socket = PathBuf::from(path),
                 None => {
@@ -144,13 +196,16 @@ fn main() -> ExitCode {
         }
     }
 
-    if words.is_empty() {
-        eprintln!("usage: ev-host [--socket PATH] [--speak] <utterance>");
+    if words.is_empty() && !listening {
+        eprintln!(
+            "usage: ev-host [--socket PATH] [--locale TAG] [--speak] \
+             [--listen | <utterance>]"
+        );
         return ExitCode::from(EXIT_NOT_UNDERSTOOD);
     }
 
     let _ = io::stdout().flush();
-    match run(socket, words.join(" "), aloud) {
+    match run(socket, words.join(" "), aloud, listening, locale) {
         Ok(code) => ExitCode::from(code),
         Err(error @ Error::Unavailable(_)) => {
             eprintln!("{error}");

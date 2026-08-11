@@ -15,6 +15,9 @@ use std::path::PathBuf;
 use std::thread;
 
 #[path = "../src/client.rs"]
+// This test binary uses part of the client, not all of it: the audio path is
+// exercised against the real daemon, not a fake one.
+#[allow(dead_code)]
 mod client;
 
 #[path = "../../protocol/generated/rust/protocol.rs"]

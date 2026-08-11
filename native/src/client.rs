@@ -56,6 +56,8 @@ impl From<std::io::Error> for Error {
 /// this fails to deserialise instead of quietly reading the wrong field.
 #[derive(Debug)]
 pub struct Turn {
+    /// What the core heard, when the turn began as speech.
+    pub heard: Option<String>,
     pub speech: Vec<SpeechRequested>,
     pub response: Response,
 }
@@ -142,21 +144,48 @@ impl Client {
         }
     }
 
-    /// One turn. `answer` decides confirmations; the host does not decide them
-    /// itself, which is the same rule the CLI follows.
+    /// One turn from typed text.
     pub fn submit(
         &mut self,
         text: &str,
         locale: Option<&str>,
         answer: &mut dyn FnMut(&Value) -> bool,
     ) -> Result<Turn, Error> {
-        let id = self.next_id();
-        self.write(
-            &id,
+        self.turn(
             json!({ "type": "utterance.submit", "text": text, "locale": locale }),
-        )?;
+            answer,
+        )
+    }
+
+    /// One turn from recorded speech. The core transcribes and then routes
+    /// exactly as if the words had been typed, so everything after this point
+    /// is identical -- including what is journalled.
+    pub fn submit_audio(
+        &mut self,
+        wav: &[u8],
+        locale: Option<&str>,
+        answer: &mut dyn FnMut(&Value) -> bool,
+    ) -> Result<Turn, Error> {
+        use base64::Engine as _;
+        let encoded = base64::engine::general_purpose::STANDARD.encode(wav);
+        self.turn(
+            json!({ "type": "audio.submit", "audio": encoded, "locale": locale }),
+            answer,
+        )
+    }
+
+    /// `answer` decides confirmations; the host does not decide them itself,
+    /// which is the same rule the CLI follows.
+    fn turn(
+        &mut self,
+        command: Value,
+        answer: &mut dyn FnMut(&Value) -> bool,
+    ) -> Result<Turn, Error> {
+        let id = self.next_id();
+        self.write(&id, command)?;
 
         let mut speech = Vec::new();
+        let mut heard = None;
 
         loop {
             let message = self.read()?;
@@ -164,7 +193,11 @@ impl Client {
             if message.get("type").is_none() && message["id"] == json!(id) {
                 let response = serde_json::from_value(message)
                     .map_err(|error| Error::Malformed(error.to_string()))?;
-                return Ok(Turn { speech, response });
+                return Ok(Turn {
+                    heard,
+                    speech,
+                    response,
+                });
             }
 
             // Dispatch on the discriminator rather than on shape. The
@@ -184,6 +217,11 @@ impl Client {
                             "granted": granted,
                         }),
                     )?;
+                }
+                Some("transcription.partial") => {
+                    // What E.V. heard, before it acts on it. Worth showing
+                    // even when it is right, and especially when it is not.
+                    heard = message["text"].as_str().map(str::to_string);
                 }
                 Some("speech.requested") => {
                     speech.push(

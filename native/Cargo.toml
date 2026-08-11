@@ -6,6 +6,9 @@ description = "The native host: the signed process that talks to the E.V. daemon
 publish = false
 
 [dependencies]
+base64 = "0.22"
+cpal = "0.15"
+hound = "3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # The socket, and nothing else. No HTTP client, no async runtime yet: the host

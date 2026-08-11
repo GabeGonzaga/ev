@@ -92,14 +92,20 @@ structure shaped by symmetry rather than by a decision.
 | `sqlite-vec`, FTS5 | retrieval actually lands (phase 4) |
 | TypeScript generation from `ev.schema.json` | the UI that consumes it exists (phase 3) |
 | Tauri, npm, a webview | phase 3. The host is a plain binary until then |
-| Audio, camera, Accessibility in `native/` | phase 2 and later, one decision each |
+| A global hotkey (event tap, Accessibility) | phase 3, with the app bundle |
+| `AudioSession` as a type | the host needs ducking, routes or interruptions |
+| Camera, Accessibility in `native/` | phase 5 and later, one decision each |
 | A second resident model | never on the interactive path |
 
 ## What does not exist yet
 
-No UI, and nothing captures audio yet: the daemon transcribes what it is
-handed, but nobody is holding a microphone, so every utterance still starts as
-text. No TCC-facing capability is implemented, no Tauri.
+No UI, no VAD, no wake word, no Tauri.
+
+The voice loop closes: the host records on a keypress, the core transcribes and
+routes, and the host speaks the answer. What it does not have is its own TCC
+identity -- launched from a shell, macOS attributes the microphone request to
+the terminal, and the host gets an identity of its own when it becomes a
+bundled app (ADR 0019).
 
 Tier 2, the generation path and `make eval` exist. `qwen3:8b` is the measured
 default (ADR 0013): 17/18 routing, 0/8 inventions, 10/10 arguments accepted.
@@ -153,3 +159,4 @@ nothing, because `open(1)` needs nothing.
 | [0016](adr/0016-the-daemon-and-why-not-for-the-reason-given.md) | The daemon, and not for the reason I gave |
 | [0017](adr/0017-the-native-host-skeleton.md) | The native host skeleton, and what a second language found |
 | [0018](adr/0018-where-speech-happens.md) | Where speech happens: capture is native, transcription is core |
+| [0019](adr/0019-capture-in-the-host.md) | Capture in the host, and what the microphone actually asked |
