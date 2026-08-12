@@ -421,7 +421,7 @@ async def test_an_unbound_confirmation_declines() -> None:
 async def test_a_refused_handshake_reaches_the_client(state: Path) -> None:
     core = Core()
     async for _ in start(state, core):
-        with pytest.raises(DaemonRefused, match=r"speaks 1\.2"):
+        with pytest.raises(DaemonRefused, match=r"speaks 1\.3"):
             async with IpcClient(socket_path(state), protocol="0.9"):
                 pass
         break
@@ -618,7 +618,9 @@ async def test_history_is_asked_for_not_pushed(state: Path) -> None:
     from ev.domain.journal import JournalEntry
     from protocol.messages import HistoryQuery
 
-    async def history(limit: int, before: int | None) -> list[JournalEntry]:
+    async def history(
+        limit: int, before: int | None, query: str | None = None
+    ) -> list[JournalEntry]:
         return [
             JournalEntry(
                 id=2,

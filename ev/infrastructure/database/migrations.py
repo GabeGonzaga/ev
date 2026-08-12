@@ -44,6 +44,61 @@ MIGRATIONS: tuple[Migration, ...] = (
             "CREATE INDEX journal_tool ON journal (tool)",
         ),
     ),
+    Migration(
+        version=2,
+        name="journal search",
+        statements=(
+            # External content: the text lives in `journal` and the index
+            # points at it, so nothing is stored twice and the trail stays the
+            # one source of truth.
+            #
+            # `remove_diacritics 2` is why "marco" finds "Março". Whisper
+            # writes accents inconsistently on short utterances and nobody
+            # types them into a search box, so folding them is the difference
+            # between finding a turn and being told it never happened.
+            """
+            CREATE VIRTUAL TABLE journal_fts USING fts5(
+                tool,
+                arguments,
+                speech,
+                content='journal',
+                content_rowid='id',
+                tokenize="unicode61 remove_diacritics 2"
+            )
+            """,
+            # Everything already recorded, indexed in place. A search that
+            # only knew about turns taken after an upgrade would be worse than
+            # no search: it would answer, and be wrong.
+            """
+            INSERT INTO journal_fts (rowid, tool, arguments, speech)
+            SELECT id, tool, arguments, speech FROM journal
+            """,
+            """
+            CREATE TRIGGER journal_ai AFTER INSERT ON journal BEGIN
+                INSERT INTO journal_fts (rowid, tool, arguments, speech)
+                VALUES (new.id, new.tool, new.arguments, new.speech);
+            END
+            """,
+            # The journal is append-only today. These two exist so that stays
+            # a property of the code rather than a thing the index depends on:
+            # an external-content index left behind by a delete answers with
+            # rows that are not there any more.
+            """
+            CREATE TRIGGER journal_ad AFTER DELETE ON journal BEGIN
+                INSERT INTO journal_fts (journal_fts, rowid, tool, arguments, speech)
+                VALUES ('delete', old.id, old.tool, old.arguments, old.speech);
+            END
+            """,
+            """
+            CREATE TRIGGER journal_au AFTER UPDATE ON journal BEGIN
+                INSERT INTO journal_fts (journal_fts, rowid, tool, arguments, speech)
+                VALUES ('delete', old.id, old.tool, old.arguments, old.speech);
+                INSERT INTO journal_fts (rowid, tool, arguments, speech)
+                VALUES (new.id, new.tool, new.arguments, new.speech);
+            END
+            """,
+        ),
+    ),
 )
 
 

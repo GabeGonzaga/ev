@@ -184,6 +184,9 @@ async def test_a_failed_write_keeps_the_records_pending(
     await journal.record(call())
 
     connection.execute("DROP TABLE journal")
+    # And the index over it: migration 2 recreates both, and a half-dropped
+    # schema is not what this test is about.
+    connection.execute("DROP TABLE journal_fts")
     with pytest.raises(sqlite3.OperationalError):
         await journal.flush()
 
@@ -250,3 +253,99 @@ async def test_a_failure_keeps_its_reason_in_the_trail(
     assert entry.ok is False
     assert entry.error_code == "permission_denied"
     assert entry.error_message == "needs apple_events"
+
+
+# --- search ---------------------------------------------------------------
+
+
+async def test_a_search_finds_a_turn_by_what_it_was_asked_for(
+    connection: sqlite3.Connection,
+) -> None:
+    journal = SqliteJournal(connection, clock=Clock())
+    await journal.record(
+        call(tool="music.play", arguments={"name": "Blonde", "kind": "album"})
+    )
+    await journal.record(call(tool="browser.open_url"))
+
+    found = await journal.search("blonde")
+
+    assert [entry.tool for entry in found] == ["music.play"]
+
+
+async def test_a_search_flushes_first(connection: sqlite3.Connection) -> None:
+    # The batch exists so the voice path does not commit per turn. A search
+    # that cannot find what just happened is not a search of the journal.
+    journal = SqliteJournal(connection, batch_size=50, clock=Clock())
+    await journal.record(call(tool="music.play", arguments={"name": "Blonde"}))
+
+    assert len(await journal.search("blonde")) == 1
+
+
+async def test_accents_are_folded_in_both_directions(
+    connection: sqlite3.Connection,
+) -> None:
+    # Whisper writes accents inconsistently on short utterances and nobody
+    # types them into a search box. pt-PT is the locale, so this is not an
+    # edge case.
+    journal = SqliteJournal(connection, clock=Clock())
+    await journal.record(
+        call(tool="notes.create", arguments={"title": "Reunião de Março"})
+    )
+
+    assert len(await journal.search("marco")) == 1
+    assert len(await journal.search("reuniao")) == 1
+
+
+async def test_a_prefix_matches_the_word_being_typed(
+    connection: sqlite3.Connection,
+) -> None:
+    journal = SqliteJournal(connection, clock=Clock())
+    await journal.record(call(tool="music.play", arguments={"name": "Blonde"}))
+
+    assert len(await journal.search("blon")) == 1
+
+
+async def test_two_words_mean_both(connection: sqlite3.Connection) -> None:
+    journal = SqliteJournal(connection, clock=Clock())
+    await journal.record(call(tool="music.play", arguments={"name": "Blonde"}))
+    await journal.record(call(tool="music.play", arguments={"name": "Channel Orange"}))
+
+    assert len(await journal.search("blonde orange")) == 0
+
+
+async def test_fts_syntax_in_a_search_is_a_search_not_a_syntax_error(
+    connection: sqlite3.Connection,
+) -> None:
+    """FTS5's MATCH takes a query language. Passing someone's words to it
+    unchanged makes `blonde AND` an exception and `name:` a column filter."""
+    journal = SqliteJournal(connection, clock=Clock())
+    await journal.record(call(tool="music.play", arguments={"name": "Blonde"}))
+
+    for text in ("blonde AND", "name:", '"', "NEAR(a b)", "blonde OR *", "^ blonde"):
+        assert await journal.search(text) is not None
+
+
+async def test_nothing_to_search_finds_nothing(
+    connection: sqlite3.Connection,
+) -> None:
+    # Punctuation alone is not a query. Answering it with the whole history
+    # would be answering a different question.
+    journal = SqliteJournal(connection, clock=Clock())
+    await journal.record(call(tool="music.play", arguments={"name": "Blonde"}))
+
+    assert await journal.search("  ...  ") == []
+
+
+async def test_results_are_newest_first(connection: sqlite3.Connection) -> None:
+    # Not by rank: bm25 would put a turn from March above yesterday's for
+    # saying "Blonde" twice, and someone searching their own history is
+    # asking when they did something.
+    journal = SqliteJournal(connection, clock=Clock())
+    for _ in range(3):
+        await journal.record(call(tool="music.play", arguments={"name": "Blonde"}))
+
+    found = await journal.search("blonde")
+
+    assert [entry.id for entry in found] == sorted(
+        (entry.id for entry in found), reverse=True
+    )

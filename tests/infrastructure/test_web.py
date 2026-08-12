@@ -238,7 +238,9 @@ async def test_audio_is_transcribed_then_routed(tmp_path: Path) -> None:
 
 @pytest.mark.asyncio
 async def test_history_is_served(tmp_path: Path) -> None:
-    async def history(limit: int, before: int | None) -> list[JournalEntry]:
+    async def history(
+        limit: int, before: int | None, query: str | None = None
+    ) -> list[JournalEntry]:
         return [
             JournalEntry(
                 id=1,
@@ -260,6 +262,28 @@ async def test_history_is_served(tmp_path: Path) -> None:
         (entry,) = answer.json()["entries"]
         assert entry["tool"] == "music.play"
         assert entry["risk"] == "sensitive"
+
+
+@pytest.mark.asyncio
+async def test_a_search_reaches_the_journal(tmp_path: Path) -> None:
+    asked: list[str | None] = []
+
+    async def history(
+        limit: int, before: int | None, query: str | None = None
+    ) -> list[JournalEntry]:
+        asked.append(query)
+        return []
+
+    core = Core()
+    async with (
+        surface(tmp_path, core, history=history) as (web, base),
+        httpx.AsyncClient() as client,
+    ):
+        for suffix in ("?q=blonde", "?q=", ""):
+            await client.get(f"{base}/api/history{suffix}", headers=headers(web.token))
+
+    # An empty box is the whole trail, not an empty search.
+    assert asked == ["blonde", None, None]
 
 
 @pytest.mark.asyncio

@@ -81,10 +81,14 @@ export const listen = (wav: Blob | null, locale: string | null) =>
         });
       })();
 
-export const history = (limit = 20) =>
+/// The trail, or a search of it. An empty query is the whole trail, which is
+/// what an empty search box means.
+export const history = (limit = 20, query: string | null = null) =>
   inTauri
-    ? callTauri<{ entries: JournalEntry[] }>("history", { limit })
-    : http<{ entries: JournalEntry[] }>(`/api/history?limit=${limit}`);
+    ? callTauri<{ entries: JournalEntry[] }>("history", { limit, query })
+    : http<{ entries: JournalEntry[] }>(
+        `/api/history?limit=${limit}` + (query ? `&q=${encodeURIComponent(query)}` : ""),
+      );
 
 export const setLocale = (locale: string | null) =>
   inTauri ? callTauri<void>("set_locale", { locale }) : Promise.resolve();

@@ -151,11 +151,11 @@ async fn listen(app: AppHandle, session: State<'_, Session>) -> Result<TurnResul
 }
 
 #[tauri::command]
-async fn history(limit: u32) -> Result<serde_json::Value, String> {
+async fn history(limit: u32, query: Option<String>) -> Result<serde_json::Value, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let mut client = Client::connect(&socket()).map_err(|error| error.to_string())?;
         client
-            .history(limit)
+            .history(limit, query)
             .map_err(|error: ev_host::client::Error| error.to_string())
     })
     .await

@@ -395,6 +395,13 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         help="what E.V. has done, newest first",
     )
     parser.add_argument(
+        "--find",
+        default=None,
+        metavar="TEXT",
+        help="search what E.V. has done: a tool, an album, a note's title. "
+        "Accents are folded, so 'marco' finds 'Março'.",
+    )
+    parser.add_argument(
         "--locale",
         default=None,
         metavar="TAG",
@@ -454,6 +461,9 @@ async def run(args: argparse.Namespace, completion: Completion | None = None) ->
 
     if args.grant or args.revoke:
         return update_grants(database.parent, args.grant, args.revoke)
+
+    if args.find is not None:
+        return await show_history(database, args.history or 20, search=args.find)
 
     if args.history is not None:
         return await show_history(database, args.history)
@@ -538,7 +548,7 @@ def show_macros(database: Path, registry: Registry) -> int:
     return EXIT_FAILED if broken else EXIT_OK
 
 
-async def show_history(database: Path, limit: int) -> int:
+async def show_history(database: Path, limit: int, *, search: str | None = None) -> int:
     """The trail, read back. The same rows the UI will show in phase 3."""
     application = build(database=database, completion=_NoModel())
     try:
@@ -546,9 +556,19 @@ async def show_history(database: Path, limit: int) -> int:
         if not isinstance(journal, SqliteJournal):  # pragma: no cover
             return EXIT_FAILED
 
-        entries = await journal.recent(limit=limit)
+        entries = (
+            await journal.search(search, limit=limit)
+            if search is not None
+            else await journal.recent(limit=limit)
+        )
         if not entries:
-            print("nothing yet.", file=sys.stderr)
+            # A search that found nothing is not the same as a journal with
+            # nothing in it, and someone who typed a word wants to know which
+            # of the two happened.
+            print(
+                f"nothing matches {search!r}." if search else "nothing yet.",
+                file=sys.stderr,
+            )
             return EXIT_OK
 
         for entry in entries:
@@ -602,10 +622,14 @@ async def serve(
         application.speaker.bind(locale)
         return await application.assistant.handle(text)
 
-    async def history(limit: int, before: int | None) -> list[JournalEntry]:
+    async def history(
+        limit: int, before: int | None, query: str | None = None
+    ) -> list[JournalEntry]:
         journal = application.journal
         if not isinstance(journal, SqliteJournal):  # pragma: no cover
             return []
+        if query:
+            return await journal.search(query, limit=limit)
         return await journal.recent(limit=limit, before=before)
 
     server = IpcServer(

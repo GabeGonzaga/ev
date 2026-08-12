@@ -442,7 +442,7 @@ impl ConfirmationRespond {
 #[doc = "    }"]
 #[doc = "  },"]
 #[doc = "  \"additionalProperties\": false,"]
-#[doc = "  \"x-ev-protocol-version\": \"1.2\""]
+#[doc = "  \"x-ev-protocol-version\": \"1.3\""]
 #[doc = "}"]
 #[doc = r" ```"]
 #[doc = r" </details>"]
@@ -673,6 +673,20 @@ impl HistoryPage {
 #[doc = "      \"maximum\": 500.0,"]
 #[doc = "      \"minimum\": 1.0"]
 #[doc = "    },"]
+#[doc = "    \"query\": {"]
+#[doc = "      \"title\": \"Query\","]
+#[doc = "      \"description\": \"Search the trail instead of paging it: a tool, an album, a note's title. Accents are folded. Ignores `before`, because a search is not a page.\","]
+#[doc = "      \"default\": null,"]
+#[doc = "      \"anyOf\": ["]
+#[doc = "        {"]
+#[doc = "          \"type\": \"string\","]
+#[doc = "          \"maxLength\": 200"]
+#[doc = "        },"]
+#[doc = "        {"]
+#[doc = "          \"type\": \"null\""]
+#[doc = "        }"]
+#[doc = "      ]"]
+#[doc = "    },"]
 #[doc = "    \"type\": {"]
 #[doc = "      \"title\": \"Type\","]
 #[doc = "      \"default\": \"history.query\","]
@@ -692,6 +706,9 @@ pub struct HistoryQuery {
     pub before: ::std::option::Option<i64>,
     #[serde(default = "defaults::default_nzu64::<::std::num::NonZeroU64, 20>")]
     pub limit: ::std::num::NonZeroU64,
+    #[doc = "Search the trail instead of paging it: a tool, an album, a note's title. Accents are folded. Ignores `before`, because a search is not a page."]
+    #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+    pub query: ::std::option::Option<HistoryQueryQuery>,
     #[serde(rename = "type", default = "defaults::history_query_type")]
     pub type_: ::std::string::String,
 }
@@ -700,6 +717,7 @@ impl ::std::default::Default for HistoryQuery {
         Self {
             before: Default::default(),
             limit: defaults::default_nzu64::<::std::num::NonZeroU64, 20>(),
+            query: Default::default(),
             type_: defaults::history_query_type(),
         }
     }
@@ -707,6 +725,74 @@ impl ::std::default::Default for HistoryQuery {
 impl HistoryQuery {
     pub fn builder() -> builder::HistoryQuery {
         Default::default()
+    }
+}
+#[doc = "`HistoryQueryQuery`"]
+#[doc = r""]
+#[doc = r" <details><summary>JSON schema</summary>"]
+#[doc = r""]
+#[doc = r" ```json"]
+#[doc = "{"]
+#[doc = "  \"type\": \"string\","]
+#[doc = "  \"maxLength\": 200"]
+#[doc = "}"]
+#[doc = r" ```"]
+#[doc = r" </details>"]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct HistoryQueryQuery(::std::string::String);
+impl ::std::ops::Deref for HistoryQueryQuery {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<HistoryQueryQuery> for ::std::string::String {
+    fn from(value: HistoryQueryQuery) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for HistoryQueryQuery {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() > 200usize {
+            return Err("longer than 200 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for HistoryQueryQuery {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<&::std::string::String> for HistoryQueryQuery {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for HistoryQueryQuery {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for HistoryQueryQuery {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
     }
 }
 #[doc = "What E.V. did, once."]
@@ -2184,6 +2270,10 @@ pub mod builder {
     pub struct HistoryQuery {
         before: ::std::result::Result<::std::option::Option<i64>, ::std::string::String>,
         limit: ::std::result::Result<::std::num::NonZeroU64, ::std::string::String>,
+        query: ::std::result::Result<
+            ::std::option::Option<super::HistoryQueryQuery>,
+            ::std::string::String,
+        >,
         type_: ::std::result::Result<::std::string::String, ::std::string::String>,
     }
     impl ::std::default::Default for HistoryQuery {
@@ -2191,6 +2281,7 @@ pub mod builder {
             Self {
                 before: Ok(Default::default()),
                 limit: Ok(super::defaults::default_nzu64::<::std::num::NonZeroU64, 20>()),
+                query: Ok(Default::default()),
                 type_: Ok(super::defaults::history_query_type()),
             }
         }
@@ -2216,6 +2307,16 @@ pub mod builder {
                 .map_err(|e| format!("error converting supplied value for limit: {e}"));
             self
         }
+        pub fn query<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<::std::option::Option<super::HistoryQueryQuery>>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.query = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for query: {e}"));
+            self
+        }
         pub fn type_<T>(mut self, value: T) -> Self
         where
             T: ::std::convert::TryInto<::std::string::String>,
@@ -2235,6 +2336,7 @@ pub mod builder {
             Ok(Self {
                 before: value.before?,
                 limit: value.limit?,
+                query: value.query?,
                 type_: value.type_?,
             })
         }
@@ -2244,6 +2346,7 @@ pub mod builder {
             Self {
                 before: Ok(value.before),
                 limit: Ok(value.limit),
+                query: Ok(value.query),
                 type_: Ok(value.type_),
             }
         }

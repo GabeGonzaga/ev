@@ -167,7 +167,7 @@ class SessionConfirmation:
 Handler = Callable[..., Awaitable[ToolResult | Clarification | None]]
 """`(text)` or `(text, locale)`. The locale is what the answer is spoken in,
 and the daemon has it -- `utterance.submit` carries it."""
-History = Callable[[int, int | None], Awaitable[list[JournalEntry]]]
+History = Callable[[int, int | None, str | None], Awaitable[list[JournalEntry]]]
 """How the daemon reads the trail back. The journal owns the storage; this is
 the only shape the socket knows about."""
 
@@ -415,7 +415,7 @@ class IpcServer:
             )
             return
 
-        entries = await self._history(command.limit, command.before)
+        entries = await self._history(command.limit, command.before, command.query)
         page = HistoryPage(entries=entries)
         await session.send(
             Response(id=request_id, ok=True, payload=json.loads(page.model_dump_json()))

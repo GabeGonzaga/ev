@@ -171,6 +171,20 @@
           "title": "Limit",
           "type": "integer"
         },
+        "query": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Search the trail instead of paging it: a tool, an album, a note's title. Accents are folded. Ignores `before`, because a search is not a page.",
+          "title": "Query"
+        },
         "type": {
           "const": "history.query",
           "default": "history.query",
@@ -676,5 +690,5 @@
   },
   "title": "Envelope",
   "type": "object",
-  "x-ev-protocol-version": "1.2"
+  "x-ev-protocol-version": "1.3"
 }

@@ -84,6 +84,10 @@ export type Type9 = "confirmation.respond";
  */
 export type Before = number | null;
 export type Limit = number;
+/**
+ * Search the trail instead of paging it: a tool, an album, a note's title. Accents are folded. Ignores `before`, because a search is not a page.
+ */
+export type Query = string | null;
 export type Type10 = "history.query";
 export type Type11 = "session.cancel";
 export type Id2 = string;
@@ -224,6 +228,7 @@ export interface ConfirmationRespond {
 export interface HistoryQuery {
   before?: Before;
   limit?: Limit;
+  query?: Query;
   type?: Type10;
 }
 export interface SessionCancel {

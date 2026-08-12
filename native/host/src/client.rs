@@ -238,8 +238,15 @@ impl Client {
     ///
     /// A request with an answer: history is asked for when a panel opens, not
     /// pushed at a client that did not want it.
-    pub fn history(&mut self, limit: u32) -> Result<Value, Error> {
-        let response = self.request(json!({ "type": "history.query", "limit": limit }))?;
+    ///
+    /// `query` searches the trail instead of paging it. `None` is the whole
+    /// trail, which is what an empty search box means.
+    pub fn history(&mut self, limit: u32, query: Option<String>) -> Result<Value, Error> {
+        let response = self.request(json!({
+            "type": "history.query",
+            "limit": limit,
+            "query": query,
+        }))?;
 
         if !response.ok {
             let why = response

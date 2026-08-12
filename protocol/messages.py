@@ -36,11 +36,12 @@ MAX_AUDIO_BASE64 = 8_000_000
 push-to-talk utterances are seconds long, and an unbounded field on a socket is
 a promise to buffer whatever arrives."""
 
-PROTOCOL_VERSION = "1.2"
+PROTOCOL_VERSION = "1.3"
 """Major.minor. The handshake compares it exactly: a mismatch refuses the
 connection rather than degrading into a conversation neither side understands.
 
-1.1 added `audio.submit`; 1.2 added `history.query`. A client that knows an
+1.1 added `audio.submit`; 1.2 added `history.query`; 1.3 gave it `query`. A
+client that knows an
 earlier version is refused rather than served a subset, because "some of the
 protocol" is not a protocol.
 """
@@ -117,6 +118,15 @@ class HistoryQuery(Message):
     limit: int = Field(default=20, ge=1, le=500)
     before: int | None = Field(
         default=None, description="Only entries older than this id. For paging."
+    )
+    query: str | None = Field(
+        default=None,
+        max_length=200,
+        description=(
+            "Search the trail instead of paging it: a tool, an album, a "
+            "note's title. Accents are folded. Ignores `before`, because a "
+            "search is not a page."
+        ),
     )
 
 

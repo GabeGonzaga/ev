@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 
 from ev.domain.journal import JournalEntry
 from ev.domain.risk import RiskLevel
+from ev.infrastructure.database.search import fts_query
 from ev.registry import CallRecord
 
 _RECENT = """
@@ -27,6 +28,22 @@ FROM journal
 WHERE (:before IS NULL OR id < :before)
 ORDER BY id DESC
 LIMIT :limit
+"""
+
+_SEARCH = """
+SELECT j.id, j.recorded_at, j.tool, j.risk, j.ok, j.error_code, j.error_message,
+       j.arguments, j.speech
+FROM journal_fts f
+JOIN journal j ON j.id = f.rowid
+WHERE journal_fts MATCH :query
+ORDER BY j.id DESC
+LIMIT :limit
+"""
+"""Newest first, not by rank.
+
+`bm25` would put a turn from March above yesterday's because it said "Blonde"
+twice. Someone searching their own history is looking for when they did
+something, and the answer to that is chronological.
 """
 
 _INSERT = """
@@ -91,20 +108,41 @@ class SqliteJournal:
             _RECENT, {"limit": max(1, min(limit, 500)), "before": before}
         ).fetchall()
 
-        return [
-            JournalEntry(
-                id=row["id"],
-                recorded_at=row["recorded_at"],
-                tool=row["tool"],
-                risk=RiskLevel(row["risk"]),
-                ok=bool(row["ok"]),
-                arguments=json.loads(row["arguments"]),
-                speech=row["speech"],
-                error_code=row["error_code"],
-                error_message=row["error_message"],
-            )
-            for row in rows
-        ]
+        return [self._entry(row) for row in rows]
+
+    async def search(self, text: str, *, limit: int = 20) -> list[JournalEntry]:
+        """The turns matching a search, newest first.
+
+        Flushes first, for the same reason `recent` does: a search that cannot
+        find what just happened is not a search of the journal.
+
+        Empty in, empty out. Punctuation alone is not a query, and answering
+        it with the whole history would be answering a different question.
+        """
+        query = fts_query(text)
+        if query is None:
+            return []
+
+        await self.flush()
+
+        rows = self._connection.execute(
+            _SEARCH, {"query": query, "limit": max(1, min(limit, 500))}
+        ).fetchall()
+
+        return [self._entry(row) for row in rows]
+
+    def _entry(self, row: sqlite3.Row) -> JournalEntry:
+        return JournalEntry(
+            id=row["id"],
+            recorded_at=row["recorded_at"],
+            tool=row["tool"],
+            risk=RiskLevel(row["risk"]),
+            ok=bool(row["ok"]),
+            arguments=json.loads(row["arguments"]),
+            speech=row["speech"],
+            error_code=row["error_code"],
+            error_message=row["error_message"],
+        )
 
     def _row(self, record: CallRecord) -> tuple[object, ...]:
         result = record.result
@@ -117,7 +155,14 @@ class SqliteJournal:
             result.error.message if result.error else None,
             # default=str: on INVALID_ARGUMENTS these are the raw proposal, and
             # the trail is worth more than a serialisation error.
-            json.dumps(record.arguments, default=str, sort_keys=True),
-            json.dumps(result.data, default=str, sort_keys=True),
+            #
+            # ensure_ascii=False: the default writes "Mar\u00e7o", which the
+            # index then tokenises as `Mar` and `u00e7o`, so searching for
+            # "Março" finds nothing and searching for "marco" finds nothing
+            # either. SQLite stores UTF-8; there is nothing to escape it for.
+            json.dumps(
+                record.arguments, default=str, sort_keys=True, ensure_ascii=False
+            ),
+            json.dumps(result.data, default=str, sort_keys=True, ensure_ascii=False),
             result.speech,
         )

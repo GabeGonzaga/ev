@@ -17,6 +17,9 @@ export const useSession = defineStore("session", () => {
   // the other side and nothing has run.
   const question = ref<{ tool: string; risk: string; arguments: Record<string, unknown> } | null>(null);
   const locale = ref<string>("pt-PT");
+  // What the history is filtered by. Empty is the whole trail: a search box
+  // someone cleared is not a search for nothing.
+  const search = ref<string>("");
 
   function apply(result: api.TurnResult) {
     if (result.outcome === "confirm") {
@@ -80,7 +83,7 @@ export const useSession = defineStore("session", () => {
 
   async function refresh() {
     try {
-      entries.value = (await api.history(20)).entries;
+      entries.value = (await api.history(20, search.value || null)).entries;
     } catch {
       // History is a nicety. Failing to read it must not bury the turn that
       // just happened.
@@ -111,7 +114,7 @@ export const useSession = defineStore("session", () => {
   }
 
   return {
-    state, heard, said, trouble, entries, locale, question,
+    state, heard, said, trouble, entries, locale, question, search,
     ask, speak, answer, refresh, choose,
   };
 });

@@ -47,7 +47,65 @@ def test_migrate_is_idempotent(connection: sqlite3.Connection) -> None:
         "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name"
     ).fetchall()
 
-    assert [row["name"] for row in tables] == ["journal"]
+    # `journal_fts` is one virtual table; the rest are the shadow tables FTS5
+    # keeps for it. They are listed here rather than filtered out so that a
+    # table appearing for any other reason fails this test.
+    assert [row["name"] for row in tables] == [
+        "journal",
+        "journal_fts",
+        "journal_fts_config",
+        "journal_fts_data",
+        "journal_fts_docsize",
+        "journal_fts_idx",
+    ]
+
+
+def test_the_index_is_backfilled_from_what_is_already_there(
+    tmp_path: Path,
+) -> None:
+    """A database written before the search existed is searchable after it.
+
+    A search that only knew about turns taken since an upgrade would be worse
+    than no search: it would answer, and be wrong.
+    """
+    connection = connect(tmp_path / "ev.db")
+    for statement in MIGRATIONS[0].statements:
+        connection.execute(statement)
+    connection.execute("PRAGMA user_version = 1")
+    connection.execute(
+        "INSERT INTO journal (recorded_at, tool, risk, ok, arguments, data, speech)"
+        " VALUES ('2026-01-01T00:00:00Z', 'music.play', 'sensitive', 1,"
+        " '{\"name\": \"Blonde\"}', '{}', 'Playing Blonde')"
+    )
+
+    migrate(connection)
+
+    found = connection.execute(
+        "SELECT rowid FROM journal_fts WHERE journal_fts MATCH '\"blonde\"'"
+    ).fetchall()
+    assert len(found) == 1
+
+
+def test_a_deleted_row_leaves_no_ghost_in_the_index(
+    connection: sqlite3.Connection,
+) -> None:
+    # The journal is append-only today. The trigger is what keeps that a
+    # property of the code rather than something the index depends on: an
+    # external-content index outliving its rows answers with turns that are
+    # not there any more.
+    migrate(connection)
+    connection.execute(
+        "INSERT INTO journal (recorded_at, tool, risk, ok, arguments, data, speech)"
+        " VALUES ('2026-01-01T00:00:00Z', 'music.play', 'sensitive', 1,"
+        " '{\"name\": \"Blonde\"}', '{}', 'Playing Blonde')"
+    )
+
+    connection.execute("DELETE FROM journal")
+
+    found = connection.execute(
+        "SELECT rowid FROM journal_fts WHERE journal_fts MATCH '\"blonde\"'"
+    ).fetchall()
+    assert found == []
 
 
 def test_the_journal_table_has_the_expected_columns(

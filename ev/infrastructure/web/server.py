@@ -43,7 +43,7 @@ declined -- silence is not consent here either."""
 
 Handler = Callable[..., Awaitable[ToolResult | Clarification | None]]
 Transcriber = Callable[[Path, str], Awaitable[str]]
-History = Callable[[int, int | None], Awaitable[list[JournalEntry]]]
+History = Callable[[int, int | None, str | None], Awaitable[list[JournalEntry]]]
 
 
 def _outcome(result: ToolResult | Clarification | None) -> dict[str, Any]:
@@ -276,7 +276,10 @@ class WebSurface:
         except ValueError:
             limit = 20
 
-        entries = await self._history(max(1, min(limit, 500)), None)
+        # `q` searches, its absence pages. An empty `q=` is someone who
+        # cleared the box, which is the whole trail rather than nothing.
+        query = request.query.get("q") or None
+        entries = await self._history(max(1, min(limit, 500)), None, query)
         return web.json_response(
             {"entries": [json.loads(entry.model_dump_json()) for entry in entries]}
         )

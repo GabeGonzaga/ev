@@ -119,7 +119,7 @@ structure shaped by symmetry rather than by a decision.
 | `PolicyDecision` gains `REQUEST_PERMISSION` | a native host exists that can service it |
 | Enforcing the `Content` marker | one step's result becomes another's argument (macro chaining, adr/0024) |
 | Streaming model responses | something can render a partial answer |
-| `sqlite-vec`, FTS5 | retrieval actually lands (phase 4) |
+| `sqlite-vec` | a corpus that a word match cannot answer (adr/0026) |
 | A model-based VAD | a measurement showing energy is not enough |
 | A global hotkey (event tap, Accessibility) | phase 3, with the app bundle |
 | `AudioSession` as a type | the host needs ducking, routes or interruptions |

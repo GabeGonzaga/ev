@@ -133,8 +133,8 @@ def test_an_utterance_may_not_be_empty() -> None:
 def test_the_version_is_stated_and_exact() -> None:
     # A mismatch refuses the connection rather than degrading into a
     # conversation neither side understands.
-    assert PROTOCOL_VERSION == "1.2"
-    assert Hello(protocol=PROTOCOL_VERSION, client="tests").protocol == "1.2"
+    assert PROTOCOL_VERSION == "1.3"
+    assert Hello(protocol=PROTOCOL_VERSION, client="tests").protocol == "1.3"
 
 
 # --- the generated artifact -----------------------------------------------

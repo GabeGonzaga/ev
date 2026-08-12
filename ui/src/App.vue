@@ -9,6 +9,16 @@ const recorder = ref<MediaRecorder | null>(null);
 
 onMounted(() => session.refresh());
 
+// Typing is faster than a round trip to SQLite, so the last keystroke wins
+// rather than every one of them queueing a query.
+let pending: ReturnType<typeof setTimeout> | undefined;
+
+function find(text: string) {
+  session.search = text;
+  clearTimeout(pending);
+  pending = setTimeout(() => session.refresh(), 150);
+}
+
 async function send() {
   const text = typed.value;
   typed.value = "";
@@ -82,7 +92,19 @@ async function talk() {
     <p v-for="line in session.said" :key="line" class="said">{{ line }}</p>
     <p v-if="session.trouble" class="trouble">{{ session.trouble }}</p>
 
+    <!-- The same search the CLI does, over the same journal: the page sends a
+         word, the core matches it. -->
+    <input
+      class="find"
+      :value="session.search"
+      placeholder="search what E.V. has done"
+      @input="find(($event.target as HTMLInputElement).value)"
+    />
+
     <ul class="history">
+      <li v-if="!session.entries.length && session.search" class="empty">
+        nothing matches "{{ session.search }}"
+      </li>
       <li v-for="entry in session.entries" :key="entry.id">
         <span :class="entry.ok ? 'ok' : 'failed'">{{ entry.ok ? "✓" : "✕" }}</span>
         <span class="tool">{{ entry.tool }}</span>
@@ -125,6 +147,8 @@ button:disabled { opacity: 0.4; }
 }
 .asking span { flex: 1; }
 .asking em { color: #ffd60a; font-style: normal; margin: 0 6px; }
+.find { width: 100%; margin-top: 8px; }
+.empty { color: #8e8e93; border-top: 1px solid #2c2c2e; padding: 3px 0; }
 .history { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
 .history li { display: flex; gap: 8px; padding: 3px 0; border-top: 1px solid #2c2c2e; }
 .ok { color: #30d158; }
