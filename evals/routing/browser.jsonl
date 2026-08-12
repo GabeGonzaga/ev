@@ -18,3 +18,7 @@
 {"id": "escalate-unrelated-intent", "locale": "pt-PT", "utterance": "esvazia o lixo", "tool": null, "arguments": {}}
 {"id": "escalate-question", "locale": "en", "utterance": "what is the weather like today?", "tool": null, "arguments": {}}
 {"id": "escalate-question", "locale": "pt-PT", "utterance": "como está o tempo hoje?", "tool": null, "arguments": {}}
+{"id": "open-url-spoken-dot", "locale": "en", "utterance": "open github dot com", "tool": "browser.open_url", "arguments": {"url": "https://github.com"}}
+{"id": "open-url-spoken-dot", "locale": "pt-PT", "utterance": "abre github ponto com", "tool": "browser.open_url", "arguments": {"url": "https://github.com"}}
+{"id": "open-url-spaced-dot", "locale": "en", "utterance": "open example . com/pricing", "tool": "browser.open_url", "arguments": {"url": "https://example.com/pricing"}}
+{"id": "open-url-spaced-dot", "locale": "pt-PT", "utterance": "abre example . com/pricing", "tool": "browser.open_url", "arguments": {"url": "https://example.com/pricing"}}

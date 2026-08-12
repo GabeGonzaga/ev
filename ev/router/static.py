@@ -36,7 +36,14 @@ _WHITESPACE = re.compile(r"\s+")
 _TRAILING = ".!?,;:…"
 _SCHEME = re.compile(r"^https?://", re.IGNORECASE)
 
-_URL = r"(?P<url>https?://\S+|[\w-]+(?:\.[\w-]+)+(?:/\S*)?)"
+# Spoken URLs arrive damaged in predictable ways: whisper writes "github dot
+# com", "github ponto com", or "github . com" for something a keyboard would
+# have typed as one token. The pattern accepts those shapes and `_url` puts
+# them back together; anything less predictable escalates rather than being
+# guessed at.
+_DOT = r"(?:\s*\.\s*|\s+(?:dot|ponto)\s+)"
+_URL = rf"(?P<url>https?://\S+|[\w-]+(?:{_DOT}[\w-]+)+(?:/\S*)?)"
+_SPOKEN_DOT = re.compile(_DOT, re.IGNORECASE)
 
 _FILE_SUFFIXES = frozenset(
     {
@@ -68,7 +75,10 @@ def normalise(utterance: str) -> str:
 
 
 def _url(groups: Mapping[str, str]) -> dict[str, object] | None:
-    url = groups["url"]
+    # "github dot com" and "github . com" are the same address as
+    # "github.com". A URL has no spaces in it, so what is left after joining
+    # the dots cannot keep any either.
+    url = "".join(_SPOKEN_DOT.sub(".", groups["url"]).split())
 
     if _SCHEME.match(url):
         return {"url": url}

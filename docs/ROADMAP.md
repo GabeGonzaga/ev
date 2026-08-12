@@ -89,10 +89,16 @@ rather than theory:
 Decided: STT runs in the Python core (ADR 0018). The host captures, because
 the microphone is a TCC surface and TCC belongs to the signed process.
 
-Nothing here has heard a real voice yet: capture was verified with an immediate
-stop, transcription with synthesised speech. Whether 800 ms is the right pause
-and four times the noise floor the right threshold are questions for the first
-person who talks to it.
+First real use, and it went mostly well. Opening sites works on the phrasings
+people actually use; the misses were transcription writing "github dot com" or
+"github . com", which tier 1 now puts back together. Music was blocked by
+E.V.'s own policy rather than by macOS -- no `permissions.json`, so it denied
+before asking, exactly as ADR 0003 describes.
+
+Correction worth carrying: the app bundle does **not** make Apple Events
+attributable to E.V. `music.play` runs in the daemon, which spawns `osascript`,
+so the TCC subject is whatever launched the daemon. That only changes when the
+daemon is bundled as the app's sidecar.
 
 Audible gap, now that it speaks: tool responses are composed in English, so a
 pt-PT voice reads English words. Locale-aware responses need session context,
