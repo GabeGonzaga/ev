@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
+import { canRecordHere } from "./api";
 import { useSession } from "./stores/session";
 
 const session = useSession();
 const typed = ref("");
+const recorder = ref<MediaRecorder | null>(null);
 
 onMounted(() => session.refresh());
 
@@ -11,6 +13,31 @@ async function send() {
   const text = typed.value;
   typed.value = "";
   await session.ask(text);
+}
+
+// In the app the signed host holds the microphone. In a browser the browser
+// does, and asks in its own name -- E.V. never pretends to hold a permission
+// it was not given.
+async function talk() {
+  if (!canRecordHere) return session.speak();
+
+  if (recorder.value) {
+    recorder.value.stop();
+    recorder.value = null;
+    return;
+  }
+
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const chunks: Blob[] = [];
+  const media = new MediaRecorder(stream);
+  media.ondataavailable = (event) => chunks.push(event.data);
+  media.onstop = async () => {
+    stream.getTracks().forEach((track) => track.stop());
+    await session.speak(new Blob(chunks, { type: media.mimeType }));
+  };
+  media.start();
+  recorder.value = media;
+  session.state = "listening";
 }
 </script>
 
@@ -28,8 +55,12 @@ async function send() {
     <form @submit.prevent="send">
       <input v-model="typed" placeholder="abre example.com" autofocus />
       <button type="submit" :disabled="session.state !== 'idle'">Send</button>
-      <button type="button" :disabled="session.state !== 'idle'" @click="session.speak()">
-        Speak
+      <button
+        type="button"
+        :disabled="session.state !== 'idle' && !recorder"
+        @click="talk()"
+      >
+        {{ recorder ? "Stop" : "Speak" }}
       </button>
     </form>
 

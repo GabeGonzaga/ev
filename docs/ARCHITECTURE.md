@@ -3,6 +3,21 @@
 What exists today, and what has to be true before each piece grows. `CLAUDE.md`
 states the invariants; this file states the current shape and the triggers.
 
+## Three surfaces, one door
+
+```text
+CLI ──────────────┐
+menu bar app ─────┤  unix socket, 0600
+browser page ─────┘  loopback HTTP, token, Origin checked, off by default
+                          │
+                     Registry.call()      the only thing that authorises
+```
+
+No surface executes anything. The web page is the weakest of the three and the
+one written most carefully: a socket cannot be addressed by a tab, a port can,
+so `ev/infrastructure/web/security.py` is what stands there and it is tested
+against a real server rather than a fake.
+
 ## The turn
 
 ```text
@@ -63,7 +78,7 @@ satisfy them structurally, which is why neither imports the other.
 
 ## One door per subsystem
 
-Each subsystem has one public port. Today there are six:
+Each subsystem has one public port. Today there are seven:
 
 | Port | Owns |
 |---|---|
@@ -73,6 +88,7 @@ Each subsystem has one public port. Today there are six:
 | `SpeechSynthesizer` | saying things. `say(1)` in development, the host in the app |
 | `SpeechRecognizer` | hearing things. whisper.cpp, spawned per utterance |
 | `IpcServer` | the socket. Handshake, framing, correlation, confirmations |
+| `WebSurface` | the loopback page. Token, `Host` and `Origin`, off by default |
 
 `AppleScriptClient` goes through `ProcessRunner` rather than around it.
 

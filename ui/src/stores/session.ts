@@ -16,12 +16,14 @@ export const useSession = defineStore("session", () => {
   const locale = ref<string>("pt-PT");
 
   function apply(result: api.TurnResult) {
-    heard.value = result.heard;
-    said.value = result.spoken;
+    heard.value = result.heard ?? null;
+    // The app returns the spoken lines; the web surface returns the result
+    // itself. One shape here rather than two branches everywhere above.
+    said.value = result.spoken ?? (result.speech ? [result.speech] : []);
     trouble.value =
       result.outcome === "not_understood"
         ? "I did not understand that."
-        : result.error;
+        : (result.error ?? null);
   }
 
   async function ask(text: string) {
@@ -29,7 +31,7 @@ export const useSession = defineStore("session", () => {
     state.value = "thinking";
     trouble.value = null;
     try {
-      apply(await api.submit(text));
+      apply(await api.submit(text, locale.value));
     } catch (error) {
       // An unreachable daemon is an operational fault, not a failure to
       // understand, and it says which.
@@ -40,12 +42,12 @@ export const useSession = defineStore("session", () => {
     }
   }
 
-  async function speak() {
+  async function speak(recording: Blob | null = null) {
     state.value = "listening";
     trouble.value = null;
     heard.value = null;
     try {
-      apply(await api.listen());
+      apply(await api.listen(recording, locale.value));
     } catch (error) {
       trouble.value = String(error);
     } finally {

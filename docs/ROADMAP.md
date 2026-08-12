@@ -106,8 +106,8 @@ which is not built.
 | TypeScript generated from the schema, CI-checked | done |
 | Tauri shell: menu bar, panel, four commands | done |
 | History in the panel; settings beyond locale | partial |
-| Local web surface: loopback, token, `Origin` checked, off by default | |
-| The same Vue app served by the daemon and embedded in the app | |
+| Local web surface: loopback, token, `Origin` checked, off by default | done |
+| The same Vue app served by the daemon and embedded in the app | done |
 | App bundle, signed, with entitlements and usage strings | done, unproven |
 
 The bundle is the phase's real prize: launched from a shell the host borrows

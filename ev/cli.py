@@ -61,6 +61,7 @@ from ev.infrastructure.permissions import (
 )
 from ev.infrastructure.speech.recognizer import WhisperCppRecognizer
 from ev.infrastructure.speech.synthesizer import SaySynthesizer, SpeechSynthesizer
+from ev.infrastructure.web.server import DEFAULT_PORT, WebSurface
 from ev.registry import CallRecord, ConfirmationPort, JournalPort, Registry
 from ev.router.model import Completion, ModelRouter
 from ev.router.static import StaticRouter
@@ -373,6 +374,17 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         "beside the journal. A cold model costs 7.5 s; this pays it once.",
     )
     parser.add_argument(
+        "--web",
+        nargs="?",
+        type=int,
+        const=DEFAULT_PORT,
+        default=None,
+        metavar="PORT",
+        help="also serve the panel to this machine's browser, on loopback, "
+        "with a token. Off unless asked for: a surface that always exists is "
+        "one an attacker can rely on.",
+    )
+    parser.add_argument(
         "--connect",
         action="store_true",
         help="send the utterance to a running daemon instead of starting a core",
@@ -409,7 +421,12 @@ async def run(args: argparse.Namespace, completion: Completion | None = None) ->
         return await connected(database.parent, args)
 
     if args.serve:
-        return await serve(database=database, model=args.model, completion=completion)
+        return await serve(
+            database=database,
+            model=args.model,
+            completion=completion,
+            web_port=args.web,
+        )
 
     application = build(database=database, model=args.model, completion=completion)
     voice = SaySynthesizer(ProcessRunner()) if args.speak else None
@@ -460,7 +477,11 @@ class _NoModel:
 
 
 async def serve(
-    *, database: Path, model: str | None, completion: Completion | None
+    *,
+    database: Path,
+    model: str | None,
+    completion: Completion | None,
+    web_port: int | None = None,
 ) -> int:
     """Run until interrupted.
 
@@ -501,6 +522,27 @@ async def serve(
         await application.aclose()
         return EXIT_FAILED
 
+    surface: WebSurface | None = None
+    if web_port is not None:
+        surface = WebSurface(
+            state_dir=database.parent,
+            handle=application.assistant.handle,
+            history=history,
+            transcribe=transcribe,
+            assets=Path(__file__).resolve().parents[1] / "ui" / "dist",
+            port=web_port,
+        )
+        try:
+            await surface.start()
+        except OSError as error:
+            print(f"could not serve the panel: {error}", file=sys.stderr)
+            await application.aclose()
+            return EXIT_FAILED
+
+        # The token rides in the fragment, so it never reaches a server log or
+        # a Referer header. Printed once, here, for the person who asked.
+        print(f"panel at {surface.url()}", file=sys.stderr)
+
     print(f"listening on {socket_path(database.parent)}", file=sys.stderr)
 
     # A daemon is stopped by a signal, not by Ctrl-C in a terminal. Without
@@ -525,6 +567,8 @@ async def serve(
         serving.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await serving
+        if surface is not None:
+            await surface.aclose()
         await server.aclose()
 
     return EXIT_OK
