@@ -8,6 +8,8 @@
 //! permission to the app (ADR 0019), and because a menu bar is a place to
 //! show state that a terminal has nowhere to put.
 
+mod settings;
+
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Sender};
 use std::sync::Mutex;
@@ -19,11 +21,24 @@ use serde::Serialize;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 /// How long a question waits for the person to answer it. Long, because they
 /// are being asked something; not forever, because a panel that was closed
 /// mid-question must not park a turn until the app quits.
 const ANSWER_WITHIN: Duration = Duration::from_secs(120);
+
+/// The longest a hold can last. A key that sticks, an app that steals the
+/// key-up, a laptop that sleeps mid-sentence: any of them would otherwise
+/// leave the microphone open until the app quits.
+const LONGEST_HOLD: Duration = Duration::from_secs(30);
+
+/// Shorter than this and it was a tap, not a sentence.
+///
+/// The panel still opens -- that is what a tap means -- but nothing is sent.
+/// whisper on a fifth of a second of room noise returns whatever it
+/// hallucinates from it, confidently.
+const SHORTEST_HOLD: Duration = Duration::from_millis(250);
 
 /// Where the daemon listens. The same path the CLI uses, because there is one
 /// daemon and it is not ours to move.
@@ -40,9 +55,12 @@ struct Session {
     /// Where an answer goes when the panel gives one. Present only while a
     /// turn is parked on a question; the app decides nothing itself.
     answering: Mutex<Option<Sender<bool>>>,
+    /// Where the key-up goes. Present only while a hold is recording, which
+    /// is also how a key repeat is told from a second press.
+    holding: Mutex<Option<Sender<()>>>,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 struct TurnResult {
     heard: Option<String>,
     spoken: Vec<String>,
@@ -51,12 +69,17 @@ struct TurnResult {
     error: Option<String>,
 }
 
-fn run_turn(
-    app: &AppHandle,
-    text: Option<String>,
-    listen: bool,
-    locale: Option<String>,
-) -> Result<TurnResult, String> {
+/// What starts a turn.
+enum Input {
+    /// Typed in the panel.
+    Text(String),
+    /// Record until the room goes quiet. What the Speak button does.
+    Listen,
+    /// Already recorded, because a key was held down for it.
+    Recorded(Vec<u8>),
+}
+
+fn run_turn(app: &AppHandle, input: Input, locale: Option<String>) -> Result<TurnResult, String> {
     let mut client = Client::connect(&socket()).map_err(|error| error.to_string())?;
 
     // The question goes to the panel and this thread waits for the answer.
@@ -85,17 +108,21 @@ fn run_turn(
         granted
     };
 
-    let turn = if listen {
-        let samples = audio::record_until_silence(audio::Vad::default())
-            .map_err(|error| error.to_string())?;
-        let wav = audio::to_wav(&samples).map_err(|error| error.to_string())?;
-        client
+    let turn = match input {
+        Input::Text(text) => client
+            .submit(&text, locale.as_deref(), &mut ask)
+            .map_err(|error| error.to_string())?,
+        Input::Listen => {
+            let samples = audio::record_until_silence(audio::Vad::default())
+                .map_err(|error| error.to_string())?;
+            let wav = audio::to_wav(&samples).map_err(|error| error.to_string())?;
+            client
+                .submit_audio(&wav, locale.as_deref(), &mut ask)
+                .map_err(|error| error.to_string())?
+        }
+        Input::Recorded(wav) => client
             .submit_audio(&wav, locale.as_deref(), &mut ask)
-            .map_err(|error| error.to_string())?
-    } else {
-        client
-            .submit(&text.unwrap_or_default(), locale.as_deref(), &mut ask)
-            .map_err(|error| error.to_string())?
+            .map_err(|error| error.to_string())?,
     };
 
     let payload = &turn.response.payload;
@@ -119,7 +146,7 @@ async fn submit(
     session: State<'_, Session>,
 ) -> Result<TurnResult, String> {
     let locale = session.locale.lock().ok().and_then(|slot| slot.clone());
-    tauri::async_runtime::spawn_blocking(move || run_turn(&app, Some(text), false, locale))
+    tauri::async_runtime::spawn_blocking(move || run_turn(&app, Input::Text(text), locale))
         .await
         .map_err(|error| error.to_string())?
 }
@@ -145,7 +172,7 @@ async fn listen(app: AppHandle, session: State<'_, Session>) -> Result<TurnResul
     let locale = session.locale.lock().ok().and_then(|slot| slot.clone());
     // Blocking: recording waits for a room to go quiet, and holding the async
     // runtime hostage for that would freeze the window it is drawing.
-    tauri::async_runtime::spawn_blocking(move || run_turn(&app, None, true, locale))
+    tauri::async_runtime::spawn_blocking(move || run_turn(&app, Input::Listen, locale))
         .await
         .map_err(|error| error.to_string())?
 }
@@ -165,8 +192,125 @@ async fn history(limit: u32, query: Option<String>) -> Result<serde_json::Value,
 #[tauri::command]
 fn set_locale(locale: Option<String>, session: State<'_, Session>) {
     if let Ok(mut slot) = session.locale.lock() {
-        *slot = locale;
+        *slot = locale.clone();
     }
+    let mut saved = settings::load();
+    saved.locale = locale;
+    let _ = settings::save(&saved);
+}
+
+#[tauri::command]
+fn settings() -> settings::Settings {
+    settings::load()
+}
+
+/// Change the key that summons E.V.
+///
+/// The new one is registered before the old one is forgotten and the file is
+/// written only if that worked: a shortcut another application already owns
+/// must leave the working one in place rather than leaving E.V. with none.
+#[tauri::command]
+fn set_shortcut(app: AppHandle, shortcut: String) -> Result<(), String> {
+    let mut saved = settings::load();
+    if saved.shortcut == shortcut {
+        return Ok(());
+    }
+
+    bind(&app, &shortcut).map_err(|error| format!("{shortcut} is not available: {error}"))?;
+    let _ = app.global_shortcut().unregister(saved.shortcut.as_str());
+
+    saved.shortcut = shortcut;
+    settings::save(&saved)
+}
+
+/// Record while the key is held, then take the turn and push the result to the
+/// panel.
+///
+/// The panel is not asking for this and cannot await it, so the result travels
+/// as an event. A hotkey turn is otherwise identical to a typed one: the same
+/// socket, the same lock in the core, the same confirmation.
+fn hold(app: &AppHandle) {
+    let (release, released) = mpsc::channel::<()>();
+    {
+        let session = app.state::<Session>();
+        let Ok(mut slot) = session.holding.lock() else {
+            return;
+        };
+        if slot.is_some() {
+            // A key held down repeats. The first press is the one recording.
+            return;
+        }
+        *slot = Some(release);
+    }
+
+    if let Some(window) = app.get_webview_window("panel") {
+        reveal(&window);
+    }
+    let _ = app.emit("turn.started", ());
+
+    let handle = app.clone();
+    std::thread::spawn(move || {
+        let started = std::time::Instant::now();
+        let recorded = audio::record(|| {
+            let _ = released.recv_timeout(LONGEST_HOLD);
+        });
+
+        if let Ok(mut slot) = handle.state::<Session>().holding.lock() {
+            *slot = None;
+        }
+
+        if started.elapsed() < SHORTEST_HOLD {
+            // A tap. The panel is open, which is what a tap asks for.
+            let _ = handle.emit("turn.cancelled", ());
+            return;
+        }
+
+        let locale = handle
+            .state::<Session>()
+            .locale
+            .lock()
+            .ok()
+            .and_then(|slot| slot.clone());
+
+        let outcome = recorded
+            .map_err(|error| error.to_string())
+            .and_then(|samples| audio::to_wav(&samples).map_err(|error| error.to_string()))
+            .and_then(|wav| run_turn(&handle, Input::Recorded(wav), locale));
+
+        let _ = match outcome {
+            Ok(result) => handle.emit("turn.completed", result),
+            Err(error) => handle.emit(
+                "turn.completed",
+                TurnResult {
+                    heard: None,
+                    spoken: Vec::new(),
+                    ok: false,
+                    outcome: "failed".into(),
+                    error: Some(error),
+                },
+            ),
+        };
+    });
+}
+
+/// Bind one key combination: down starts recording, up ends it.
+///
+/// Carbon's `RegisterEventHotKey` under this, not an event tap -- so E.V.
+/// hears one combination and nothing else, and does not have to ask for
+/// Accessibility to be listened to at all.
+fn bind(app: &AppHandle, shortcut: &str) -> Result<(), String> {
+    app.global_shortcut()
+        .on_shortcut(shortcut, |app, _shortcut, event| match event.state {
+            ShortcutState::Pressed => hold(app),
+            ShortcutState::Released => {
+                if let Ok(mut slot) = app.state::<Session>().holding.lock() {
+                    if let Some(release) = slot.take() {
+                        let _ = release.send(());
+                    }
+                }
+            }
+        })
+        .map_err(|error| error.to_string())
 }
 
 /// Show the panel and give it the keyboard. Hidden rather than closed, because
@@ -177,12 +321,24 @@ fn reveal(window: &WebviewWindow) {
 }
 
 pub fn run() {
+    let saved = settings::load();
+
     tauri::Builder::default()
-        .manage(Session::default())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .manage(Session {
+            locale: Mutex::new(saved.locale.clone()),
+            ..Session::default()
+        })
         .invoke_handler(tauri::generate_handler![
-            submit, listen, confirm, history, set_locale
+            submit,
+            listen,
+            confirm,
+            history,
+            set_locale,
+            set_shortcut,
+            settings
         ])
-        .setup(|app| {
+        .setup(move |app| {
             let show = MenuItem::with_id(app, "show", "Open E.V.", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show, &quit])?;
@@ -204,6 +360,13 @@ pub fn run() {
                     _ => {}
                 })
                 .build(app)?;
+
+            // A shortcut another application already owns is a message, not a
+            // reason to refuse to start: everything else about E.V. works
+            // without it, and the panel is where the person can pick another.
+            if let Err(error) = bind(app.handle(), &saved.shortcut) {
+                eprintln!("the shortcut {} is not available: {error}", saved.shortcut);
+            }
 
             Ok(())
         })

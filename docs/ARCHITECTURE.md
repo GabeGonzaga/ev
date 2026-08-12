@@ -121,8 +121,8 @@ structure shaped by symmetry rather than by a decision.
 | Streaming model responses | something can render a partial answer |
 | `sqlite-vec` | a corpus that a word match cannot answer (adr/0026) |
 | A model-based VAD | a measurement showing energy is not enough |
-| A global hotkey (event tap, Accessibility) | phase 3, with the app bundle |
 | `AudioSession` as a type | the host needs ducking, routes or interruptions |
+| An event tap, and the Accessibility permission with it | a gesture a key combination cannot express (adr/0028) |
 | Camera, Accessibility in `native/` | phase 5 and later, one decision each |
 | A second resident model | never on the interactive path |
 

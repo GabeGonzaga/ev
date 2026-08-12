@@ -1,9 +1,9 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "enables the default permissions",
+  "description": "core permissions for the panel, which is the only window there is",
   "windows": [
-    "main"
+    "panel"
   ],
   "permissions": [
     "core:default"

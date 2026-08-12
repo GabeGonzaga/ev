@@ -21,6 +21,10 @@ ev-host = { path = "../host" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tauri = { version = "2.11.3", features = ["tray-icon"] }
+# Hold-to-talk from anywhere. Carbon's RegisterEventHotKey under this, which
+# is a key combination and not an event tap -- so it needs no Accessibility
+# permission, and E.V. does not ask for one to listen for a keypress.
+tauri-plugin-global-shortcut = "2"
 
 [lints.rust]
 unsafe_code = "forbid"

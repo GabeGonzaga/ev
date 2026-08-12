@@ -13,6 +13,10 @@ export const useSession = defineStore("session", () => {
   const said = ref<string[]>([]);
   const trouble = ref<string | null>(null);
   const entries = ref<JournalEntry[]>([]);
+  // The key that summons E.V., and whether the app took it. Empty in a
+  // browser: a page cannot hold a global shortcut, and should not claim to.
+  const shortcut = ref<string>("");
+  const shortcutTrouble = ref<string | null>(null);
   // A question the core is waiting on. While this is set, a turn is parked on
   // the other side and nothing has run.
   const question = ref<{ tool: string; risk: string; arguments: Record<string, unknown> } | null>(null);
@@ -81,6 +85,41 @@ export const useSession = defineStore("session", () => {
     };
   });
 
+  // A turn started by the hotkey, which the panel did not ask for and cannot
+  // await. Same shape as any other turn once it arrives.
+  void api.onHotkeyTurn(
+    () => {
+      state.value = "listening";
+      heard.value = null;
+      said.value = [];
+      trouble.value = null;
+    },
+    (result) => {
+      state.value = "idle";
+      if (result) apply(result);
+      void refresh();
+    },
+  );
+
+  async function load() {
+    const saved = await api.settings();
+    shortcut.value = saved.shortcut;
+    if (saved.locale) locale.value = saved.locale;
+  }
+
+  async function bind(combination: string) {
+    shortcutTrouble.value = null;
+    try {
+      await api.setShortcut(combination);
+      shortcut.value = combination;
+    } catch (error) {
+      // The old one is still bound: the app registers the new key before it
+      // forgets the old, so a combination another application owns costs
+      // nothing.
+      shortcutTrouble.value = String(error);
+    }
+  }
+
   async function refresh() {
     try {
       entries.value = (await api.history(20, search.value || null)).entries;
@@ -115,6 +154,7 @@ export const useSession = defineStore("session", () => {
 
   return {
     state, heard, said, trouble, entries, locale, question, search,
-    ask, speak, answer, refresh, choose,
+    shortcut, shortcutTrouble,
+    ask, speak, answer, refresh, choose, load, bind,
   };
 });

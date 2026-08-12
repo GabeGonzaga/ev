@@ -6,11 +6,11 @@ is right.
 | Phase | Scope | State |
 |---|---|---|
 | 0 | Headless core: registry, journal, migrations, tools, CLI | done |
-| 1 | Ollama tier 2, structured output, evals, confidence policy, translation capability | current |
+| 1 | Ollama tier 2, structured output, evals, confidence policy, translation capability | done |
 | 1.5 | Typed IPC protocol + signed native host skeleton | done |
-| 2 | Push-to-talk, VAD, whisper.cpp, AVSpeechSynthesizer | current |
-| 3 | Tauri, menu bar, NSPanel, settings, history | current |
-| 4 | JSON macros, more adapters, retrieval | macros, notes, reminders, search done |
+| 2 | Push-to-talk, VAD, whisper.cpp, AVSpeechSynthesizer | done |
+| 3 | Tauri, menu bar, NSPanel, settings, history | done, unproven on device |
+| 4 | JSON macros, more adapters, retrieval | done |
 | 5 | Camera and vision | |
 | 6 | Wake word, continuous interaction | |
 
@@ -112,12 +112,19 @@ nothing.
 | Journal read API, `history.query` at protocol 1.2, `--history` | done |
 | TypeScript generated from the schema, CI-checked | done |
 | Tauri shell: menu bar, panel, four commands | done |
-| History in the panel; settings beyond locale | partial |
+| History in the panel, searchable | done |
+| A global hotkey: hold to talk, anywhere | done, unproven on device |
+| Settings: the shortcut and the locale, remembered | done |
 | Confirmation in the browser page, sharing the core's turn lock | done |
 | Confirmation in the Tauri panel | done |
 | Local web surface: loopback, token, `Origin` checked, off by default | done |
 | The same Vue app served by the daemon and embedded in the app | done |
 | App bundle, signed, with entitlements and usage strings | done, unproven |
+
+Unproven means exactly that: `EV.app` builds, signs and verifies, and nobody
+has yet held the key down on this machine and watched it hear something. The
+parts it is made of are each exercised -- the socket, the capture, the
+transcription, the turn -- but the app itself has not been run.
 
 The bundle is the phase's real prize: launched from a shell the host borrows
 the terminal's microphone grant (ADR 0019), and only a bundled app gets an

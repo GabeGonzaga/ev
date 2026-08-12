@@ -1,13 +1,33 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { canRecordHere } from "./api";
+import { canBindKeys, canRecordHere } from "./api";
 import { useSession } from "./stores/session";
 
 const session = useSession();
 const typed = ref("");
 const recorder = ref<MediaRecorder | null>(null);
 
-onMounted(() => session.refresh());
+onMounted(() => {
+  session.refresh();
+  session.load();
+});
+
+// Recorded as it is typed, so "Cmd+Shift+Space" is one gesture rather than
+// something to spell. The app answers whether it could take the key.
+function record(event: KeyboardEvent) {
+  event.preventDefault();
+  if (["Meta", "Shift", "Alt", "Control"].includes(event.key)) return;
+
+  const parts = [];
+  if (event.metaKey) parts.push("CmdOrCtrl");
+  if (event.ctrlKey && !event.metaKey) parts.push("Ctrl");
+  if (event.altKey) parts.push("Alt");
+  if (event.shiftKey) parts.push("Shift");
+  parts.push(event.code.replace(/^Key|^Digit/, ""));
+
+  if (parts.length < 2) return;
+  session.bind(parts.join("+"));
+}
 
 // Typing is faster than a round trip to SQLite, so the last keystroke wins
 // rather than every one of them queueing a query.
@@ -92,6 +112,19 @@ async function talk() {
     <p v-for="line in session.said" :key="line" class="said">{{ line }}</p>
     <p v-if="session.trouble" class="trouble">{{ session.trouble }}</p>
 
+    <!-- Hold this anywhere on the machine to talk. It is a key combination,
+         not an event tap, so E.V. hears this and nothing else. -->
+    <p v-if="canBindKeys" class="shortcut">
+      <span>Hold to talk:</span>
+      <input
+        readonly
+        :value="session.shortcut"
+        placeholder="click and press a combination"
+        @keydown="record"
+      />
+      <em v-if="session.shortcutTrouble">{{ session.shortcutTrouble }}</em>
+    </p>
+
     <!-- The same search the CLI does, over the same journal: the page sends a
          word, the core matches it. -->
     <input
@@ -147,6 +180,9 @@ button:disabled { opacity: 0.4; }
 }
 .asking span { flex: 1; }
 .asking em { color: #ffd60a; font-style: normal; margin: 0 6px; }
+.shortcut { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.shortcut input { flex: 1; }
+.shortcut em { color: #ff9f0a; font-style: normal; }
 .find { width: 100%; margin-top: 8px; }
 .empty { color: #8e8e93; border-top: 1px solid #2c2c2e; padding: 3px 0; }
 .history { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }

@@ -99,6 +99,7 @@ rust: protocol-check-rust
 # on Linux would prove nothing and needs GTK and WebKit to prove it.
 app-check:
 	cd native && $(CARGO) clippy -p ev-app --all-targets -- -D warnings
+	cd native && $(CARGO) test -p ev-app
 	cd native && $(CARGO) build -p ev-app --release
 
 # Local only. TCC keys its grants to a code signature, so an unsigned host is

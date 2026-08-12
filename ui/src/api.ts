@@ -116,6 +116,40 @@ export const confirm = async (granted: boolean): Promise<TurnResult | null> => {
 /// In the app a question arrives as an event while the turn waits. In a
 /// browser it arrives as the turn's own answer, so there is nothing to
 /// subscribe to.
+/// A turn the panel did not start.
+///
+/// The hotkey records while a key is held, anywhere on the machine, and the
+/// window is not awaiting anything when that happens -- so the app pushes what
+/// it heard and what it did. In a browser there is no hotkey and nothing
+/// subscribes.
+export async function onHotkeyTurn(
+  started: () => void,
+  finished: (result: TurnResult | null) => void,
+): Promise<void> {
+  if (!inTauri) return;
+  const { listen } = await import("@tauri-apps/api/event");
+  await listen("turn.started", () => started());
+  await listen("turn.cancelled", () => finished(null));
+  await listen<TurnResult>("turn.completed", (event) => finished(event.payload));
+}
+
+export interface Settings {
+  shortcut: string;
+  locale: string | null;
+}
+
+/// What the app remembers between launches. A browser page has no app to
+/// remember anything, so it reports the defaults it cannot change.
+export const settings = (): Promise<Settings> =>
+  inTauri
+    ? callTauri<Settings>("settings")
+    : Promise.resolve({ shortcut: "", locale: null });
+
+export const setShortcut = (shortcut: string) =>
+  inTauri ? callTauri<void>("set_shortcut", { shortcut }) : Promise.resolve();
+
+export const canBindKeys = inTauri;
+
 export async function onQuestion(
   handle: (question: Record<string, unknown>) => void,
 ): Promise<void> {
