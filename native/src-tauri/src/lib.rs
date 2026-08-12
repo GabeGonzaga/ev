@@ -24,6 +24,9 @@ use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
+/// The menu bar item, by name, so the core's state can be written to it later.
+const TRAY: &str = "ev";
+
 /// How long a question waits for the person to answer it. Long, because they
 /// are being asked something; not forever, because a panel that was closed
 /// mid-question must not park a turn until the app quits.
@@ -388,23 +391,38 @@ pub fn run() {
         ])
         .setup(move |app| {
             let show = MenuItem::with_id(app, "show", "Open E.V.", true, None::<&str>)?;
+            // A core that could not start -- a permission not yet granted, a
+            // daemon killed by hand -- should not need the app relaunched.
+            let core_item = MenuItem::with_id(app, "core", "Start the core", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show, &quit])?;
+            let menu = Menu::with_items(app, &[&show, &core_item, &quit])?;
 
             // A menu bar item and no Dock icon: E.V. is somewhere to speak to,
             // not an application to switch to. LSUIElement in the plist is the
             // other half of that.
-            TrayIconBuilder::new()
+            let restarting = core.clone();
+            TrayIconBuilder::with_id(TRAY)
                 .icon(app.default_window_icon().cloned().ok_or("no icon")?)
                 .menu(&menu)
                 .tooltip(format!(
                     "E.V.\n{}",
                     core.lock().map(|it| it.describe()).unwrap_or_default()
                 ))
-                .on_menu_event(|app: &AppHandle, event| match event.id().as_ref() {
+                .on_menu_event(move |app: &AppHandle, event| match event.id().as_ref() {
                     "show" => {
                         if let Some(window) = app.get_webview_window("panel") {
                             reveal(&window);
+                        }
+                    }
+                    "core" => {
+                        if let Ok(mut state) = restarting.lock() {
+                            daemon::stop(&mut state);
+                            *state = daemon::ensure(&socket());
+                            let said = state.describe();
+                            eprintln!("{said}");
+                            if let Some(tray) = app.tray_by_id(TRAY) {
+                                let _ = tray.set_tooltip(Some(format!("E.V.\n{said}")));
+                            }
                         }
                     }
                     "quit" => app.exit(0),

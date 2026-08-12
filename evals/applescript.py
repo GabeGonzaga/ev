@@ -73,7 +73,9 @@ async def main() -> int:
     await expect_error(
         "play playlist", adapter.play_playlist(MISSING), "there is no playlist"
     )
-    # No branch matches, so this reads the player and changes nothing.
+    # No branch matches, so this reads the player and changes nothing. It also
+    # exercises `my nowPlaying()`, which compiled perfectly while being sent
+    # to Music -- "Can't continue nowPlaying", found by running it.
     await expect_value("control", adapter.control("noop"))
     await expect_value("volume step", adapter.step(0))
 

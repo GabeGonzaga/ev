@@ -93,12 +93,25 @@ CONTROL: Final = """on run argv
 		else if theAction is "stop" then
 			stop
 		end if
-		if player state is stopped then
-			return ""
-		end if
-		return name of current track
+		return my nowPlaying()
 	end tell
-end run"""
+end run
+
+on nowPlaying()
+	tell application "Music"
+		try
+			if player state is stopped then return ""
+			return name of current track
+		on error
+			-- Skipping past the end of a queue, or a track Music can no
+			-- longer reach, leaves a player that is not stopped and has no
+			-- current track. It happened; "Music got an error: Can't get name
+			-- of current track" is a real line from the journal. The action
+			-- worked, so the answer is what is playing -- nothing.
+			return ""
+		end try
+	end tell
+end nowPlaying"""
 
 VOLUME: Final = """on run argv
 	tell application "Music"

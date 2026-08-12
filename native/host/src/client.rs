@@ -15,10 +15,14 @@ use serde_json::{json, Value};
 
 use crate::protocol::{ConfirmationRequired, Response, SpeechRequested};
 
-/// The version this host speaks. A mismatch is refused by the daemon, and
-/// refusing is the point: a protocol neither side agrees on is not a
-/// conversation worth having.
-pub const PROTOCOL_VERSION: &str = "1.2";
+// The version this host speaks. A mismatch is refused by the daemon, and
+// refusing is the point: a protocol neither side agrees on is not a
+// conversation worth having.
+//
+// Generated from protocol/messages.py by `make protocol`, because the
+// hand-written copy that used to live here drifted to 1.2 while Python went
+// to 1.4 -- and every turn the app took was refused by its own daemon.
+include!("../../../protocol/generated/rust/version.rs");
 
 #[derive(Debug)]
 pub enum Error {

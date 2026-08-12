@@ -12,6 +12,19 @@
   <key>NSMicrophoneUsageDescription</key>
   <string>E.V. listens when you ask it to, and only then. Audio stays on this Mac.</string>
 
+  <!-- E.V. runs its own core, and the core is Python in this repository. If
+       the repository sits in Desktop, Documents or Downloads, macOS gates
+       reading it: without these keys the app does not get asked, it gets
+       EPERM, and the daemon dies on `pyvenv.cfg` before it prints anything
+       (ADR 0031). A terminal already has this access, which is why it never
+       came up until the app started the daemon itself. -->
+  <key>NSDesktopFolderUsageDescription</key>
+  <string>E.V.'s own core lives in its project folder. It reads nothing else there.</string>
+  <key>NSDocumentsFolderUsageDescription</key>
+  <string>E.V.'s own core lives in its project folder. It reads nothing else there.</string>
+  <key>NSDownloadsFolderUsageDescription</key>
+  <string>E.V.'s own core lives in its project folder. It reads nothing else there.</string>
+
   <!-- The camera, for one frame at a time. Without this key macOS does not
        ask; it refuses, and the refusal looks like a broken camera. -->
   <key>NSCameraUsageDescription</key>

@@ -7,6 +7,7 @@ shape is read by Rust and TypeScript too, and neither of them runs this suite.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 from pydantic import TypeAdapter, ValidationError
@@ -171,3 +172,27 @@ def test_every_message_type_appears_in_the_schema() -> None:
         "permission.changed",
     ):
         assert name in document, f"{name} missing from the generated schema"
+
+
+# --- the version, in every language that reads it -------------------------
+
+
+def test_the_rust_client_speaks_this_version() -> None:
+    """The bug this exists for.
+
+    `cargo typify` generates the message types and not the constant beside
+    them, so the handshake version was hand-written in the Rust client. Python
+    reached 1.4 while it still said 1.2: the app started its own daemon, was
+    refused by it, and reported "the core did not answer" -- a version
+    mismatch wearing the costume of a daemon that would not start.
+    """
+    generated = (
+        Path(__file__).resolve().parents[2]
+        / "protocol"
+        / "generated"
+        / "rust"
+        / "version.rs"
+    )
+
+    assert generated.is_file(), "run: make protocol"
+    assert f'"{PROTOCOL_VERSION}"' in generated.read_text(encoding="utf-8")

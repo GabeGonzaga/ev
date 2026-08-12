@@ -534,3 +534,20 @@ async def test_a_stopped_player_is_not_asked_what_is_playing() -> None:
     result = await service.control(ControlArgs(action="stop"))
 
     assert result.speech == "Stopped"
+
+
+def test_the_control_script_survives_a_player_with_no_track() -> None:
+    """A real line from the journal: "Music got an error: Can't get name of
+    current track".
+
+    Skipping past the end of a queue leaves a player that is not stopped and
+    has no current track. The action worked; only the answer was missing, and
+    it turned a successful pause into a failed turn.
+    """
+    from ev.capabilities.music.adapters import CONTROL
+
+    assert "on error" in CONTROL
+    # `my`, not bare: a handler called inside a `tell application` block is
+    # sent to the application, which answers "Can't continue nowPlaying".
+    # It compiled, it shipped, and `make applescript` is what found it.
+    assert "my nowPlaying()" in CONTROL

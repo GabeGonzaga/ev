@@ -39,6 +39,13 @@ const WITHIN: Duration = Duration::from_secs(10);
 /// could route and act but never hear anything.
 const ALSO_LOOK_IN: [&str; 2] = ["/opt/homebrew/bin", "/usr/local/bin"];
 
+/// Where the daemon's own output goes.
+///
+/// Launched from Finder there is no terminal to inherit, so a daemon that
+/// refuses something says it into nothing. This file is beside the journal,
+/// and it is the first place to look when E.V. will not start.
+const LOG: &str = "daemon.log";
+
 /// How long a SIGTERM has to be enough. Past this the daemon is not flushing,
 /// it is stuck, and the app is quitting either way.
 const GOODBYE: Duration = Duration::from_secs(3);
@@ -137,16 +144,32 @@ pub fn ensure(socket: &Path) -> State {
     // stderr is inherited on purpose: the daemon says why it refused things,
     // and launched from Finder that lands in the system log where Console.app
     // can be pointed at it.
-    let child = Command::new(interpreter)
+    let mut command = Command::new(interpreter);
+    command
         .args(["-m", "ev.cli", "--serve"])
         .current_dir(&root)
         .env(
             "PATH",
             path_with_homebrew(std::env::var("PATH").ok().as_deref()),
-        )
-        .spawn();
+        );
 
-    let child = match child {
+    // Both streams to one file, if it can be opened. If it cannot, the daemon
+    // still starts: a log is for diagnosing E.V., not a condition of running
+    // it.
+    let log = socket.parent().map(|directory| directory.join(LOG));
+    if let Some(file) = log.as_ref().and_then(|path| {
+        std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .ok()
+    }) {
+        if let Ok(second) = file.try_clone() {
+            command.stdout(file).stderr(second);
+        }
+    }
+
+    let mut child = match command.spawn() {
         Ok(child) => child,
         Err(error) => return State::Absent(error.to_string()),
     };
@@ -156,10 +179,37 @@ pub fn ensure(socket: &Path) -> State {
         if matches!(answering(socket), Ok(true)) {
             return State::Started(child);
         }
+        // It may have already given up, in which case waiting the full ten
+        // seconds tells nobody anything.
+        if matches!(child.try_wait(), Ok(Some(_))) {
+            return State::Absent(said(log.as_deref()));
+        }
         std::thread::sleep(Duration::from_millis(100));
     }
 
-    State::Absent(format!("it did not answer within {}s", WITHIN.as_secs()))
+    // Started and not answering. Ending it is the point: an orphan holding a
+    // socket nobody adopted is worse than no core at all, and the next launch
+    // would find it and adopt something the app cannot manage.
+    let mut orphan = State::Started(child);
+    stop(&mut orphan);
+
+    State::Absent(format!(
+        "it did not answer within {}s. {}",
+        WITHIN.as_secs(),
+        said(log.as_deref())
+    ))
+}
+
+/// The last thing the daemon said, for the message the app shows.
+fn said(log: Option<&Path>) -> String {
+    let Some(text) = log.and_then(|path| std::fs::read_to_string(path).ok()) else {
+        return "It said nothing.".into();
+    };
+
+    match text.lines().rev().find(|line| !line.trim().is_empty()) {
+        Some(last) => format!("Last line: {last}"),
+        None => "It said nothing.".into(),
+    }
 }
 
 /// End what the app started. Adopted daemons are left running.

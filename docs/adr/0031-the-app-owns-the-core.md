@@ -74,6 +74,39 @@ runs it.
 the environment story is verified in a shell, and whether macOS names EV in the
 Apple Events prompt is a thing only running the app can answer.
 
+## Three defects the first real launch found
+
+Running it is not the same as building it, and the first launch said so three
+times.
+
+**The Rust host was still speaking protocol 1.2.** `cargo typify` generates the
+message types and not the constant beside them, so the handshake version was
+hand-written in `client.rs` and had drifted while Python went to 1.4. The app
+started its own daemon, was refused by it, and reported "the core did not
+answer" — a version mismatch wearing the costume of a daemon that would not
+start. The version is now generated into `protocol/generated/rust/version.rs`
+by `make protocol`, and a test in the Python suite fails if the two disagree,
+so the gate is `make test` rather than only CI.
+
+**The repository is on the Desktop, and the Desktop is TCC-protected.** The
+daemon died on `pyvenv.cfg` with `Operation not permitted` before printing a
+line. A terminal already has that access, which is why it never came up until
+the app started the daemon itself. `NSDesktopFolderUsageDescription` and its
+Documents and Downloads siblings are what turn a silent `EPERM` into a question
+macOS asks. A denial cached before those keys existed has to be cleared with
+`tccutil reset SystemPolicyDesktopFolder com.gabegonzaga.ev`, which is worth
+writing down because nothing about the failure suggests it.
+
+**A daemon that never answered was left running.** `ensure` gave up after ten
+seconds and dropped the `Child`, which does not kill it; the next launch would
+find it and adopt something the app could not manage. It is now stopped on the
+way out, and the app also notices a daemon that has already exited rather than
+waiting the full ten seconds to say nothing useful.
+
+The daemon's output goes to `~/Library/Application Support/EV/daemon.log`.
+Launched from Finder there is no terminal to inherit, and all three of these
+were diagnosed from that file — the first one only after adding it.
+
 ## Alternatives rejected
 
 **A `launchd` agent for the daemon.** It survives logout and starts on boot,

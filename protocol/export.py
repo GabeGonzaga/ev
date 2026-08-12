@@ -19,6 +19,14 @@ from protocol.messages import PROTOCOL_VERSION, Envelope
 
 GENERATED = Path(__file__).resolve().parent / "generated"
 SCHEMA = GENERATED / "ev.schema.json"
+VERSION_RS = GENERATED / "rust" / "version.rs"
+"""The version, as Rust source.
+
+`cargo typify` generates the message types and not the constant beside them,
+so the handshake version was written by hand in the Rust client -- and drifted:
+Python reached 1.4 while the client still said 1.2, and the app's every turn
+was refused by its own daemon. Generated now, and checked by the suite.
+"""
 
 
 def schema() -> dict[str, Any]:
@@ -36,10 +44,24 @@ def render() -> str:
     return json.dumps(schema(), indent=2, sort_keys=True, ensure_ascii=False) + "\n"
 
 
+def render_version_rs() -> str:
+    return (
+        "// Generated from protocol/messages.py by `make protocol`. "
+        "Do not edit.\n"
+        "//\n"
+        "// The handshake compares this exactly, so a hand-written copy is a\n"
+        "// silent refusal waiting to happen -- which is what it was.\n"
+        f'pub const PROTOCOL_VERSION: &str = "{PROTOCOL_VERSION}";\n'
+    )
+
+
 def write() -> None:
     GENERATED.mkdir(parents=True, exist_ok=True)
     SCHEMA.write_text(render(), encoding="utf-8")
+    VERSION_RS.parent.mkdir(parents=True, exist_ok=True)
+    VERSION_RS.write_text(render_version_rs(), encoding="utf-8")
     print(f"wrote {SCHEMA}")
+    print(f"wrote {VERSION_RS}")
 
 
 def check() -> int:
@@ -56,7 +78,20 @@ def check() -> int:
         )
         return 1
 
-    print(f"{SCHEMA.name} matches protocol/messages.py")
+    if (
+        not VERSION_RS.exists()
+        or VERSION_RS.read_text(encoding="utf-8") != render_version_rs()
+    ):
+        print(
+            f"{VERSION_RS} is stale: the protocol version has changed.\n"
+            "Run: make protocol. A Rust client that speaks an older version "
+            "is refused by its own daemon, and the refusal reads like a "
+            "daemon that will not start.",
+            file=sys.stderr,
+        )
+        return 1
+
+    print(f"{SCHEMA.name} and version.rs match protocol/messages.py")
     return 0
 
 
