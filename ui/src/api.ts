@@ -95,17 +95,20 @@ export const history = (limit = 20, query: string | null = null) =>
 /// The browser owns the camera here, exactly as it owns the microphone:
 /// getUserMedia asks in the browser's name, the stream is stopped the moment
 /// the frame is taken, and nothing is stored anywhere.
-/// The app has no camera yet -- capture there is AVFoundation and an
-/// indicator, and it is its own decision. Until then this is the browser's.
-export const look = (image: string, text: string | null, locale: string | null) =>
+/// In the app the signed host opens the camera and takes the frame, so the
+/// window never sees one. In a browser the page captures it and sends it,
+/// because there getUserMedia asks in the browser's name.
+export const look = (image: string | null, text: string | null, locale: string | null) =>
   inTauri
-    ? Promise.reject(new Error("the app cannot see yet: use the browser surface"))
+    ? callTauri<TurnResult>("look", { text })
     : http<TurnResult>("/api/vision", {
         method: "POST",
         body: JSON.stringify({ image, text, locale }),
       });
 
-export const canSeeHere = !inTauri;
+/// Whether the frame is taken here. False in the app: the host takes it.
+export const capturesHere = !inTauri;
+export const canSee = true;
 
 export const setLocale = (locale: string | null) =>
   inTauri ? callTauri<void>("set_locale", { locale }) : Promise.resolve();
@@ -133,6 +136,17 @@ export const confirm = async (granted: boolean): Promise<TurnResult | null> => {
 /// In the app a question arrives as an event while the turn waits. In a
 /// browser it arrives as the turn's own answer, so there is nothing to
 /// subscribe to.
+/// The camera, while it is on.
+///
+/// macOS shows its own indicator, and E.V. shows one too: a light that belongs
+/// to the system does not say which application turned it on.
+export async function onCamera(live: (on: boolean) => void): Promise<void> {
+  if (!inTauri) return;
+  const { listen } = await import("@tauri-apps/api/event");
+  await listen("camera.started", () => live(true));
+  await listen("camera.stopped", () => live(false));
+}
+
 /// A turn the panel did not start.
 ///
 /// The hotkey records while a key is held, anywhere on the machine, and the

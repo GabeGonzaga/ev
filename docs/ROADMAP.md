@@ -11,7 +11,7 @@ is right.
 | 2 | Push-to-talk, VAD, whisper.cpp, AVSpeechSynthesizer | done |
 | 3 | Tauri, menu bar, NSPanel, settings, history | done, unproven on device |
 | 4 | JSON macros, more adapters, retrieval | done |
-| 5 | Camera and vision | core and browser done |
+| 5 | Camera and vision | done, unproven on device |
 | 6 | Wake word, continuous interaction | |
 
 ## Phase 0
@@ -138,7 +138,7 @@ identity macOS decides about.
 | `vision.submit` at protocol 1.4, from a surface that captured a frame | done |
 | The vision role: a larger model, loaded on capture and unloaded after | done |
 | A frame in the browser: `getUserMedia`, one still, camera off again | done |
-| Capture in the app: AVFoundation, an indicator, a session timeout | |
+| Capture in the app: AVFoundation, an indicator, a session timeout | done, unproven on device |
 | A frame from the screen rather than the camera | not decided |
 
 Measured, gemma3:12b on an M2 Pro: 14-19 s from frame to answer, most of it

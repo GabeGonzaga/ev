@@ -16,6 +16,9 @@ export const useSession = defineStore("session", () => {
   // The key that summons E.V., and whether the app took it. Empty in a
   // browser: a page cannot hold a global shortcut, and should not claim to.
   const shortcut = ref<string>("");
+  // On while the camera is. In the app the host says so; in a browser the
+  // page knows, because it is the one holding the stream.
+  const camera = ref(false);
   const shortcutTrouble = ref<string | null>(null);
   // A question the core is waiting on. While this is set, a turn is parked on
   // the other side and nothing has run.
@@ -85,6 +88,8 @@ export const useSession = defineStore("session", () => {
     };
   });
 
+  void api.onCamera((on) => (camera.value = on));
+
   // A turn started by the hotkey, which the panel did not ask for and cannot
   // await. Same shape as any other turn once it arrives.
   void api.onHotkeyTurn(
@@ -103,18 +108,36 @@ export const useSession = defineStore("session", () => {
 
   /// Take one frame and ask about it.
   ///
-  /// The camera is on for as long as it takes to read a single frame and is
-  /// stopped in a `finally`. `CLAUDE.md` invariant 8 asks for a visible
-  /// active state and a session timeout; a session this short is the strongest
-  /// form of both, and the browser shows its own indicator while it lasts.
+  /// Two shells, two cameras. In the app the signed host opens it, takes one
+  /// frame and closes it, and says so with `camera.started` / `camera.stopped`.
+  /// In a browser the page does it, because there `getUserMedia` asks in the
+  /// browser's name and E.V. does not hold a permission it was not given.
+  ///
+  /// Either way the camera is on for one frame. `CLAUDE.md` invariant 8 asks
+  /// for a visible active state and a session timeout; a session this short is
+  /// the strongest form of both.
   async function look(text: string | null = null) {
-    if (!api.canSeeHere) return;
-    state.value = "listening";
     trouble.value = null;
+
+    if (!api.capturesHere) {
+      state.value = "thinking";
+      try {
+        apply(await api.look(null, text, locale.value));
+      } catch (error) {
+        trouble.value = String(error);
+      } finally {
+        state.value = "idle";
+        await refresh();
+      }
+      return;
+    }
+
+    state.value = "listening";
 
     let stream: MediaStream | null = null;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      camera.value = true;
       const video = document.createElement("video");
       video.srcObject = stream;
       video.muted = true;
@@ -135,6 +158,7 @@ export const useSession = defineStore("session", () => {
       trouble.value = String(error);
     } finally {
       stream?.getTracks().forEach((track) => track.stop());
+      camera.value = false;
       state.value = "idle";
       await refresh();
     }
@@ -193,7 +217,7 @@ export const useSession = defineStore("session", () => {
 
   return {
     state, heard, said, trouble, entries, locale, question, search,
-    shortcut, shortcutTrouble,
+    shortcut, shortcutTrouble, camera,
     ask, speak, look, answer, refresh, choose, load, bind,
   };
 });

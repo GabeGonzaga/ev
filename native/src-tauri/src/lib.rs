@@ -15,8 +15,8 @@ use std::sync::mpsc::{self, Sender};
 use std::sync::Mutex;
 use std::time::Duration;
 
-use ev_host::audio;
 use ev_host::client::Client;
+use ev_host::{audio, camera};
 use serde::Serialize;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
@@ -77,6 +77,8 @@ enum Input {
     Listen,
     /// Already recorded, because a key was held down for it.
     Recorded(Vec<u8>),
+    /// One frame, and what was said while looking at it.
+    Seen(Vec<u8>, Option<String>),
 }
 
 fn run_turn(app: &AppHandle, input: Input, locale: Option<String>) -> Result<TurnResult, String> {
@@ -122,6 +124,9 @@ fn run_turn(app: &AppHandle, input: Input, locale: Option<String>) -> Result<Tur
         }
         Input::Recorded(wav) => client
             .submit_audio(&wav, locale.as_deref(), &mut ask)
+            .map_err(|error| error.to_string())?,
+        Input::Seen(frame, text) => client
+            .submit_vision(&frame, text.as_deref(), locale.as_deref(), &mut ask)
             .map_err(|error| error.to_string())?,
     };
 
@@ -175,6 +180,35 @@ async fn listen(app: AppHandle, session: State<'_, Session>) -> Result<TurnResul
     tauri::async_runtime::spawn_blocking(move || run_turn(&app, Input::Listen, locale))
         .await
         .map_err(|error| error.to_string())?
+}
+
+/// Take one frame and ask about it.
+///
+/// The camera is opened, read and closed inside `take_frame`, and the panel is
+/// told when it starts and when it stops. `CLAUDE.md` invariant 8 asks for a
+/// visible active state: macOS shows its own indicator, and E.V. shows one
+/// too, because a light that belongs to the system does not say which
+/// application turned it on.
+#[tauri::command]
+async fn look(
+    app: AppHandle,
+    text: Option<String>,
+    session: State<'_, Session>,
+) -> Result<TurnResult, String> {
+    let locale = session.locale.lock().ok().and_then(|slot| slot.clone());
+
+    tauri::async_runtime::spawn_blocking(move || {
+        let _ = app.emit("camera.started", ());
+        let frame = camera::take_frame(camera::SESSION).map_err(|error| error.to_string());
+        // Emitted before the turn, not after it: the camera is already off,
+        // and an indicator that stays on while a model thinks is a lie about
+        // what the hardware is doing.
+        let _ = app.emit("camera.stopped", ());
+
+        run_turn(&app, Input::Seen(frame?, text), locale)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -333,6 +367,7 @@ pub fn run() {
             submit,
             listen,
             confirm,
+            look,
             history,
             set_locale,
             set_shortcut,
@@ -367,6 +402,14 @@ pub fn run() {
             if let Err(error) = bind(app.handle(), &saved.shortcut) {
                 eprintln!("the shortcut {} is not available: {error}", saved.shortcut);
             }
+
+            // Asked for once, at startup, so the dialog arrives when the app
+            // was opened rather than in the middle of a turn. Refusing is an
+            // answer: everything except vision.look works without it.
+            let handle = app.handle().clone();
+            camera::request(move |granted| {
+                let _ = handle.emit("camera.permission", granted);
+            });
 
             Ok(())
         })

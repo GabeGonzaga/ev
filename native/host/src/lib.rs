@@ -6,6 +6,9 @@
 //! honest by hand.
 
 pub mod audio;
+/// macOS only: on Linux there is no camera to open and no app to open it for.
+#[cfg(target_os = "macos")]
+pub mod camera;
 pub mod client;
 
 /// The generated view of the contract, produced from

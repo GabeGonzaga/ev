@@ -61,14 +61,15 @@ is one line in `models.json`, which is what the role is for.
 The pt-PT answers came back in European Portuguese, unprompted beyond the
 "responde em português de Portugal" line the service adds.
 
-## What is not built
+## What is not built here
 
-**Capture in the app.** AVFoundation, an indicator that is visible while the
-camera is on, and a session timeout are three decisions, and invariant 8 asks
-for all of them. In the browser they already exist and are not E.V.'s: the page
-uses `getUserMedia`, so the browser asks in its own name and shows its own
-indicator, and the stream is stopped in a `finally` after a single frame — a
-session short enough that a timeout has nothing to bound.
+**Capture in the app.** AVFoundation, an indicator visible while the camera is
+on, and a session timeout are three decisions, and invariant 8 asks for all of
+them. They are ADR 0030, which followed immediately. In the browser they
+already existed and are not E.V.'s: the page uses `getUserMedia`, so the
+browser asks in its own name and shows its own indicator, and the stream is
+stopped in a `finally` after a single frame — a session short enough that a
+timeout has nothing to bound.
 
 ## Alternatives rejected
 

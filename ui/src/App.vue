@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { canBindKeys, canRecordHere, canSeeHere } from "./api";
+import { canBindKeys, canRecordHere } from "./api";
 import { useSession } from "./stores/session";
 
 const session = useSession();
@@ -101,7 +101,6 @@ async function talk() {
       <!-- One frame, then the camera goes off again. What is typed goes with
            it as the question; empty means "describe it". -->
       <button
-        v-if="canSeeHere"
         type="button"
         :disabled="session.state !== 'idle'"
         @click="peek()"
@@ -123,6 +122,10 @@ async function talk() {
       <button type="button" @click="session.answer(true)">Run it</button>
       <button type="button" @click="session.answer(false)">Cancel</button>
     </div>
+
+    <!-- Invariant 8, the visible half. macOS lights its own indicator; this
+         one says which application did it, and goes out with the camera. -->
+    <p v-if="session.camera" class="camera">● the camera is on</p>
 
     <p v-if="session.heard" class="heard">heard: {{ session.heard }}</p>
     <p v-for="line in session.said" :key="line" class="said">{{ line }}</p>
@@ -196,6 +199,7 @@ button:disabled { opacity: 0.4; }
 }
 .asking span { flex: 1; }
 .asking em { color: #ffd60a; font-style: normal; margin: 0 6px; }
+.camera { color: #ff453a; margin: 6px 0 0; font-weight: 600; }
 .shortcut { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
 .shortcut input { flex: 1; }
 .shortcut em { color: #ff9f0a; font-style: normal; }

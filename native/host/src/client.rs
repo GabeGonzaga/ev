@@ -174,6 +174,31 @@ impl Client {
         )
     }
 
+    /// One turn from one frame. The core answers about what is in it and acts
+    /// on nothing it was not asked to: `vision.look` has no argument that
+    /// selects a target, which is the whole design (ADR 0029).
+    ///
+    /// `text` is what was said while looking. `None` means: describe it.
+    pub fn submit_vision(
+        &mut self,
+        image: &[u8],
+        text: Option<&str>,
+        locale: Option<&str>,
+        answer: &mut dyn FnMut(&Value) -> bool,
+    ) -> Result<Turn, Error> {
+        use base64::Engine as _;
+        let encoded = base64::engine::general_purpose::STANDARD.encode(image);
+        self.turn(
+            json!({
+                "type": "vision.submit",
+                "image": encoded,
+                "text": text,
+                "locale": locale,
+            }),
+            answer,
+        )
+    }
+
     /// `answer` decides confirmations; the host does not decide them itself,
     /// which is the same rule the CLI follows.
     fn turn(

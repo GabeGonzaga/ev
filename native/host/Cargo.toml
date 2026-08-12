@@ -28,3 +28,7 @@ unsafe_code = "forbid"
 
 [lints.clippy]
 all = "deny"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+image = { version = "0.25.10", default-features = false, features = ["jpeg"] }
+nokhwa = { version = "0.10.11", features = ["input-avfoundation"] }

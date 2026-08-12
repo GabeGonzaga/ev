@@ -6,6 +6,11 @@
   <key>com.apple.security.device.audio-input</key>
   <true/>
 
+  <!-- The camera, under the hardened runtime. One frame per press, never a
+       stream, and nothing written down (ADR 0029). -->
+  <key>com.apple.security.device.camera</key>
+  <true/>
+
   <!-- Apple Events, which is how music.play reaches Music. Until this exists
        and macOS has been asked, that tool is denied by policy (ADR 0003). -->
   <key>com.apple.security.automation.apple-events</key>
