@@ -9,19 +9,16 @@ the real list, never passed through freely" -- and a playlist called
 
 from __future__ import annotations
 
-import re
-
 from ev.application.speech import Speaker
 from ev.capabilities.music.adapters import MusicAdapter
 from ev.capabilities.music.args import STEP, ControlArgs, PlayArgs, VolumeArgs
+from ev.domain.naming import closest
 from ev.domain.results import ToolErrorCode, ToolResult
 from ev.infrastructure.macos.applescript import AppleScriptError
 
 PLAY = "music.play"
 CONTROL = "music.control"
 VOLUME = "music.volume"
-
-_NOISE = re.compile(r"[^\w]+", re.UNICODE)
 
 NOT_FOUND = "nothing in the library matches"
 """What the album and track scripts say when a name is not in the library.
@@ -42,40 +39,6 @@ WITH_TRACK = {"resume", "next", "previous"}
 """The three where naming what is playing now is the useful part of the
 answer. Each has its own phrase, because "Skipped" and "Skipped to X" do not
 compose by concatenation in every language -- pt-PT wants "para", not "to"."""
-
-
-def simplify(name: str) -> str:
-    """What a name sounds like, with the punctuation nobody says removed.
-
-    `{Jazzy}`, `Indie kid??` and `Main PlayList :D` are real playlist names.
-    Nobody dictates the braces.
-    """
-    return _NOISE.sub("", name).casefold()
-
-
-def closest(spoken: str, existing: list[str]) -> str | None:
-    """The playlist someone meant, or nothing.
-
-    Exact first, then punctuation-blind, then a unique prefix or containment.
-    Ambiguity returns nothing rather than a guess: playing the wrong playlist
-    is worse than saying which ones matched.
-    """
-    for name in existing:
-        if name == spoken:
-            return name
-
-    wanted = simplify(spoken)
-    if not wanted:
-        return None
-
-    simple = [(simplify(name), name) for name in existing]
-
-    exact = [name for key, name in simple if key == wanted]
-    if len(exact) == 1:
-        return exact[0]
-
-    partial = [name for key, name in simple if key.startswith(wanted) or wanted in key]
-    return partial[0] if len(partial) == 1 else None
 
 
 class MusicService:

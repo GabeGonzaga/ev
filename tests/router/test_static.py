@@ -160,3 +160,30 @@ def test_a_macro_needs_a_name() -> None:
 
 def test_a_word_starting_like_macro_is_not_one() -> None:
     assert StaticRouter().resolve("run the marathon") is None
+
+
+# --- notes ----------------------------------------------------------------
+
+
+def test_a_bare_title_is_routed() -> None:
+    resolution = StaticRouter().resolve("cria uma nota chamada Compras")
+
+    assert resolution is not None
+    assert resolution.tool == "notes.create"
+    assert resolution.arguments == {"title": "Compras"}
+
+
+def test_a_title_with_a_body_after_it_escalates() -> None:
+    # A greedy capture would title the note "Boiler saying it was serviced in
+    # March" and lose the body entirely -- a wrong argument that looks like a
+    # success, which is the failure mode tier 1 exists to avoid.
+    assert (
+        StaticRouter().resolve("take a note called Boiler saying it was serviced")
+        is None
+    )
+
+
+def test_a_folder_in_the_sentence_escalates() -> None:
+    assert (
+        StaticRouter().resolve("guarda uma nota chamada Ata na pasta Trabalho") is None
+    )

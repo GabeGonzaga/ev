@@ -43,6 +43,9 @@ from ev.capabilities.macros.tools import macro_tools
 from ev.capabilities.music.adapters import MusicAdapter
 from ev.capabilities.music.service import MusicService
 from ev.capabilities.music.tools import music_tools
+from ev.capabilities.notes.adapters import NotesAdapter
+from ev.capabilities.notes.service import NotesService
+from ev.capabilities.notes.tools import notes_tools
 from ev.domain.journal import JournalEntry
 from ev.domain.macro import Macro
 from ev.domain.results import Clarification, ToolResult
@@ -165,6 +168,7 @@ def build_registry(
     for spec in (
         *browser_tools(BrowserService(OpenAdapter(processes), speaker)),
         *music_tools(MusicService(MusicAdapter(applescript), speaker)),
+        *notes_tools(NotesService(NotesAdapter(applescript), speaker)),
         *language_tools(LanguageService(generation)),
         # A macro calls the registry it lives in: same door, once per step.
         *macro_tools(MacroService(saved, registry.call, speaker)),

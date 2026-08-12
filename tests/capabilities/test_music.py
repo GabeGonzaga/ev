@@ -7,8 +7,9 @@ from ev.application.policy import PermissionLedger, PermissionPolicy
 from ev.application.speech import Speaker
 from ev.capabilities.music.adapters import MusicAdapter
 from ev.capabilities.music.args import ControlArgs, PlayArgs, VolumeArgs
-from ev.capabilities.music.service import MusicService, closest
+from ev.capabilities.music.service import MusicService
 from ev.capabilities.music.tools import music_tools
+from ev.domain.naming import closest
 from ev.domain.permissions import Permission, PermissionState
 from ev.domain.results import ToolErrorCode
 from ev.domain.risk import RiskLevel

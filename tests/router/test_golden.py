@@ -50,6 +50,18 @@ def test_golden_case(case: dict[str, Any]) -> None:
         )
         return
 
+    if case.get("tier") == 2:
+        # Named the model's job, not tier 1's: "take a note called Boiler
+        # saying it was serviced in March" has a body in it, and deciding
+        # where the title ends is the judgement a regex does not have. The
+        # suite checks only that tier 1 stands aside; `make eval` checks that
+        # the model gets it right, against the same tool and arguments.
+        assert resolution is None, (
+            f"{case['utterance']!r} is a tier 2 case, "
+            f"but tier 1 answered with {resolution!r}"
+        )
+        return
+
     assert resolution is not None, f"{case['utterance']!r} was not routed"
     assert resolution.tool == case["tool"]
     assert resolution.arguments == case["arguments"]

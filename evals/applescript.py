@@ -12,9 +12,12 @@ So each script is run here on a path with no side effect:
   fail in their own words after reaching the library
 * control is given an action matching no branch, so it only reads the player
 * step moves the volume by zero, so the arithmetic and the clamping run
+* the note is asked for a folder that cannot exist, so it fails before it
+  makes anything
 
-Needs a Mac with Music installed, so it lives beside `make eval` rather than
-in the suite.
+Needs a Mac with Music and Notes installed, so it lives beside `make eval`
+rather than in the suite. It sends Apple Events to both, so macOS asks for
+permission the first time.
 """
 
 from __future__ import annotations
@@ -23,6 +26,7 @@ import asyncio
 import sys
 
 from ev.capabilities.music.adapters import QUEUE, MusicAdapter
+from ev.capabilities.notes.adapters import NotesAdapter
 from ev.infrastructure.macos.applescript import AppleScriptClient, AppleScriptError
 from ev.infrastructure.macos.processes import ProcessRunner
 
@@ -30,7 +34,9 @@ MISSING = "EV Nonexistent QQQ"
 
 
 async def main() -> int:
-    adapter = MusicAdapter(AppleScriptClient(ProcessRunner()))
+    applescript = AppleScriptClient(ProcessRunner())
+    adapter = MusicAdapter(applescript)
+    notes = NotesAdapter(applescript)
     failures: list[str] = []
 
     async def expect_error(name: str, run: object, wanted: str) -> None:
@@ -67,6 +73,16 @@ async def main() -> int:
     # No branch matches, so this reads the player and changes nothing.
     await expect_value("control", adapter.control("noop"))
     await expect_value("volume step", adapter.step(0))
+
+    print("running every notes script against Notes")
+
+    await expect_value("list folders", notes.folders())
+    # The folder cannot exist, so this fails before `make new note` runs.
+    await expect_error(
+        "create note",
+        notes.create(MISSING, "checking", MISSING),
+        "there is no folder called",
+    )
 
     if failures:
         print("\n".join(f"  FAILED {failure}" for failure in failures), file=sys.stderr)

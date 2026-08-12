@@ -1,0 +1,6 @@
+{"id": "note-by-title", "locale": "en", "utterance": "make a note called Shopping", "tool": "notes.create", "arguments": {"title": "Shopping"}}
+{"id": "note-by-title", "locale": "pt-PT", "utterance": "cria uma nota chamada Compras", "tool": "notes.create", "arguments": {"title": "Compras"}}
+{"id": "note-with-a-body", "locale": "en", "tier": 2, "utterance": "take a note called Boiler saying it was serviced in March", "tool": "notes.create", "arguments": {"title": "Boiler", "body": "serviced in March"}}
+{"id": "note-with-a-body", "locale": "pt-PT", "tier": 2, "utterance": "cria uma nota chamada Caldeira a dizer que foi revista em março", "tool": "notes.create", "arguments": {"title": "Caldeira", "body": "revista em março"}}
+{"id": "note-in-a-folder", "locale": "en", "tier": 2, "utterance": "save a note titled Minutes in the Work folder", "tool": "notes.create", "arguments": {"title": "Minutes", "folder": "Work"}}
+{"id": "note-in-a-folder", "locale": "pt-PT", "tier": 2, "utterance": "guarda uma nota chamada Ata na pasta Trabalho", "tool": "notes.create", "arguments": {"title": "Ata", "folder": "Trabalho"}}

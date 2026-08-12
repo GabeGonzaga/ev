@@ -10,7 +10,7 @@ is right.
 | 1.5 | Typed IPC protocol + signed native host skeleton | done |
 | 2 | Push-to-talk, VAD, whisper.cpp, AVSpeechSynthesizer | current |
 | 3 | Tauri, menu bar, NSPanel, settings, history | current |
-| 4 | JSON macros, more adapters, retrieval | macros done |
+| 4 | JSON macros, more adapters, retrieval | macros, notes done |
 | 5 | Camera and vision | |
 | 6 | Wake word, continuous interaction | |
 

@@ -247,6 +247,22 @@ def _rule(
     return Rule(tool=tool, pattern=re.compile(pattern, re.IGNORECASE), build=build)
 
 
+_BODY = re.compile(
+    r"\b(saying|that\s+says|which\s+says|with\s+the\s+text|about|"
+    r"in\s+the\s+\S+\s+folder|a\s+dizer|que\s+diz|com\s+o\s+texto|"
+    r"sobre|na\s+pasta|dentro\s+da\s+pasta)\b",
+    re.IGNORECASE,
+)
+"""Where a title stops being a title. Tier 1 has no way to tell what belongs
+to the note's name and what belongs in it, so it declines instead of guessing
+-- the model does that part."""
+
+
+def _note(groups: Mapping[str, str]) -> dict[str, object] | None:
+    title = groups["title"].strip()
+    return None if _BODY.search(title) else {"title": title}
+
+
 RULES: tuple[Rule, ...] = (
     _rule(
         "browser.open_url",
@@ -311,6 +327,23 @@ RULES: tuple[Rule, ...] = (
         r"^(?:por\s+favor\s+)?(?:corre|executa|faz)\s+(?:a\s+)?macro\s+"
         r"(?P<name>.+)$",
         lambda groups: {"name": groups["name"].strip()},
+    ),
+    # A title and nothing else. "Take a note called Boiler saying it was
+    # serviced in March" carries a body, and a greedy capture titles the note
+    # with the whole sentence -- a wrong argument that looks like a success.
+    # Those escalate; a bare title lands here for free.
+    _rule(
+        "notes.create",
+        r"^(?:please\s+)?(?:make|take|create|write|start)\s+(?:a\s+)?(?:new\s+)?"
+        r"note\s+(?:called|titled|named)\s+(?P<title>.+)$",
+        _note,
+    ),
+    _rule(
+        "notes.create",
+        r"^(?:por\s+favor\s+)?(?:cria|criar|faz|escreve|abre)\s+(?:uma\s+)?"
+        r"(?:nova\s+)?nota\s+(?:chamada|com\s+o\s+nome|com\s+o\s+título|"
+        r"com\s+o\s+titulo)\s+(?P<title>.+)$",
+        _note,
     ),
     # Quoted only. Without quotation marks there is no way to tell where the
     # text to translate ends and the instruction resumes, and guessing would
