@@ -308,10 +308,11 @@ def test_speak_says_the_answer_out_loud(tmp_path: Path, fake_bin: FakeBin) -> No
     assert runs[1][1:] == ["--", "Opening example.com"]
 
 
-def test_the_locale_chooses_the_voice(tmp_path: Path, fake_bin: FakeBin) -> None:
-    # Known gap, audible now that it speaks: the sentence is composed in
-    # English by the tool, so Joana reads English. Locale-aware responses need
-    # session context, which does not exist yet.
+def test_the_locale_chooses_the_voice_and_the_words(
+    tmp_path: Path, fake_bin: FakeBin
+) -> None:
+    # The gap this closed: Joana used to read "Opening example.com". A
+    # Portuguese voice reading English words is worse than either alone.
     main(
         [
             "--database",
@@ -323,7 +324,7 @@ def test_the_locale_chooses_the_voice(tmp_path: Path, fake_bin: FakeBin) -> None
         ]
     )
 
-    assert fake_bin.runs()[1] == ["say", "-v", "Joana", "--", "Opening example.com"]
+    assert fake_bin.runs()[1] == ["say", "-v", "Joana", "--", "A abrir example.com"]
 
 
 def test_without_speak_nothing_is_said(tmp_path: Path, fake_bin: FakeBin) -> None:

@@ -164,7 +164,9 @@ class SessionConfirmation:
         return await self._asker.confirm(request)
 
 
-Handler = Callable[[str], Awaitable[ToolResult | Clarification | None]]
+Handler = Callable[..., Awaitable[ToolResult | Clarification | None]]
+"""`(text)` or `(text, locale)`. The locale is what the answer is spoken in,
+and the daemon has it -- `utterance.submit` carries it."""
 History = Callable[[int, int | None], Awaitable[list[JournalEntry]]]
 """How the daemon reads the trail back. The journal owns the storage; this is
 the only shape the socket knows about."""
@@ -453,7 +455,7 @@ class IpcServer:
         async with self._turn:
             self._confirmation.bind(session)
             try:
-                outcome = await self._handle(command.text)
+                outcome = await self._handle(command.text, command.locale)
             except Exception as error:  # the daemon outlives one bad turn
                 await self._refuse(
                     session,

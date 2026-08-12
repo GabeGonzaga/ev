@@ -30,6 +30,7 @@ from typing import Any
 from ev.application.assistant import Assistant
 from ev.application.confirmation import ConfirmationRequest
 from ev.application.policy import ConfidencePolicy, PermissionLedger, PermissionPolicy
+from ev.application.speech import Speaker
 from ev.capabilities.browser.adapters import OpenAdapter
 from ev.capabilities.browser.service import BrowserService
 from ev.capabilities.browser.tools import browser_tools
@@ -116,6 +117,7 @@ class Application:
     connection: sqlite3.Connection | None
     ledger: PermissionLedger
     settings: OllamaSettings
+    speaker: Speaker
 
     async def aclose(self) -> None:
         # The journal batches, so the pending tail is only durable once this
@@ -132,6 +134,7 @@ def build_registry(
     confirmation: ConfirmationPort,
     ledger: PermissionLedger,
     generation: Completion,
+    speaker: Speaker,
 ) -> Registry:
     registry = Registry(
         policy=PermissionPolicy(ledger), confirmation=confirmation, journal=journal
@@ -141,8 +144,8 @@ def build_registry(
     applescript = AppleScriptClient(processes)
 
     for spec in (
-        *browser_tools(BrowserService(OpenAdapter(processes))),
-        *music_tools(MusicService(MusicAdapter(applescript))),
+        *browser_tools(BrowserService(OpenAdapter(processes), speaker)),
+        *music_tools(MusicService(MusicAdapter(applescript), speaker)),
         *language_tools(LanguageService(generation)),
     ):
         registry.register(spec)
@@ -156,6 +159,7 @@ def build(
     confirmation: ConfirmationPort | None = None,
     model: str | None = None,
     completion: Completion | None = None,
+    speaker: Speaker | None = None,
 ) -> Application:
     connection: sqlite3.Connection | None = None
     journal: JournalPort
@@ -183,11 +187,13 @@ def build(
     router_model: Completion = completion or client.bind("router")  # type: ignore[union-attr]
     generation_model: Completion = completion or client.bind("generation")  # type: ignore[union-attr]
 
+    voice = speaker or Speaker()
     registry = build_registry(
         journal=journal,
         confirmation=confirmation or ConsoleConfirmation(),
         ledger=ledger,
         generation=generation_model,
+        speaker=voice,
     )
 
     return Application(
@@ -205,6 +211,7 @@ def build(
         connection=connection,
         ledger=ledger,
         settings=settings,
+        speaker=voice,
     )
 
 
@@ -431,6 +438,7 @@ async def run(args: argparse.Namespace, completion: Completion | None = None) ->
         )
 
     application = build(database=database, model=args.model, completion=completion)
+    application.speaker.bind(args.locale)
     voice = SaySynthesizer(ProcessRunner()) if args.speak else None
     try:
         if args.repl:
@@ -503,6 +511,13 @@ async def serve(
     async def transcribe(audio: Path, locale: str) -> str:
         return await recognizer.transcribe(audio, language=locale)
 
+    async def handle(text: str, locale: str | None = None) -> object:
+        # Bound per turn, under the same lock that serialises turns, for the
+        # same reason the confirmation port is: one core, many surfaces, and
+        # the language belongs to whoever is speaking now.
+        application.speaker.bind(locale)
+        return await application.assistant.handle(text)
+
     async def history(limit: int, before: int | None) -> list[JournalEntry]:
         journal = application.journal
         if not isinstance(journal, SqliteJournal):  # pragma: no cover
@@ -511,7 +526,7 @@ async def serve(
 
     server = IpcServer(
         path=socket_path(database.parent),
-        handle=application.assistant.handle,
+        handle=handle,  # type: ignore[arg-type]
         confirmation=confirmation,
         transcribe=transcribe,
         history=history,
@@ -530,7 +545,7 @@ async def serve(
     if web_port is not None:
         surface = WebSurface(
             state_dir=database.parent,
-            handle=application.assistant.handle,
+            handle=handle,  # type: ignore[arg-type]
             history=history,
             transcribe=transcribe,
             assets=Path(__file__).resolve().parents[1] / "ui" / "dist",

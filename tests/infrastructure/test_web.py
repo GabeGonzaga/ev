@@ -37,7 +37,9 @@ class Core:
         self.asked: list[str] = []
         self._outcome = outcome
 
-    async def handle(self, text: str) -> ToolResult | Clarification | None:
+    async def handle(
+        self, text: str, locale: str | None = None
+    ) -> ToolResult | Clarification | None:
         self.asked.append(text)
         return self._outcome
 
@@ -45,7 +47,9 @@ class Core:
 class Answers(Protocol):
     """Anything that can take a turn. The helper does not care which fake."""
 
-    async def handle(self, text: str) -> ToolResult | Clarification | None: ...
+    async def handle(
+        self, text: str, locale: str | None = None
+    ) -> ToolResult | Clarification | None: ...
 
 
 @asynccontextmanager
@@ -308,7 +312,9 @@ class Destructive:
         self.confirmation = confirmation
         self.granted: bool | None = None
 
-    async def handle(self, text: str) -> ToolResult | Clarification | None:
+    async def handle(
+        self, text: str, locale: str | None = None
+    ) -> ToolResult | Clarification | None:
         self.granted = await self.confirmation.confirm(
             ConfirmationRequest(
                 tool="system.empty_trash",

@@ -41,7 +41,7 @@ ABANDONED_AFTER = 120.0
 mid-question must not park a turn forever, and a turn nobody answers is
 declined -- silence is not consent here either."""
 
-Handler = Callable[[str], Awaitable[ToolResult | Clarification | None]]
+Handler = Callable[..., Awaitable[ToolResult | Clarification | None]]
 Transcriber = Callable[[Path, str], Awaitable[str]]
 History = Callable[[int, int | None], Awaitable[list[JournalEntry]]]
 
@@ -189,14 +189,14 @@ class WebSurface:
         if not text:
             raise web.HTTPBadRequest(text="nothing to do")
 
-        return web.json_response(await self._begin(text))
+        return web.json_response(await self._begin(text, body.get("locale")))
 
-    async def _begin(self, text: str) -> dict[str, Any]:
+    async def _begin(self, text: str, locale: str | None = None) -> dict[str, Any]:
         """Run a turn until it finishes or asks something."""
         await self._abandon()
         await self._turn.acquire()
 
-        parked = Asked(asyncio.ensure_future(self._handle(text)))
+        parked = Asked(asyncio.ensure_future(self._handle(text, locale)))
         self._parked = parked
         if self._confirmation is not None:
             self._confirmation.bind(parked)
@@ -265,7 +265,7 @@ class WebSurface:
             # A recording of someone's voice does not outlive the sentence.
             path.unlink(missing_ok=True)
 
-        return web.json_response({"heard": said, **await self._begin(said)})
+        return web.json_response({"heard": said, **await self._begin(said, locale)})
 
     async def _history_route(self, request: web.Request) -> web.StreamResponse:
         if self._history is None:

@@ -64,7 +64,9 @@ class Core:
         self._confirmation = confirm_with
         self.granted: bool | None = None
 
-    async def handle(self, utterance: str) -> ToolResult | Clarification | None:
+    async def handle(
+        self, utterance: str, locale: str | None = None
+    ) -> ToolResult | Clarification | None:
         self.utterances.append(utterance)
         if self._confirmation is not None:
             self.granted = await self._confirmation.confirm(
@@ -253,7 +255,9 @@ async def test_an_unrouted_turn_says_so(state: Path) -> None:
 
 async def test_a_failing_turn_does_not_kill_the_daemon(state: Path) -> None:
     class Exploding(Core):
-        async def handle(self, utterance: str) -> ToolResult | Clarification | None:
+        async def handle(
+            self, utterance: str, locale: str | None = None
+        ) -> ToolResult | Clarification | None:
             raise RuntimeError("boom")
 
     core = Exploding()

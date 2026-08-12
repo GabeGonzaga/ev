@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 
+from ev.application.speech import Speaker
 from ev.capabilities.music.adapters import MusicAdapter
 from ev.capabilities.music.args import STEP, ControlArgs, PlayArgs, VolumeArgs
 from ev.domain.results import ToolErrorCode, ToolResult
@@ -28,11 +29,11 @@ Matched here so a miss can be turned into something useful rather than
 repeated back at the user."""
 
 SPOKEN = {
-    "pause": "Paused",
-    "resume": "Playing",
-    "next": "Skipped",
-    "previous": "Went back",
-    "stop": "Stopped",
+    "pause": "music.paused",
+    "resume": "music.resumed",
+    "next": "music.next",
+    "previous": "music.previous",
+    "stop": "music.stopped",
 }
 
 
@@ -71,8 +72,9 @@ def closest(spoken: str, existing: list[str]) -> str | None:
 
 
 class MusicService:
-    def __init__(self, adapter: MusicAdapter) -> None:
+    def __init__(self, adapter: MusicAdapter, speaker: Speaker | None = None) -> None:
         self._adapter = adapter
+        self._speaker = speaker or Speaker()
 
     async def play(self, args: PlayArgs) -> ToolResult:
         if args.kind == "playlist":
@@ -86,9 +88,13 @@ class MusicService:
             # An album plays through now: E.V. builds its own playlist, which
             # is the only thing Music will play in order. Saying where it
             # started is still honest -- the queue begins somewhere.
-            speech = f"Playing {args.name}"
-            if started_at and started_at != args.name:
-                speech = f"{speech}, from {started_at}"
+            speech = (
+                self._speaker.say(
+                    "music.playing_from", name=args.name, track=started_at
+                )
+                if started_at and started_at != args.name
+                else self._speaker.say("music.playing", name=args.name)
+            )
             return ToolResult.success(
                 PLAY,
                 data={"name": args.name, "kind": "album", "started_at": started_at},
@@ -103,7 +109,7 @@ class MusicService:
         return ToolResult.success(
             PLAY,
             data={"name": args.name, "kind": "track", "started_at": started_at},
-            speech=f"Playing {args.name}",
+            speech=self._speaker.say("music.playing", name=args.name),
         )
 
     async def _not_an_album(self, spoken: str, error: AppleScriptError) -> ToolResult:
@@ -132,7 +138,7 @@ class MusicService:
                 "started_at": started_at,
                 "asked_for": spoken,
             },
-            speech=f"No album called {spoken}. Playing the playlist {name}",
+            speech=self._speaker.say("music.playing_instead", asked=spoken, name=name),
         )
 
     async def _playlist(self, spoken: str) -> ToolResult:
@@ -146,14 +152,16 @@ class MusicService:
             return ToolResult.failure(
                 PLAY,
                 ToolErrorCode.INVALID_ARGUMENTS,
-                f"no playlist matches {spoken!r}. You have: {suggestions}",
+                self._speaker.say(
+                    "music.no_playlist", name=spoken, existing=suggestions
+                ),
             )
 
         started_at = await self._adapter.play_playlist(name)
         return ToolResult.success(
             PLAY,
             data={"name": name, "kind": "playlist", "started_at": started_at},
-            speech=f"Playing {name}",
+            speech=self._speaker.say("music.playing", name=name),
         )
 
     async def control(self, args: ControlArgs) -> ToolResult:
@@ -185,11 +193,13 @@ class MusicService:
             return ToolResult.success(
                 VOLUME,
                 data={"change": args.change},
-                speech="Muted" if args.change == "mute" else "Sound back on",
+                speech=self._speaker.say(
+                    "music.muted" if args.change == "mute" else "music.unmuted"
+                ),
             )
 
         return ToolResult.success(
             VOLUME,
             data={"level": now or args.level, "change": args.change},
-            speech=f"Volume {now}" if now else "Volume set",
+            speech=self._speaker.say("music.volume", level=now or args.level),
         )

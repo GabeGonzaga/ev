@@ -87,13 +87,14 @@ satisfy them structurally, which is why neither imports the other.
 
 ## One door per subsystem
 
-Each subsystem has one public port. Today there are seven:
+Each subsystem has one public port. Today there are eight:
 
 | Port | Owns |
 |---|---|
 | `ProcessRunner` | every subprocess. argv only — no shell, no `cwd`, no `env` |
 | `AppleScriptClient` | every AppleScript. Constant source, values as `argv` |
 | `OllamaClient` | every model call, both paths. Local HTTP, model from config |
+| `Speaker` | what E.V. says, in the language it was asked in. No model |
 | `SpeechSynthesizer` | saying things. `say(1)` in development, the host in the app |
 | `SpeechRecognizer` | hearing things. whisper.cpp, spawned per utterance |
 | `IpcServer` | the socket. Handshake, framing, correlation, confirmations |

@@ -100,9 +100,10 @@ attributable to E.V. `music.play` runs in the daemon, which spawns `osascript`,
 so the TCC subject is whatever launched the daemon. That only changes when the
 daemon is bundled as the app's sidecar.
 
-Audible gap, now that it speaks: tool responses are composed in English, so a
-pt-PT voice reads English words. Locale-aware responses need session context,
-which is not built.
+Closed: tool responses are composed in the language of the request. A phrasebook
+per locale, looked up rather than generated, because these lines are written by
+us and a model call to translate what we wrote would be a round trip for
+nothing.
 
 ## Phase 3
 
