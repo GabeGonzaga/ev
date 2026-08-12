@@ -35,6 +35,13 @@ SPOKEN = {
     "previous": "music.previous",
     "stop": "music.stopped",
 }
+"""Action to phrase key. The key is looked up, never spoken: an earlier
+version returned it directly and Joana read "music.paused" out loud."""
+
+WITH_TRACK = {"resume", "next", "previous"}
+"""The three where naming what is playing now is the useful part of the
+answer. Each has its own phrase, because "Skipped" and "Skipped to X" do not
+compose by concatenation in every language -- pt-PT wants "para", not "to"."""
 
 
 def simplify(name: str) -> str:
@@ -167,16 +174,14 @@ class MusicService:
     async def control(self, args: ControlArgs) -> ToolResult:
         playing = await self._adapter.control(args.action)
 
-        said = SPOKEN[args.action]
-        if playing and args.action in {"resume", "next", "previous"}:
-            said = (
-                f"{said} to {playing}"
-                if args.action != "resume"
-                else f"{said} {playing}"
-            )
+        key = SPOKEN[args.action]
+        if playing and args.action in WITH_TRACK:
+            key = f"{key}_track"
 
         return ToolResult.success(
-            CONTROL, data={"action": args.action, "track": playing}, speech=said
+            CONTROL,
+            data={"action": args.action, "track": playing},
+            speech=self._speaker.say(key, track=playing),
         )
 
     async def volume(self, args: VolumeArgs) -> ToolResult:

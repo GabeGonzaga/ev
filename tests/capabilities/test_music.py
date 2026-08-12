@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from ev.application.policy import PermissionLedger, PermissionPolicy
+from ev.application.speech import Speaker
 from ev.capabilities.music.adapters import MusicAdapter
 from ev.capabilities.music.args import ControlArgs, PlayArgs, VolumeArgs
 from ev.capabilities.music.service import MusicService, closest
@@ -479,3 +480,56 @@ async def test_muting_says_so_rather_than_naming_a_number(
     result = await registry.call("music.volume", {"change": "mute"})
 
     assert result.speech == "Muted"
+
+
+# --- what the controls say ------------------------------------------------
+
+
+class Playing:
+    """A player that answers with whatever it is on now."""
+
+    def __init__(self, track: str) -> None:
+        self._track = track
+
+    async def control(self, action: str) -> str:
+        return self._track
+
+
+@pytest.mark.asyncio
+async def test_a_control_speaks_words_not_a_phrase_key() -> None:
+    # This shipped saying "music.paused" out loud: the lookup table held keys
+    # and the key went straight into `speech`.
+    service = MusicService(Playing("Nikes"), Speaker("en"))  # type: ignore[arg-type]
+
+    result = await service.control(ControlArgs(action="pause"))
+
+    assert result.speech == "Paused"
+
+
+@pytest.mark.asyncio
+async def test_skipping_names_the_new_track() -> None:
+    service = MusicService(Playing("Solo"), Speaker("en"))  # type: ignore[arg-type]
+
+    result = await service.control(ControlArgs(action="next"))
+
+    assert result.speech == "Skipped to Solo"
+
+
+@pytest.mark.asyncio
+async def test_the_preposition_is_translated_not_concatenated() -> None:
+    # "Saltei" + " to " + track is what concatenation gives. The whole line is
+    # a phrase per language for exactly this reason.
+    service = MusicService(Playing("Solo"), Speaker("pt-PT"))  # type: ignore[arg-type]
+
+    result = await service.control(ControlArgs(action="next"))
+
+    assert result.speech == "Saltei para Solo"
+
+
+@pytest.mark.asyncio
+async def test_a_stopped_player_is_not_asked_what_is_playing() -> None:
+    service = MusicService(Playing(""), Speaker("en"))  # type: ignore[arg-type]
+
+    result = await service.control(ControlArgs(action="stop"))
+
+    assert result.speech == "Stopped"
