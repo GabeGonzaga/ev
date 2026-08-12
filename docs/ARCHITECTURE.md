@@ -13,6 +13,12 @@ browser page ─────┘  loopback HTTP, token, Origin checked, off by de
                      Registry.call()      the only thing that authorises
 ```
 
+Every surface can ask before a destructive action, and none of them answers on
+the user's behalf. The question travels differently in each -- an event on the
+socket, the turn's own answer over HTTP, a Tauri event in the panel -- and the
+rule is identical in all three: **an unanswered question is a no**, whether the
+silence is a closed connection, a closed tab, or a closed window.
+
 No surface executes anything, and no two surfaces act at once: one lock is
 shared by the socket and the page, so a browser turn and a voice turn cannot
 race for the registry, the journal, or the person being asked to confirm.

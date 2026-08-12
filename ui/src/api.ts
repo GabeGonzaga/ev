@@ -93,10 +93,31 @@ export const canRecordHere = !inTauri;
 
 /// Answering a question the core asked mid-turn. The page decides nothing on
 /// the user's behalf: this only carries what they clicked.
-export const confirm = (granted: boolean) =>
-  inTauri
-    ? callTauri<TurnResult>("confirm", { granted })
-    : http<TurnResult>("/api/confirm", {
-        method: "POST",
-        body: JSON.stringify({ granted }),
-      });
+///
+/// The two shells differ in where the answer lands. In a browser the turn was
+/// returned to us as a question, so answering it produces the outcome. In the
+/// app the original call is still pending and resolves with the outcome
+/// itself, so there is nothing to return here.
+export const confirm = async (granted: boolean): Promise<TurnResult | null> => {
+  if (inTauri) {
+    await callTauri<void>("confirm", { granted });
+    return null;
+  }
+  return http<TurnResult>("/api/confirm", {
+    method: "POST",
+    body: JSON.stringify({ granted }),
+  });
+};
+
+/// In the app a question arrives as an event while the turn waits. In a
+/// browser it arrives as the turn's own answer, so there is nothing to
+/// subscribe to.
+export async function onQuestion(
+  handle: (question: Record<string, unknown>) => void,
+): Promise<void> {
+  if (!inTauri) return;
+  const { listen } = await import("@tauri-apps/api/event");
+  await listen<Record<string, unknown>>("confirmation.required", (event) =>
+    handle(event.payload),
+  );
+}

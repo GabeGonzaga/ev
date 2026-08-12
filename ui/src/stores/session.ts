@@ -68,6 +68,16 @@ export const useSession = defineStore("session", () => {
     }
   }
 
+  // In the app the question arrives while a turn waits; in a browser it comes
+  // back as the turn's answer. One place to show it either way.
+  void api.onQuestion((asked) => {
+    question.value = {
+      tool: String(asked.tool ?? ""),
+      risk: String(asked.risk ?? ""),
+      arguments: (asked.arguments ?? {}) as Record<string, unknown>,
+    };
+  });
+
   async function refresh() {
     try {
       entries.value = (await api.history(20)).entries;
@@ -83,7 +93,10 @@ export const useSession = defineStore("session", () => {
     if (!asked) return;
     state.value = "thinking";
     try {
-      apply(await api.confirm(granted));
+      // Null in the app: the turn that asked is still pending and will
+      // resolve with the outcome itself.
+      const result = await api.confirm(granted);
+      if (result) apply(result);
     } catch (error) {
       trouble.value = String(error);
     } finally {

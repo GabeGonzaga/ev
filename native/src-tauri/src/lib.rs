@@ -9,14 +9,21 @@
 //! show state that a terminal has nowhere to put.
 
 use std::path::PathBuf;
+use std::sync::mpsc::{self, Sender};
 use std::sync::Mutex;
+use std::time::Duration;
 
 use ev_host::audio;
 use ev_host::client::Client;
 use serde::Serialize;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::{AppHandle, Manager, State, WebviewWindow};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
+
+/// How long a question waits for the person to answer it. Long, because they
+/// are being asked something; not forever, because a panel that was closed
+/// mid-question must not park a turn until the app quits.
+const ANSWER_WITHIN: Duration = Duration::from_secs(120);
 
 /// Where the daemon listens. The same path the CLI uses, because there is one
 /// daemon and it is not ours to move.
@@ -29,9 +36,10 @@ fn socket() -> PathBuf {
 
 #[derive(Default)]
 struct Session {
-    /// Confirmations are answered by the person, so the app holds the question
-    /// until the panel answers it rather than deciding on their behalf.
     locale: Mutex<Option<String>>,
+    /// Where an answer goes when the panel gives one. Present only while a
+    /// turn is parked on a question; the app decides nothing itself.
+    answering: Mutex<Option<Sender<bool>>>,
 }
 
 #[derive(Serialize)]
@@ -44,26 +52,49 @@ struct TurnResult {
 }
 
 fn run_turn(
+    app: &AppHandle,
     text: Option<String>,
     listen: bool,
     locale: Option<String>,
 ) -> Result<TurnResult, String> {
     let mut client = Client::connect(&socket()).map_err(|error| error.to_string())?;
 
-    // The app never decides a confirmation. Until the panel can ask, it
-    // declines -- the same answer a pipe gets, and for the same reason.
-    let mut decline = |_: &serde_json::Value| false;
+    // The question goes to the panel and this thread waits for the answer.
+    // The app decides nothing: no answer within the window is a decline, the
+    // same rule the socket has for a closed connection and the terminal has
+    // for a pipe.
+    let mut ask = |question: &serde_json::Value| -> bool {
+        let (sender, receiver) = mpsc::channel();
+        {
+            let session = app.state::<Session>();
+            let Ok(mut slot) = session.answering.lock() else {
+                return false;
+            };
+            *slot = Some(sender);
+        }
+
+        if app.emit("confirmation.required", question.clone()).is_err() {
+            return false;
+        }
+
+        let granted = receiver.recv_timeout(ANSWER_WITHIN).unwrap_or(false);
+
+        if let Ok(mut slot) = app.state::<Session>().answering.lock() {
+            *slot = None;
+        }
+        granted
+    };
 
     let turn = if listen {
         let samples = audio::record_until_silence(audio::Vad::default())
             .map_err(|error| error.to_string())?;
         let wav = audio::to_wav(&samples).map_err(|error| error.to_string())?;
         client
-            .submit_audio(&wav, locale.as_deref(), &mut decline)
+            .submit_audio(&wav, locale.as_deref(), &mut ask)
             .map_err(|error| error.to_string())?
     } else {
         client
-            .submit(&text.unwrap_or_default(), locale.as_deref(), &mut decline)
+            .submit(&text.unwrap_or_default(), locale.as_deref(), &mut ask)
             .map_err(|error| error.to_string())?
     };
 
@@ -82,19 +113,39 @@ fn run_turn(
 }
 
 #[tauri::command]
-async fn submit(text: String, session: State<'_, Session>) -> Result<TurnResult, String> {
+async fn submit(
+    app: AppHandle,
+    text: String,
+    session: State<'_, Session>,
+) -> Result<TurnResult, String> {
     let locale = session.locale.lock().ok().and_then(|slot| slot.clone());
-    tauri::async_runtime::spawn_blocking(move || run_turn(Some(text), false, locale))
+    tauri::async_runtime::spawn_blocking(move || run_turn(&app, Some(text), false, locale))
         .await
         .map_err(|error| error.to_string())?
 }
 
+/// What the person clicked. Nothing else may call this into being: the sender
+/// exists only while a turn is actually waiting.
 #[tauri::command]
-async fn listen(session: State<'_, Session>) -> Result<TurnResult, String> {
+fn confirm(granted: bool, session: State<'_, Session>) -> Result<(), String> {
+    let sender = session
+        .answering
+        .lock()
+        .map_err(|_| "the session is poisoned".to_string())?
+        .take();
+
+    match sender {
+        Some(sender) => sender.send(granted).map_err(|_| "nobody is waiting".into()),
+        None => Err("nothing is waiting on an answer".into()),
+    }
+}
+
+#[tauri::command]
+async fn listen(app: AppHandle, session: State<'_, Session>) -> Result<TurnResult, String> {
     let locale = session.locale.lock().ok().and_then(|slot| slot.clone());
     // Blocking: recording waits for a room to go quiet, and holding the async
     // runtime hostage for that would freeze the window it is drawing.
-    tauri::async_runtime::spawn_blocking(move || run_turn(None, true, locale))
+    tauri::async_runtime::spawn_blocking(move || run_turn(&app, None, true, locale))
         .await
         .map_err(|error| error.to_string())?
 }
@@ -129,7 +180,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(Session::default())
         .invoke_handler(tauri::generate_handler![
-            submit, listen, history, set_locale
+            submit, listen, confirm, history, set_locale
         ])
         .setup(|app| {
             let show = MenuItem::with_id(app, "show", "Open E.V.", true, None::<&str>)?;
