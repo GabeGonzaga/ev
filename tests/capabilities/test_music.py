@@ -5,8 +5,8 @@ from pydantic import ValidationError
 
 from ev.application.policy import PermissionLedger, PermissionPolicy
 from ev.capabilities.music.adapters import MusicAdapter
-from ev.capabilities.music.args import PlayArgs
-from ev.capabilities.music.service import MusicService
+from ev.capabilities.music.args import ControlArgs, PlayArgs, VolumeArgs
+from ev.capabilities.music.service import MusicService, closest
 from ev.capabilities.music.tools import music_tools
 from ev.domain.permissions import Permission, PermissionState
 from ev.domain.results import ToolErrorCode
@@ -19,36 +19,15 @@ from tests.conftest import FakeBin
 # Written out rather than imported: the point of the assertion is that this
 # exact text is what reaches osascript, so importing the constant would only
 # assert that a variable equals itself.
-EXPECTED_SOURCE = """on run argv
+EXPECTED_TRACK_SOURCE = """on run argv
 \tset theName to item 1 of argv
-\tset theKind to item 2 of argv
 \ttell application "Music"
-\t\tif theKind is "playlist" then
-\t\t\tif not (exists playlist theName) then
-\t\t\t\terror "there is no playlist called " & theName
-\t\t\tend if
-\t\t\tplay playlist theName
-\t\telse
-\t\t\tset lib to library playlist 1
-\t\t\tif theKind is "album" then
-\t\t\t\tset matches to (every track of lib whose album is theName)
-\t\t\telse
-\t\t\t\tset matches to (every track of lib whose name is theName)
-\t\t\tend if
-\t\t\tif matches is {} then
-\t\t\t\terror "nothing in the library matches " & theName
-\t\t\tend if
-\t\t\tset startAt to item 1 of matches
-\t\t\tif theKind is "album" then
-\t\t\t\trepeat with aTrack in matches
-\t\t\t\t\tif track number of aTrack is 1 then
-\t\t\t\t\t\tset startAt to contents of aTrack
-\t\t\t\t\t\texit repeat
-\t\t\t\t\tend if
-\t\t\t\tend repeat
-\t\t\tend if
-\t\t\tplay startAt
+\t\tset lib to library playlist 1
+\t\tset matches to (every track of lib whose name is theName)
+\t\tif matches is {} then
+\t\t\terror "nothing in the library matches " & theName
 \t\tend if
+\t\tplay item 1 of matches
 \t\treturn name of current track
 \tend tell
 end run"""
@@ -110,10 +89,10 @@ def test_an_empty_name_is_refused() -> None:
 async def test_the_exact_source_and_argv_reach_osascript(fake_bin: FakeBin) -> None:
     adapter = MusicAdapter(AppleScriptClient(ProcessRunner()))
 
-    await adapter.play("Blonde", "album")
+    await adapter.play_track("Nikes")
 
     assert fake_bin.command() == "osascript"
-    assert fake_bin.argv() == ["-e", EXPECTED_SOURCE, "--", "Blonde", "album"]
+    assert fake_bin.argv() == ["-e", EXPECTED_TRACK_SOURCE, "--", "Nikes"]
 
 
 @pytest.mark.asyncio
@@ -123,10 +102,10 @@ async def test_a_hostile_name_stays_an_argument(fake_bin: FakeBin) -> None:
     hostile = '" & do shell script "rm -rf ~" & "'
     adapter = MusicAdapter(AppleScriptClient(ProcessRunner()))
 
-    await adapter.play(hostile, "album")
+    await adapter.play_track(hostile)
 
     argv = fake_bin.argv()
-    assert argv[1] == EXPECTED_SOURCE
+    assert argv[1] == EXPECTED_TRACK_SOURCE
     assert argv[3] == hostile
     assert "do shell script" not in argv[1]
 
@@ -201,7 +180,9 @@ async def test_the_speech_reports_the_track_it_actually_started_on(
 async def test_a_playlist_is_named_plainly(
     fake_bin: FakeBin, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("EV_FAKE_STDOUT", "Nikes")
+    # The fake answers every osascript the same way, which is enough here: the
+    # listing returns "Focus", so "Focus" is what resolves and what plays.
+    monkeypatch.setenv("EV_FAKE_STDOUT", "Focus")
     registry, _ = build(granted=True)
 
     result = await registry.call("music.play", {"name": "Focus", "kind": "playlist"})
@@ -212,10 +193,141 @@ async def test_a_playlist_is_named_plainly(
 # --- declaration ----------------------------------------------------------
 
 
-def test_the_tool_declares_apple_events_and_is_sensitive() -> None:
+# --- playlists are matched against the ones that exist --------------------
+
+
+def test_a_spoken_name_finds_a_punctuated_playlist() -> None:
+    """Real playlist names from a real library.
+
+    Nobody dictates "GO w/Flow!!" or "{Jazzy}". Matching what was said against
+    what exists is the same rule CLAUDE.md states for shortcuts.
+    """
+    existing = ["{Jazzy}", "GO w/Flow!!", "Indie kid??", "Main PlayList :D", "Logic"]
+
+    assert closest("Jazzy", existing) == "{Jazzy}"
+    assert closest("go w flow", existing) == "GO w/Flow!!"
+    assert closest("indie kid", existing) == "Indie kid??"
+    assert closest("main playlist", existing) == "Main PlayList :D"
+
+
+def test_an_exact_name_wins_over_a_looser_match() -> None:
+    assert closest("Logic", ["Logic", "Logic Pro Favourites"]) == "Logic"
+
+
+def test_an_ambiguous_name_matches_nothing() -> None:
+    # Two plausible playlists is not a reason to pick one. Playing the wrong
+    # playlist is worse than saying which ones matched.
+    assert closest("jazz", ["Jazz Classics", "Jazz Nights"]) is None
+
+
+def test_a_name_that_is_only_punctuation_matches_nothing() -> None:
+    assert closest("???", ["Indie kid??"]) is None
+
+
+@pytest.mark.asyncio
+async def test_a_playlist_is_resolved_before_it_is_played(fake_bin: FakeBin) -> None:
+    adapter = MusicAdapter(AppleScriptClient(ProcessRunner()))
+    service = MusicService(adapter)
+
+    async def playlists() -> list[str]:
+        return ["{Jazzy}", "GO w/Flow!!"]
+
+    adapter.playlists = playlists  # type: ignore[method-assign]
+
+    result = await service.play(PlayArgs(name="jazzy", kind="playlist"))
+
+    assert result.ok
+    # The exact name reaches Music, not the spoken one.
+    assert fake_bin.argv()[-1] == "{Jazzy}"
+    assert result.data["name"] == "{Jazzy}"
+
+
+@pytest.mark.asyncio
+async def test_an_unknown_playlist_names_the_ones_that_exist(
+    fake_bin: FakeBin,
+) -> None:
+    adapter = MusicAdapter(AppleScriptClient(ProcessRunner()))
+    service = MusicService(adapter)
+
+    async def playlists() -> list[str]:
+        return ["{Jazzy}", "GROOVY"]
+
+    adapter.playlists = playlists  # type: ignore[method-assign]
+
+    result = await service.play(PlayArgs(name="something else", kind="playlist"))
+
+    assert not result.ok
+    assert result.error is not None
+    assert "{Jazzy}" in result.error.message
+
+
+# --- an album plays through -----------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_an_album_is_played_as_a_playlist(fake_bin: FakeBin) -> None:
+    """The fix for what actually happened: it played one song and stopped.
+
+    Music's `play` takes a single item, so playing a track plays a track. A
+    playlist is the only thing it will play through, so E.V. keeps one of its
+    own and refills it.
+    """
+    monkeypatched = MusicAdapter(AppleScriptClient(ProcessRunner()))
+
+    await monkeypatched.play_album("Blonde")
+
+    source = fake_bin.argv()[1]
+    assert "make new user playlist" in source
+    assert "duplicate matches to theQueue" in source
+    assert "play theQueue" in source
+    # Its own playlist, replaced each time, and never anything else.
+    assert fake_bin.argv()[-1] == "E.V. queue"
+
+
+@pytest.mark.asyncio
+async def test_the_queue_is_replaced_not_appended(fake_bin: FakeBin) -> None:
+    await MusicAdapter(AppleScriptClient(ProcessRunner())).play_album("Blonde")
+
+    source = fake_bin.argv()[1]
+    assert "delete user playlist queueName" in source
+
+
+# --- the controls ---------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_each_control_reaches_music_as_itself(fake_bin: FakeBin) -> None:
+    adapter = MusicAdapter(AppleScriptClient(ProcessRunner()))
+
+    for action in ("pause", "resume", "next", "previous", "stop"):
+        await adapter.control(action)
+        assert fake_bin.argv()[-1] == action
+
+
+@pytest.mark.asyncio
+async def test_the_volume_is_a_number_music_understands(fake_bin: FakeBin) -> None:
+    await MusicAdapter(AppleScriptClient(ProcessRunner())).volume(40)
+
+    assert fake_bin.argv()[-1] == "40"
+
+
+def test_a_volume_outside_the_dial_is_refused() -> None:
+    for bad in (-1, 101):
+        with pytest.raises(ValidationError):
+            VolumeArgs(level=bad)
+
+
+def test_an_invented_action_is_refused() -> None:
+    with pytest.raises(ValidationError):
+        ControlArgs.model_validate({"action": "shuffle everything"})
+
+
+def test_the_controls_declare_apple_events_too() -> None:
     service = MusicService(MusicAdapter(AppleScriptClient(ProcessRunner())))
 
-    (spec,) = music_tools(service)
+    specs = {spec.name: spec for spec in music_tools(service)}
 
-    assert spec.permissions == frozenset({Permission.APPLE_EVENTS})
-    assert spec.risk is RiskLevel.SENSITIVE
+    assert set(specs) == {"music.play", "music.control", "music.volume"}
+    for spec in specs.values():
+        assert spec.permissions == frozenset({Permission.APPLE_EVENTS})
+        assert spec.risk is RiskLevel.SENSITIVE

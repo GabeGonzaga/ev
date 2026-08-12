@@ -12,3 +12,17 @@
 {"id": "escalate-ambiguous-kind", "locale": "pt-PT", "utterance": "toca Blonde", "tool": null, "arguments": {}}
 {"id": "escalate-missing-name", "locale": "en", "utterance": "play the album", "tool": null, "arguments": {}}
 {"id": "escalate-missing-name", "locale": "pt-PT", "utterance": "toca o álbum", "tool": null, "arguments": {}}
+{"id": "control-pause", "locale": "en", "utterance": "pause the music", "tool": "music.control", "arguments": {"action": "pause"}}
+{"id": "control-pause", "locale": "pt-PT", "utterance": "pausa a música", "tool": "music.control", "arguments": {"action": "pause"}}
+{"id": "control-next", "locale": "en", "utterance": "next track", "tool": "music.control", "arguments": {"action": "next"}}
+{"id": "control-next", "locale": "pt-PT", "utterance": "próxima música", "tool": "music.control", "arguments": {"action": "next"}}
+{"id": "control-previous", "locale": "en", "utterance": "go back", "tool": "music.control", "arguments": {"action": "previous"}}
+{"id": "control-previous", "locale": "pt-PT", "utterance": "anterior", "tool": "music.control", "arguments": {"action": "previous"}}
+{"id": "control-resume", "locale": "en", "utterance": "resume", "tool": "music.control", "arguments": {"action": "resume"}}
+{"id": "control-resume", "locale": "pt-PT", "utterance": "continua a música", "tool": "music.control", "arguments": {"action": "resume"}}
+{"id": "control-stop", "locale": "en", "utterance": "stop the music", "tool": "music.control", "arguments": {"action": "stop"}}
+{"id": "control-stop", "locale": "pt-PT", "utterance": "para a música", "tool": "music.control", "arguments": {"action": "stop"}}
+{"id": "volume-set", "locale": "en", "utterance": "set volume to 40", "tool": "music.volume", "arguments": {"level": 40}}
+{"id": "volume-set", "locale": "pt-PT", "utterance": "põe o volume a 40", "tool": "music.volume", "arguments": {"level": 40}}
+{"id": "escalate-impossible-volume", "locale": "en", "utterance": "volume 900", "tool": null, "arguments": {}}
+{"id": "escalate-impossible-volume", "locale": "pt-PT", "utterance": "volume 900", "tool": null, "arguments": {}}

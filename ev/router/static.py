@@ -154,6 +154,47 @@ def _translate(groups: Mapping[str, str]) -> dict[str, object] | None:
     return {"text": text, "to": language}
 
 
+_ACTIONS = {
+    # English
+    "pause": "pause",
+    "resume": "resume",
+    "continue": "resume",
+    "next": "next",
+    "skip": "next",
+    "previous": "previous",
+    "go back": "previous",
+    "back": "previous",
+    "stop": "stop",
+    # Portuguese
+    "pausa": "pause",
+    "pára": "stop",
+    "para": "stop",
+    "continua": "resume",
+    "retoma": "resume",
+    "próxima": "next",
+    "proxima": "next",
+    "seguinte": "next",
+    "salta": "next",
+    "anterior": "previous",
+    "volta atrás": "previous",
+    "volta atras": "previous",
+}
+_ACTION = "|".join(sorted(_ACTIONS, key=len, reverse=True))
+
+
+def _control(groups: Mapping[str, str]) -> dict[str, object] | None:
+    action = _ACTIONS.get(groups["action"].casefold())
+    return None if action is None else {"action": action}
+
+
+def _volume(groups: Mapping[str, str]) -> dict[str, object] | None:
+    level = int(groups["level"])
+    # The args model bounds this too. Refusing here means a misheard "volume
+    # 900" escalates instead of dying as INVALID_ARGUMENTS for something tier
+    # 1 could see was not a volume.
+    return {"level": level} if 0 <= level <= 100 else None
+
+
 @dataclass(frozen=True, slots=True)
 class Rule:
     tool: str
@@ -193,6 +234,26 @@ RULES: tuple[Rule, ...] = (
         rf"^(?:por\s+favor\s+)?(?:toca|tocar|põe|poe|coloca|pôe)\s+"
         rf"(?:o\s+|a\s+)?(?P<kind>{_KIND})\s+(?P<name>.+)$",
         _play,
+    ),
+    # Transport controls. Whatever is playing is already playing, so there is
+    # nothing to capture but the verb.
+    _rule(
+        "music.control",
+        rf"^(?:please\s+|por\s+favor\s+)?(?P<action>{_ACTION})"
+        rf"(?:\s+(?:the\s+|a\s+|o\s+)?(?:music|song|track|música|musica|"
+        rf"canção|cancao))?$",
+        _control,
+    ),
+    _rule(
+        "music.volume",
+        r"^(?:set\s+)?(?:the\s+)?volume\s+(?:to\s+)?(?P<level>\d{1,3})$",
+        _volume,
+    ),
+    _rule(
+        "music.volume",
+        r"^(?:põe\s+|poe\s+|coloca\s+)?(?:o\s+)?volume\s+"
+        r"(?:a\s+|em\s+|no\s+|nos\s+)?(?P<level>\d{1,3})$",
+        _volume,
     ),
     # Quoted only. Without quotation marks there is no way to tell where the
     # text to translate ends and the instruction resumes, and guessing would
