@@ -35,6 +35,9 @@ PHRASES: dict[str, dict[str, str]] = {
         "music.no_playlist": "No playlist matches {name}. You have: {existing}",
         "unsure": "Did you mean {guess}? I am only {confidence} sure.",
         "not_understood": "I did not understand that.",
+        "macro.ran": "Ran {name}: {steps} steps",
+        "macro.stopped": "{name} stopped at step {step} ({tool}): {why}",
+        "macro.unknown": "No macro called {name}. You have: {existing}",
     },
     "pt-PT": {
         # European Portuguese. "Ecrã" not "tela", "a tocar" not "tocando".
@@ -55,6 +58,9 @@ PHRASES: dict[str, dict[str, str]] = {
         "music.no_playlist": "Nenhuma playlist corresponde a {name}. Tens: {existing}",
         "unsure": "Querias dizer {guess}? Só tenho {confidence} de certeza.",
         "not_understood": "Não percebi.",
+        "macro.ran": "Corri {name}: {steps} passos",
+        "macro.stopped": "{name} parou no passo {step} ({tool}): {why}",
+        "macro.unknown": "Não há nenhuma macro chamada {name}. Tens: {existing}",
     },
 }
 

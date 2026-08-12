@@ -139,3 +139,24 @@ def test_the_kind_word_becomes_the_argument() -> None:
     assert resolution is not None
     assert resolution.tool == "music.play"
     assert resolution.arguments == {"name": "Cantigas do Maio", "kind": "album"}
+
+
+# --- macros ---------------------------------------------------------------
+
+
+def test_a_macro_name_is_captured_verbatim() -> None:
+    # The name is the user's, matched against the saved list later. Capturing
+    # it verbatim is what lets "Segunda-feira" survive to the service.
+    resolution = StaticRouter().resolve("corre a macro Segunda-feira")
+
+    assert resolution is not None
+    assert resolution.tool == "macro.run"
+    assert resolution.arguments == {"name": "Segunda-feira"}
+
+
+def test_a_macro_needs_a_name() -> None:
+    assert StaticRouter().resolve("run the macro") is None
+
+
+def test_a_word_starting_like_macro_is_not_one() -> None:
+    assert StaticRouter().resolve("run the marathon") is None

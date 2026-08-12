@@ -36,3 +36,5 @@
 {"id": "volume-quieter", "locale": "pt-PT", "utterance": "baixa o volume", "tool": "music.volume", "arguments": {"change": "down"}}
 {"id": "volume-mute", "locale": "en", "utterance": "mute", "tool": "music.volume", "arguments": {"change": "mute"}}
 {"id": "volume-mute", "locale": "pt-PT", "utterance": "silencia", "tool": "music.volume", "arguments": {"change": "mute"}}
+{"id": "run-a-macro", "locale": "en", "utterance": "run the macro morning", "tool": "macro.run", "arguments": {"name": "morning"}}
+{"id": "run-a-macro", "locale": "pt-PT", "utterance": "corre a macro manhã", "tool": "macro.run", "arguments": {"name": "manhã"}}

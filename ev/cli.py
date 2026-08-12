@@ -27,6 +27,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from pydantic import ValidationError
+
 from ev.application.assistant import Assistant
 from ev.application.confirmation import ConfirmationRequest
 from ev.application.policy import ConfidencePolicy, PermissionLedger, PermissionPolicy
@@ -36,10 +38,13 @@ from ev.capabilities.browser.service import BrowserService
 from ev.capabilities.browser.tools import browser_tools
 from ev.capabilities.language.service import LanguageService
 from ev.capabilities.language.tools import language_tools
+from ev.capabilities.macros.service import MacroService
+from ev.capabilities.macros.tools import macro_tools
 from ev.capabilities.music.adapters import MusicAdapter
 from ev.capabilities.music.service import MusicService
 from ev.capabilities.music.tools import music_tools
 from ev.domain.journal import JournalEntry
+from ev.domain.macro import Macro
 from ev.domain.results import Clarification, ToolResult
 from ev.infrastructure.database.connection import connect, default_database_path
 from ev.infrastructure.database.journal import SqliteJournal
@@ -48,6 +53,7 @@ from ev.infrastructure.ipc.client import DaemonRefused, DaemonUnavailable, IpcCl
 from ev.infrastructure.ipc.server import IpcServer, SessionConfirmation, socket_path
 from ev.infrastructure.macos.applescript import AppleScriptClient
 from ev.infrastructure.macos.processes import ProcessRunner
+from ev.infrastructure.macros import load_macros, macros_path
 from ev.infrastructure.ollama.client import OllamaClient, OllamaError
 from ev.infrastructure.ollama.settings import (
     OllamaSettings,
@@ -135,6 +141,7 @@ def build_registry(
     ledger: PermissionLedger,
     generation: Completion,
     speaker: Speaker,
+    macros: Path | None = None,
 ) -> Registry:
     registry = Registry(
         policy=PermissionPolicy(ledger), confirmation=confirmation, journal=journal
@@ -143,10 +150,24 @@ def build_registry(
     processes = ProcessRunner()
     applescript = AppleScriptClient(processes)
 
+    def saved() -> dict[str, Macro]:
+        # Read per run rather than held: a macro edited in an editor should
+        # work on the next turn, the same reason grants are re-read.
+        if macros is None:
+            return {}
+        try:
+            return load_macros(macros)
+        except ValueError:
+            # A broken file is reported by `ev --macros`, and must not stop
+            # every other tool from working.
+            return {}
+
     for spec in (
         *browser_tools(BrowserService(OpenAdapter(processes), speaker)),
         *music_tools(MusicService(MusicAdapter(applescript), speaker)),
         *language_tools(LanguageService(generation)),
+        # A macro calls the registry it lives in: same door, once per step.
+        *macro_tools(MacroService(saved, registry.call, speaker)),
     ):
         registry.register(spec)
 
@@ -194,6 +215,7 @@ def build(
         ledger=ledger,
         generation=generation_model,
         speaker=voice,
+        macros=macros_path(database.parent) if database is not None else None,
     )
 
     return Application(
@@ -354,6 +376,12 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         help="undo a --grant. Repeatable.",
     )
     parser.add_argument(
+        "--macros",
+        action="store_true",
+        help="list the saved macros and check them against the tools that "
+        "exist, before one of them fails halfway through",
+    )
+    parser.add_argument(
         "--history",
         nargs="?",
         type=int,
@@ -426,6 +454,13 @@ async def run(args: argparse.Namespace, completion: Completion | None = None) ->
     if args.history is not None:
         return await show_history(database, args.history)
 
+    if args.macros:
+        application = build(database=database, completion=_NoModel())
+        try:
+            return show_macros(database, application.registry)
+        finally:
+            await application.aclose()
+
     if args.connect:
         return await connected(database.parent, args)
 
@@ -452,6 +487,51 @@ async def run(args: argparse.Namespace, completion: Completion | None = None) ->
         return await turn(application, utterance, voice, args.locale)
     finally:
         await application.aclose()
+
+
+def show_macros(database: Path, registry: Registry) -> int:
+    """List the macros, and validate them against the tools that exist.
+
+    A macro is checked here rather than when it runs, because a list of calls
+    that fails at step four is a trap and this is the moment to find it.
+    """
+    path = macros_path(database.parent)
+
+    try:
+        macros = load_macros(path)
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return EXIT_FAILED
+
+    if not macros:
+        print(f"no macros. Write some in {path}", file=sys.stderr)
+        return EXIT_OK
+
+    broken = 0
+    for macro in sorted(macros.values(), key=lambda m: m.name):
+        print(f"{macro.name}  (v{macro.version})  {macro.description}".rstrip())
+
+        for number, step in enumerate(macro.steps, start=1):
+            spec = registry.spec(step.tool)
+            if spec is None:
+                print(f"  {number}. {step.tool}  <- no such tool", file=sys.stderr)
+                broken += 1
+                continue
+
+            try:
+                spec.args.model_validate(step.arguments)
+            except ValidationError as error:
+                first = error.errors()[0]
+                where = ".".join(str(part) for part in first["loc"]) or "(root)"
+                print(
+                    f"  {number}. {step.tool}  <- {where}: {first['msg']}",
+                    file=sys.stderr,
+                )
+                broken += 1
+            else:
+                print(f"  {number}. {step.tool} {step.arguments}")
+
+    return EXIT_FAILED if broken else EXIT_OK
 
 
 async def show_history(database: Path, limit: int) -> int:

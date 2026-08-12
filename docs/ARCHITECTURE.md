@@ -117,7 +117,7 @@ structure shaped by symmetry rather than by a decision.
 | A new capability directory | its first tool lands |
 | `ev/router/` gains a module | tier 2 arrives (phase 1) |
 | `PolicyDecision` gains `REQUEST_PERMISSION` | a native host exists that can service it |
-| Enforcing the `Content` marker | tools feed each other — macros, phase 4 |
+| Enforcing the `Content` marker | one step's result becomes another's argument (macro chaining, adr/0024) |
 | Streaming model responses | something can render a partial answer |
 | `sqlite-vec`, FTS5 | retrieval actually lands (phase 4) |
 | A model-based VAD | a measurement showing energy is not enough |

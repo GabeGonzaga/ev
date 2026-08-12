@@ -299,6 +299,19 @@ RULES: tuple[Rule, ...] = (
         r"(?:a\s+|em\s+|no\s+|nos\s+)?(?P<level>\d{1,3})$",
         _volume,
     ),
+    # A macro is a name the user chose, so it is captured verbatim and matched
+    # against the saved ones later -- the same rule as playlists.
+    _rule(
+        "macro.run",
+        r"^(?:please\s+)?(?:run|start)\s+(?:the\s+)?macro\s+(?P<name>.+)$",
+        lambda groups: {"name": groups["name"].strip()},
+    ),
+    _rule(
+        "macro.run",
+        r"^(?:por\s+favor\s+)?(?:corre|executa|faz)\s+(?:a\s+)?macro\s+"
+        r"(?P<name>.+)$",
+        lambda groups: {"name": groups["name"].strip()},
+    ),
     # Quoted only. Without quotation marks there is no way to tell where the
     # text to translate ends and the instruction resumes, and guessing would
     # send half a sentence to the model as if it were the whole of it.

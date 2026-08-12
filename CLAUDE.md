@@ -53,6 +53,7 @@ python -m ev.cli "play the album Blonde"
 python -m ev.cli --repl
 python -m ev.cli --specs      # generated LLM tool specs
 python -m ev.cli --manifest   # capability manifest
+python -m ev.cli --macros     # saved macros, each step validated
 ```
 
 `make test` must pass before any change is done. If a change makes the Python

@@ -108,6 +108,12 @@ class Registry:
             raise ValueError(f"{spec.name}: args model must set extra='forbid'")
         self._tools[spec.name] = spec
 
+    def spec(self, name: str) -> ToolSpec[Any] | None:
+        """What a tool expects. Macros validate against this before they are
+        saved: a list of calls that fails at step four is a trap, and the
+        moment to find that is while writing it."""
+        return self._tools.get(name)
+
     def tools(self) -> list[ToolSpec[Any]]:
         return [self._tools[name] for name in sorted(self._tools)]
 
