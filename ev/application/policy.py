@@ -12,7 +12,7 @@ router lands, so it is phase 1 work.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from enum import StrEnum
 from typing import Protocol, Self
 
@@ -110,11 +110,27 @@ class PermissionLedger:
     """
 
     def __init__(
-        self, states: Mapping[Permission, PermissionState] | None = None
+        self,
+        states: Mapping[Permission, PermissionState] | None = None,
+        refresh: Callable[[], Mapping[Permission, PermissionState] | None]
+        | None = None,
     ) -> None:
         self._states: dict[Permission, PermissionState] = dict(states or {})
+        # Asserting a permission and then having to restart the daemon for it
+        # to count is a footgun: the user did the thing they were told to do
+        # and nothing happened. When a source is given, it is consulted before
+        # every answer, and it reports only when something changed.
+        self._refresh = refresh
+
+    def _reload(self) -> None:
+        if self._refresh is None:
+            return
+        fresh = self._refresh()
+        if fresh is not None:
+            self._states = dict(fresh)
 
     def state(self, permission: Permission) -> PermissionState:
+        self._reload()
         return self._states.get(permission, PermissionState.UNDETERMINED)
 
     def update(self, permission: Permission, state: PermissionState) -> None:
@@ -149,7 +165,8 @@ class PermissionPolicy:
         if withheld:
             missing = ", ".join(permission.value for permission in withheld)
             return PolicyVerdict.deny(
-                f"{spec.name} needs permission not granted: {missing}"
+                f"{spec.name} needs permission not granted: {missing}. "
+                f"Grant it with: ev --grant {withheld[0].value}"
             )
 
         if _ORDER[spec.risk] >= _ORDER[self._confirm_at]:

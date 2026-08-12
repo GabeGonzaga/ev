@@ -14,7 +14,7 @@ this becomes a fallback for a host that is not running.
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 
 from ev.domain.permissions import Permission, PermissionState
@@ -49,6 +49,39 @@ def load_grants(path: Path) -> dict[Permission, PermissionState]:
         return {parse_permission(name): PermissionState.GRANTED for name in granted}
     except ValueError as error:
         raise ValueError(f"{path}: {error}") from None
+
+
+def reloader(
+    path: Path,
+) -> Callable[[], dict[Permission, PermissionState] | None]:
+    """Watches the grants file, and reports only when it has changed.
+
+    Cheap enough to consult on every decision: one `stat`, and a read only
+    when the modification time moves. The alternative was telling people to
+    restart a daemon after granting, which is the kind of instruction that
+    gets left out of the message and discovered an hour later.
+    """
+    seen: list[float] = []
+
+    def read() -> dict[Permission, PermissionState] | None:
+        try:
+            stamp = path.stat().st_mtime
+        except OSError:
+            return None
+
+        if seen and seen[0] == stamp:
+            return None
+
+        seen.clear()
+        seen.append(stamp)
+        try:
+            return load_grants(path)
+        except ValueError:
+            # A malformed file is not a reason to forget what was already
+            # granted; it is reported when the CLI reads it.
+            return None
+
+    return read
 
 
 def save_grants(path: Path, permissions: Iterable[Permission]) -> None:

@@ -57,6 +57,7 @@ from ev.infrastructure.permissions import (
     grants_path,
     load_grants,
     parse_permission,
+    reloader,
     save_grants,
 )
 from ev.infrastructure.speech.recognizer import WhisperCppRecognizer
@@ -169,7 +170,8 @@ def build(
         journal = SqliteJournal(connection)
         # E.V. keeps its state in one directory; the grants and the model
         # settings sit beside the journal rather than behind more path flags.
-        ledger = PermissionLedger(load_grants(grants_path(database.parent)))
+        grants = grants_path(database.parent)
+        ledger = PermissionLedger(load_grants(grants), refresh=reloader(grants))
         settings = load_settings(settings_path(database.parent))
 
     if model is not None:

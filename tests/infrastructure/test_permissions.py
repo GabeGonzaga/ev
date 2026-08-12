@@ -12,6 +12,7 @@ from ev.infrastructure.permissions import (
     grants_path,
     load_grants,
     parse_permission,
+    reloader,
     save_grants,
 )
 
@@ -80,3 +81,76 @@ def test_an_asserted_permission_makes_a_guarded_tool_reachable(
 
     assert denied.decision is PolicyDecision.DENY
     assert allowed.decision is PolicyDecision.ALLOW
+
+
+def test_a_grant_counts_without_a_restart(tmp_path: Path) -> None:
+    """The defect this fixes: a daemon read its grants once, at startup.
+
+    Someone granted apple_events, was told it was recorded, and watched the
+    next turn refuse anyway -- because the process had been running for half
+    an hour. Doing what you were told and nothing happening is worse than
+    being refused.
+    """
+    path = grants_path(tmp_path)
+    ledger = PermissionLedger(load_grants(path), refresh=reloader(path))
+    policy = PermissionPolicy(ledger)
+
+    class Guarded:
+        name = "music.play"
+        risk = RiskLevel.SENSITIVE
+        permissions = frozenset({Permission.APPLE_EVENTS})
+
+    assert policy.decide(Guarded()).decision is PolicyDecision.DENY
+
+    # The same thing `ev --grant apple_events` does, while this runs.
+    save_grants(path, [Permission.APPLE_EVENTS])
+
+    assert policy.decide(Guarded()).decision is PolicyDecision.ALLOW
+
+
+def test_a_revoked_grant_also_counts_immediately(tmp_path: Path) -> None:
+    path = grants_path(tmp_path)
+    save_grants(path, [Permission.APPLE_EVENTS])
+    ledger = PermissionLedger(load_grants(path), refresh=reloader(path))
+
+    assert ledger.state(Permission.APPLE_EVENTS) is PermissionState.GRANTED
+
+    save_grants(path, [])
+
+    assert ledger.state(Permission.APPLE_EVENTS) is PermissionState.UNDETERMINED
+
+
+def test_a_missing_file_leaves_the_ledger_alone(tmp_path: Path) -> None:
+    ledger = PermissionLedger(
+        {Permission.APPLE_EVENTS: PermissionState.GRANTED},
+        refresh=reloader(grants_path(tmp_path)),
+    )
+
+    # Nothing to read is not the same as "nothing is granted": the host may
+    # have reported this, and a missing file must not erase that.
+    assert ledger.state(Permission.APPLE_EVENTS) is PermissionState.GRANTED
+
+
+def test_a_malformed_file_does_not_erase_what_was_granted(tmp_path: Path) -> None:
+    path = grants_path(tmp_path)
+    save_grants(path, [Permission.APPLE_EVENTS])
+    ledger = PermissionLedger(load_grants(path), refresh=reloader(path))
+    assert ledger.state(Permission.APPLE_EVENTS) is PermissionState.GRANTED
+
+    path.write_text("{ not json")
+
+    assert ledger.state(Permission.APPLE_EVENTS) is PermissionState.GRANTED
+
+
+def test_the_refusal_says_how_to_fix_itself(tmp_path: Path) -> None:
+    policy = PermissionPolicy(PermissionLedger())
+
+    class Guarded:
+        name = "music.play"
+        risk = RiskLevel.SENSITIVE
+        permissions = frozenset({Permission.APPLE_EVENTS})
+
+    verdict = policy.decide(Guarded())
+
+    assert verdict.reason is not None
+    assert "ev --grant apple_events" in verdict.reason
