@@ -161,6 +161,11 @@ nothing, because `open(1)` needs nothing.
   intent, including the utterances that must *not* route.
 - Database tests run against a real file, not `:memory:` — WAL is a no-op in
   memory.
+- AppleScript is **run**, not just compiled: `make applescript` exercises every
+  script against Music on a path with no side effect. `osacompile` proved a
+  script that failed at runtime — `set text item delimiters` inside a
+  `tell application` block is Music's problem, not AppleScript's — and a user
+  found what the compiler could not.
 - The suite runs on Linux. That is the fast feedback loop, and it is why every
   macOS boundary is behind a port. CI runs `make test` and `make lint` on
   `ubuntu-latest` and `macos-latest`; a test that passes only on the Mac means

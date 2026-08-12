@@ -1,7 +1,7 @@
 PY ?= $(shell [ -x .venv/bin/python ] && echo .venv/bin/python || echo python3)
 
 .DEFAULT_GOAL := help
-.PHONY: help test lint format install eval protocol protocol-check rust app-check sign models ui app
+.PHONY: help test lint format install eval applescript protocol protocol-check rust app-check sign models ui app
 
 help:
 	@echo "test     run the suite (must pass on Linux and macOS alike)"
@@ -16,9 +16,15 @@ help:
 	@echo "ui       typecheck and build the panel"
 	@echo "app      build EV.app, then sign it with entitlements"
 	@echo "models   download model weights and verify their checksums"
+	@echo "applescript  run every AppleScript for real. Needs Music. NOT in CI"
 
 test:
 	$(PY) -m pytest
+
+# osacompile proves syntax; this proves the scripts work. Needs a Mac with
+# Music, so it is not a build gate either.
+applescript:
+	$(PY) -m evals.applescript
 
 # Needs weights and is non-deterministic, so it is never a build gate.
 eval:

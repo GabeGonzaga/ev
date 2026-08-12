@@ -24,10 +24,17 @@ edits your library should do so where you can see it.
 
 LIST_PLAYLISTS: Final = """on run argv
 	tell application "Music"
-		set text item delimiters to linefeed
-		return (name of every user playlist) as text
+		set theNames to name of every user playlist
 	end tell
+	set AppleScript's text item delimiters to linefeed
+	return theNames as text
 end run"""
+"""The delimiter is set outside the `tell`, and named as AppleScript's.
+
+`text item delimiters` belongs to AppleScript, not to Music. Setting it inside
+the block sends it to Music, which answers "Can't set text item delimiters" at
+runtime -- and compiles perfectly, because the syntax was never the problem.
+"""
 
 PLAY_ALBUM: Final = """on run argv
 	set theName to item 1 of argv
