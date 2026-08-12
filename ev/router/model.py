@@ -21,7 +21,8 @@ the decoding grammar would mean two definitions of the same contract.
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from datetime import datetime, timedelta
 from typing import Any, Protocol
 
 from pydantic import ValidationError
@@ -48,6 +49,36 @@ of the request.
 
 Tools:
 """
+
+
+TODAY = "Now: {now} ({weekday}). Tomorrow: {tomorrow}. Write dates in exactly \
+that format -- ISO 8601 local time, no timezone. Never write a date earlier \
+than now."
+"""A second system message, not part of the first one.
+
+A tool takes a date now, and "amanhã às nove" cannot be turned into one by a
+model that does not know what day it is. It is separate for two reasons: the
+tool list is identical on every turn and Ollama caches that prefix, and a
+daemon that has been up for two days would otherwise still be telling the
+model it is Monday.
+
+The date is written in the format the answer must use, which is worth more
+than any wording. Measured against qwen3:8b, with the same six utterances each
+time: prose ("Today is Wednesday, 12 August 2026") put "amanhã às nove" a day
+late in Portuguese and right in English; the same fact as an ISO stamp did not.
+Tomorrow is spelled out rather than left as arithmetic for the same reason.
+
+What this does not fix: "on the 1st", when the 1st has passed, resolves to
+this month rather than next. A sentence spelling that rule out was tried and
+made it worse -- the English case went back to writing a date in the past. The
+service refuses a past date and says so, which is the honest end of it, and
+"tomorrow", "tonight" and "in two hours" are the phrasings that actually
+matter and all measure correct.
+"""
+
+
+def _now() -> datetime:
+    return datetime.now()
 
 
 class Completion(Protocol):
@@ -84,9 +115,13 @@ def system_prompt(specs: Sequence[Mapping[str, Any]]) -> str:
 
 class ModelRouter:
     def __init__(
-        self, completion: Completion, specs: Sequence[Mapping[str, Any]]
+        self,
+        completion: Completion,
+        specs: Sequence[Mapping[str, Any]],
+        clock: Callable[[], datetime] = _now,
     ) -> None:
         self._completion = completion
+        self._clock = clock
         self._specs = list(specs)
         self._names = [str(spec.get("function", spec)["name"]) for spec in self._specs]
         # Built once: the registry does not change after startup, and this is
@@ -98,9 +133,21 @@ class ModelRouter:
         if not self._names:
             return None
 
+        now = self._clock()
         content = await self._completion.complete(
             [
                 {"role": "system", "content": self._system},
+                # After the stable prefix and before the utterance, which
+                # reaches the model verbatim -- prefixing the user's own words
+                # with context would change the request it is reading.
+                {
+                    "role": "system",
+                    "content": TODAY.format(
+                        now=now.strftime("%Y-%m-%dT%H:%M"),
+                        weekday=now.strftime("%A"),
+                        tomorrow=(now + timedelta(days=1)).strftime("%Y-%m-%d"),
+                    ),
+                },
                 {"role": "user", "content": utterance},
             ],
             schema=self._schema,

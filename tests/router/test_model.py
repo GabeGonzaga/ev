@@ -8,6 +8,7 @@ different question, measured by `make eval` against the golden cases.
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from typing import Any
 
 import pytest
@@ -110,6 +111,39 @@ async def test_the_utterance_is_sent_verbatim() -> None:
         "role": "user",
         "content": "  Toca o álbum Blonde  ",
     }
+
+
+@pytest.mark.asyncio
+async def test_the_model_is_told_what_day_it_is() -> None:
+    """`reminders.create` takes a date, and "amanhã às nove" cannot become one
+    without today's."""
+    completion = FakeCompletion(answer())
+
+    await ModelRouter(
+        completion, SPECS, clock=lambda: datetime(2026, 8, 12, 18, 4)
+    ).resolve("lembra-me de comprar pão amanhã às nove")
+
+    context = completion.messages[1]
+    assert context["role"] == "system"
+    # In the format the answer must use. Measured: the same fact as prose put
+    # "amanhã às nove" a day late in Portuguese.
+    assert "2026-08-12T18:04" in context["content"]
+    assert "Wednesday" in context["content"]
+    assert "2026-08-13" in context["content"]
+
+
+@pytest.mark.asyncio
+async def test_the_date_is_not_in_the_cached_prefix() -> None:
+    """It is a second message on purpose.
+
+    The tool list is identical on every turn and Ollama caches that prefix;
+    the date is not, and a daemon that has been up for two days would
+    otherwise still be saying it is Monday.
+    """
+    router = ModelRouter(FakeCompletion(answer()), SPECS)
+
+    assert "Today is" not in system_prompt(SPECS)
+    assert router._system == system_prompt(SPECS)
 
 
 @pytest.mark.asyncio

@@ -1,0 +1,6 @@
+{"id": "remind-with-no-date", "locale": "en", "utterance": "remind me to call the dentist", "tool": "reminders.create", "arguments": {"title": "call the dentist"}}
+{"id": "remind-with-no-date", "locale": "pt-PT", "utterance": "lembra-me de comprar pão", "tool": "reminders.create", "arguments": {"title": "comprar pão"}}
+{"id": "remind-with-a-time", "locale": "en", "tier": 2, "utterance": "remind me to call the dentist tomorrow at nine", "tool": "reminders.create", "arguments": {"title": "call the dentist"}}
+{"id": "remind-with-a-time", "locale": "pt-PT", "tier": 2, "utterance": "lembra-me de ligar ao dentista amanhã às nove", "tool": "reminders.create", "arguments": {"title": "ligar ao dentista"}}
+{"id": "remind-in-a-list", "locale": "en", "tier": 2, "utterance": "remind me to buy milk in the Shopping list", "tool": "reminders.create", "arguments": {"title": "buy milk", "list": "Shopping"}}
+{"id": "remind-in-a-list", "locale": "pt-PT", "tier": 2, "utterance": "lembra-me de comprar leite na lista Compras", "tool": "reminders.create", "arguments": {"title": "comprar leite", "list": "Compras"}}

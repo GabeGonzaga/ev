@@ -12,21 +12,23 @@ So each script is run here on a path with no side effect:
   fail in their own words after reaching the library
 * control is given an action matching no branch, so it only reads the player
 * step moves the volume by zero, so the arithmetic and the clamping run
-* the note is asked for a folder that cannot exist, so it fails before it
-  makes anything
+* the note is asked for a folder that cannot exist, and the reminder for a
+  list that cannot exist, so both fail before they make anything
 
-Needs a Mac with Music and Notes installed, so it lives beside `make eval`
-rather than in the suite. It sends Apple Events to both, so macOS asks for
-permission the first time.
+Needs a Mac with Music, Notes and Reminders installed, so it lives beside
+`make eval` rather than in the suite. It sends Apple Events to each of them, so
+macOS asks for permission the first time.
 """
 
 from __future__ import annotations
 
 import asyncio
 import sys
+from datetime import datetime
 
 from ev.capabilities.music.adapters import QUEUE, MusicAdapter
 from ev.capabilities.notes.adapters import NotesAdapter
+from ev.capabilities.reminders.adapters import RemindersAdapter
 from ev.infrastructure.macos.applescript import AppleScriptClient, AppleScriptError
 from ev.infrastructure.macos.processes import ProcessRunner
 
@@ -37,6 +39,7 @@ async def main() -> int:
     applescript = AppleScriptClient(ProcessRunner())
     adapter = MusicAdapter(applescript)
     notes = NotesAdapter(applescript)
+    reminders = RemindersAdapter(applescript)
     failures: list[str] = []
 
     async def expect_error(name: str, run: object, wanted: str) -> None:
@@ -82,6 +85,18 @@ async def main() -> int:
         "create note",
         notes.create(MISSING, "checking", MISSING),
         "there is no folder called",
+    )
+
+    print("running every reminders script against Reminders")
+
+    await expect_value("list lists", reminders.lists())
+    # The list cannot exist, so this fails before `make new reminder` runs --
+    # and it fails after the date has been built, which is the part worth
+    # exercising: the arithmetic is in the script.
+    await expect_error(
+        "create reminder",
+        reminders.create(MISSING, "checking", datetime(2027, 1, 31, 9, 30), MISSING),
+        "there is no list called",
     )
 
     if failures:

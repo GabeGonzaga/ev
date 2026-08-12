@@ -187,3 +187,45 @@ def test_a_folder_in_the_sentence_escalates() -> None:
     assert (
         StaticRouter().resolve("guarda uma nota chamada Ata na pasta Trabalho") is None
     )
+
+
+# --- reminders ------------------------------------------------------------
+
+
+def test_a_reminder_with_no_date_is_routed() -> None:
+    resolution = StaticRouter().resolve("lembra-me de comprar pão")
+
+    assert resolution is not None
+    assert resolution.tool == "reminders.create"
+    assert resolution.arguments == {"title": "comprar pão"}
+
+
+def test_a_hyphen_is_optional_in_portuguese() -> None:
+    # Whisper writes "lembra me" as often as "lembra-me".
+    assert StaticRouter().resolve("lembra me de comprar pão") is not None
+
+
+def test_anything_with_a_time_in_it_escalates() -> None:
+    """A date is computed, not quoted.
+
+    "amanhã às nove" is not in the utterance as a value: it depends on what
+    day it is, which is the model's job. Tier 1 answering would set the
+    reminder with the words as its title.
+    """
+    router = StaticRouter()
+
+    for utterance in (
+        "remind me to call the dentist tomorrow",
+        "remind me to call at 15",
+        "remind me to pay the rent on the 15th",
+        "remind me to water the plants at noon",
+        "lembra-me de ligar ao médico às 15",
+        "lembra-me de pagar a renda no dia 15",
+        "lembra-me de regar as plantas logo",
+        "lembra-me de comprar pão amanhã",
+    ):
+        assert router.resolve(utterance) is None, utterance
+
+
+def test_a_named_list_escalates_too() -> None:
+    assert StaticRouter().resolve("remind me to buy milk in the Shopping list") is None

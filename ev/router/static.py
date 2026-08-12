@@ -247,6 +247,35 @@ def _rule(
     return Rule(tool=tool, pattern=re.compile(pattern, re.IGNORECASE), build=build)
 
 
+_WHEN = re.compile(
+    r"\b(at\s+\d+|at\s+noon|tonight|tomorrow|today|this\s+(morning|afternoon|"
+    r"evening)|next\s+\w+|on\s+(monday|tuesday|wednesday|thursday|friday|"
+    r"saturday|sunday)|in\s+\d+\s+(minutes?|hours?|days?)|in\s+an?\s+"
+    r"(minute|hour|day)|amanh[ãa]|hoje|logo|daqui\s+a|[àa]s\s+\d+|ao\s+"
+    r"(almo[çc]o|jantar)|na\s+(segunda|ter[çc]a|quarta|quinta|sexta)|"
+    r"em\s+\d+\s+(minutos?|horas?|dias?)|no\s+dia\s+\d+|on\s+the\s+\d+|"
+    r"na\s+lista|in\s+the\s+\S+\s+list)",
+    re.IGNORECASE,
+)
+"""When a reminder stops being just a title.
+
+Only the leading boundary is anchored. A closing one looks tidier and is wrong
+here: a digit followed by a word boundary does not match "on the 15th" or
+"às 15", because the character after the digits is a letter. This is a guard,
+and one that sometimes matches half a word still escalates the right
+utterance.
+
+A date is not a name someone said: it is computed from the utterance and from
+what day it is, which is the model's job and not a regular expression's. Tier 1
+takes "remind me to call the dentist" and stands aside for the rest.
+"""
+
+
+def _remind(groups: Mapping[str, str]) -> dict[str, object] | None:
+    title = groups["title"].strip()
+    return None if _WHEN.search(title) else {"title": title}
+
+
 _BODY = re.compile(
     r"\b(saying|that\s+says|which\s+says|with\s+the\s+text|about|"
     r"in\s+the\s+\S+\s+folder|a\s+dizer|que\s+diz|com\s+o\s+texto|"
@@ -344,6 +373,20 @@ RULES: tuple[Rule, ...] = (
         r"(?:nova\s+)?nota\s+(?:chamada|com\s+o\s+nome|com\s+o\s+título|"
         r"com\s+o\s+titulo)\s+(?P<title>.+)$",
         _note,
+    ),
+    # A reminder with no date. Anything with a time in it escalates: see
+    # `_WHEN`.
+    _rule(
+        "reminders.create",
+        r"^(?:please\s+)?remind\s+me\s+(?:to\s+|about\s+|that\s+)?"
+        r"(?P<title>.+)$",
+        _remind,
+    ),
+    _rule(
+        "reminders.create",
+        r"^(?:por\s+favor\s+)?(?:lembra|lembre|relembra)[\s-]*me\s+"
+        r"(?:de\s+|para\s+|que\s+)?(?P<title>.+)$",
+        _remind,
     ),
     # Quoted only. Without quotation marks there is no way to tell where the
     # text to translate ends and the instruction resumes, and guessing would
