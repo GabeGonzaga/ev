@@ -185,6 +185,9 @@ impl AudioSubmit {
 #[doc = "      \"$ref\": \"#/$defs/AudioSubmit\""]
 #[doc = "    },"]
 #[doc = "    {"]
+#[doc = "      \"$ref\": \"#/$defs/VisionSubmit\""]
+#[doc = "    },"]
+#[doc = "    {"]
 #[doc = "      \"$ref\": \"#/$defs/ConfirmationRespond\""]
 #[doc = "    },"]
 #[doc = "    {"]
@@ -201,7 +204,8 @@ impl AudioSubmit {
 #[doc = "      \"hello\": \"#/$defs/Hello\","]
 #[doc = "      \"history.query\": \"#/$defs/HistoryQuery\","]
 #[doc = "      \"session.cancel\": \"#/$defs/SessionCancel\","]
-#[doc = "      \"utterance.submit\": \"#/$defs/UtteranceSubmit\""]
+#[doc = "      \"utterance.submit\": \"#/$defs/UtteranceSubmit\","]
+#[doc = "      \"vision.submit\": \"#/$defs/VisionSubmit\""]
 #[doc = "    },"]
 #[doc = "    \"propertyName\": \"type\""]
 #[doc = "  }"]
@@ -214,6 +218,7 @@ pub enum Command {
     Hello(Hello),
     UtteranceSubmit(UtteranceSubmit),
     AudioSubmit(AudioSubmit),
+    VisionSubmit(VisionSubmit),
     ConfirmationRespond(ConfirmationRespond),
     HistoryQuery(HistoryQuery),
     SessionCancel(SessionCancel),
@@ -231,6 +236,11 @@ impl ::std::convert::From<UtteranceSubmit> for Command {
 impl ::std::convert::From<AudioSubmit> for Command {
     fn from(value: AudioSubmit) -> Self {
         Self::AudioSubmit(value)
+    }
+}
+impl ::std::convert::From<VisionSubmit> for Command {
+    fn from(value: VisionSubmit) -> Self {
+        Self::VisionSubmit(value)
     }
 }
 impl ::std::convert::From<ConfirmationRespond> for Command {
@@ -442,7 +452,7 @@ impl ConfirmationRespond {
 #[doc = "    }"]
 #[doc = "  },"]
 #[doc = "  \"additionalProperties\": false,"]
-#[doc = "  \"x-ev-protocol-version\": \"1.3\""]
+#[doc = "  \"x-ev-protocol-version\": \"1.4\""]
 #[doc = "}"]
 #[doc = r" ```"]
 #[doc = r" </details>"]
@@ -795,6 +805,76 @@ impl<'de> ::serde::Deserialize<'de> for HistoryQueryQuery {
             })
     }
 }
+#[doc = "base64 of a JPEG or PNG frame."]
+#[doc = r""]
+#[doc = r" <details><summary>JSON schema</summary>"]
+#[doc = r""]
+#[doc = r" ```json"]
+#[doc = "{"]
+#[doc = "  \"title\": \"Image\","]
+#[doc = "  \"description\": \"base64 of a JPEG or PNG frame.\","]
+#[doc = "  \"type\": \"string\","]
+#[doc = "  \"maxLength\": 8000000"]
+#[doc = "}"]
+#[doc = r" ```"]
+#[doc = r" </details>"]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct Image(::std::string::String);
+impl ::std::ops::Deref for Image {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<Image> for ::std::string::String {
+    fn from(value: Image) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for Image {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() > 8000000usize {
+            return Err("longer than 8000000 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for Image {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<&::std::string::String> for Image {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for Image {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for Image {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
 #[doc = "What E.V. did, once."]
 #[doc = r""]
 #[doc = r" <details><summary>JSON schema</summary>"]
@@ -1135,6 +1215,9 @@ impl ::std::convert::TryFrom<::std::string::String> for PermissionState {
 #[doc = "          \"$ref\": \"#/$defs/AudioSubmit\""]
 #[doc = "        },"]
 #[doc = "        {"]
+#[doc = "          \"$ref\": \"#/$defs/VisionSubmit\""]
+#[doc = "        },"]
+#[doc = "        {"]
 #[doc = "          \"$ref\": \"#/$defs/ConfirmationRespond\""]
 #[doc = "        },"]
 #[doc = "        {"]
@@ -1151,7 +1234,8 @@ impl ::std::convert::TryFrom<::std::string::String> for PermissionState {
 #[doc = "          \"hello\": \"#/$defs/Hello\","]
 #[doc = "          \"history.query\": \"#/$defs/HistoryQuery\","]
 #[doc = "          \"session.cancel\": \"#/$defs/SessionCancel\","]
-#[doc = "          \"utterance.submit\": \"#/$defs/UtteranceSubmit\""]
+#[doc = "          \"utterance.submit\": \"#/$defs/UtteranceSubmit\","]
+#[doc = "          \"vision.submit\": \"#/$defs/VisionSubmit\""]
 #[doc = "        },"]
 #[doc = "        \"propertyName\": \"type\""]
 #[doc = "      }"]
@@ -1816,6 +1900,150 @@ pub struct UtteranceSubmit {
 impl UtteranceSubmit {
     pub fn builder() -> builder::UtteranceSubmit {
         Default::default()
+    }
+}
+#[doc = "One frame, and optionally what to ask about it.\n\nThe same shape as `audio.submit` and for the same reason: a surface\ncaptured it because a person asked for it. `CLAUDE.md` invariant 8 -- the\ncamera may not be started by ambiguous model inference -- is why a frame\narrives as a command rather than being fetched by a tool.\n\nNothing here names a file. The frame crosses as bytes, is answered, and is\nnot persisted."]
+#[doc = r""]
+#[doc = r" <details><summary>JSON schema</summary>"]
+#[doc = r""]
+#[doc = r" ```json"]
+#[doc = "{"]
+#[doc = "  \"title\": \"VisionSubmit\","]
+#[doc = "  \"description\": \"One frame, and optionally what to ask about it.\\n\\nThe same shape as `audio.submit` and for the same reason: a surface\\ncaptured it because a person asked for it. `CLAUDE.md` invariant 8 -- the\\ncamera may not be started by ambiguous model inference -- is why a frame\\narrives as a command rather than being fetched by a tool.\\n\\nNothing here names a file. The frame crosses as bytes, is answered, and is\\nnot persisted.\","]
+#[doc = "  \"type\": \"object\","]
+#[doc = "  \"required\": ["]
+#[doc = "    \"image\""]
+#[doc = "  ],"]
+#[doc = "  \"properties\": {"]
+#[doc = "    \"image\": {"]
+#[doc = "      \"title\": \"Image\","]
+#[doc = "      \"description\": \"base64 of a JPEG or PNG frame.\","]
+#[doc = "      \"type\": \"string\","]
+#[doc = "      \"maxLength\": 8000000"]
+#[doc = "    },"]
+#[doc = "    \"locale\": {"]
+#[doc = "      \"title\": \"Locale\","]
+#[doc = "      \"description\": \"The session locale.\","]
+#[doc = "      \"default\": null,"]
+#[doc = "      \"anyOf\": ["]
+#[doc = "        {"]
+#[doc = "          \"type\": \"string\""]
+#[doc = "        },"]
+#[doc = "        {"]
+#[doc = "          \"type\": \"null\""]
+#[doc = "        }"]
+#[doc = "      ]"]
+#[doc = "    },"]
+#[doc = "    \"text\": {"]
+#[doc = "      \"title\": \"Text\","]
+#[doc = "      \"description\": \"What was said while looking, verbatim. Absent means: describe it.\","]
+#[doc = "      \"default\": null,"]
+#[doc = "      \"anyOf\": ["]
+#[doc = "        {"]
+#[doc = "          \"type\": \"string\","]
+#[doc = "          \"maxLength\": 4000"]
+#[doc = "        },"]
+#[doc = "        {"]
+#[doc = "          \"type\": \"null\""]
+#[doc = "        }"]
+#[doc = "      ]"]
+#[doc = "    },"]
+#[doc = "    \"type\": {"]
+#[doc = "      \"title\": \"Type\","]
+#[doc = "      \"default\": \"vision.submit\","]
+#[doc = "      \"type\": \"string\","]
+#[doc = "      \"const\": \"vision.submit\""]
+#[doc = "    }"]
+#[doc = "  },"]
+#[doc = "  \"additionalProperties\": false"]
+#[doc = "}"]
+#[doc = r" ```"]
+#[doc = r" </details>"]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct VisionSubmit {
+    #[doc = "base64 of a JPEG or PNG frame."]
+    pub image: Image,
+    #[doc = "The session locale."]
+    #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+    pub locale: ::std::option::Option<::std::string::String>,
+    #[doc = "What was said while looking, verbatim. Absent means: describe it."]
+    #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+    pub text: ::std::option::Option<VisionSubmitText>,
+    #[serde(rename = "type", default = "defaults::vision_submit_type")]
+    pub type_: ::std::string::String,
+}
+impl VisionSubmit {
+    pub fn builder() -> builder::VisionSubmit {
+        Default::default()
+    }
+}
+#[doc = "`VisionSubmitText`"]
+#[doc = r""]
+#[doc = r" <details><summary>JSON schema</summary>"]
+#[doc = r""]
+#[doc = r" ```json"]
+#[doc = "{"]
+#[doc = "  \"type\": \"string\","]
+#[doc = "  \"maxLength\": 4000"]
+#[doc = "}"]
+#[doc = r" ```"]
+#[doc = r" </details>"]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct VisionSubmitText(::std::string::String);
+impl ::std::ops::Deref for VisionSubmitText {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<VisionSubmitText> for ::std::string::String {
+    fn from(value: VisionSubmitText) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for VisionSubmitText {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() > 4000usize {
+            return Err("longer than 4000 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for VisionSubmitText {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<&::std::string::String> for VisionSubmitText {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for VisionSubmitText {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for VisionSubmitText {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
     }
 }
 #[doc = r" Types for composing complex structures."]
@@ -3182,6 +3410,94 @@ pub mod builder {
             }
         }
     }
+    #[derive(Clone, Debug)]
+    pub struct VisionSubmit {
+        image: ::std::result::Result<super::Image, ::std::string::String>,
+        locale: ::std::result::Result<
+            ::std::option::Option<::std::string::String>,
+            ::std::string::String,
+        >,
+        text: ::std::result::Result<
+            ::std::option::Option<super::VisionSubmitText>,
+            ::std::string::String,
+        >,
+        type_: ::std::result::Result<::std::string::String, ::std::string::String>,
+    }
+    impl ::std::default::Default for VisionSubmit {
+        fn default() -> Self {
+            Self {
+                image: Err("no value supplied for image".to_string()),
+                locale: Ok(Default::default()),
+                text: Ok(Default::default()),
+                type_: Ok(super::defaults::vision_submit_type()),
+            }
+        }
+    }
+    impl VisionSubmit {
+        pub fn image<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<super::Image>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.image = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for image: {e}"));
+            self
+        }
+        pub fn locale<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<::std::option::Option<::std::string::String>>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.locale = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for locale: {e}"));
+            self
+        }
+        pub fn text<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<::std::option::Option<super::VisionSubmitText>>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.text = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for text: {e}"));
+            self
+        }
+        pub fn type_<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<::std::string::String>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.type_ = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for type_: {e}"));
+            self
+        }
+    }
+    impl ::std::convert::TryFrom<VisionSubmit> for super::VisionSubmit {
+        type Error = super::error::ConversionError;
+        fn try_from(
+            value: VisionSubmit,
+        ) -> ::std::result::Result<Self, super::error::ConversionError> {
+            Ok(Self {
+                image: value.image?,
+                locale: value.locale?,
+                text: value.text?,
+                type_: value.type_?,
+            })
+        }
+    }
+    impl ::std::convert::From<super::VisionSubmit> for VisionSubmit {
+        fn from(value: super::VisionSubmit) -> Self {
+            Self {
+                image: Ok(value.image),
+                locale: Ok(value.locale),
+                text: Ok(value.text),
+                type_: Ok(value.type_),
+            }
+        }
+    }
 }
 #[doc = r" Generation of default values for serde."]
 pub mod defaults {
@@ -3234,5 +3550,8 @@ pub mod defaults {
     }
     pub(super) fn utterance_submit_type() -> ::std::string::String {
         "utterance.submit".to_string()
+    }
+    pub(super) fn vision_submit_type() -> ::std::string::String {
+        "vision.submit".to_string()
     }
 }

@@ -123,7 +123,8 @@ structure shaped by symmetry rather than by a decision.
 | A model-based VAD | a measurement showing energy is not enough |
 | `AudioSession` as a type | the host needs ducking, routes or interruptions |
 | An event tap, and the Accessibility permission with it | a gesture a key combination cannot express (adr/0028) |
-| Camera, Accessibility in `native/` | phase 5 and later, one decision each |
+| Camera capture in `native/` | the app needs an indicator and a session timeout first (adr/0029) |
+| Accessibility in `native/` | a capability that needs it, one decision each |
 | A second resident model | never on the interactive path |
 
 ## What does not exist yet

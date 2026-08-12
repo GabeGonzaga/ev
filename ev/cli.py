@@ -31,6 +31,7 @@ from pydantic import ValidationError
 
 from ev.application.assistant import Assistant
 from ev.application.confirmation import ConfirmationRequest
+from ev.application.frames import Frames
 from ev.application.policy import ConfidencePolicy, PermissionLedger, PermissionPolicy
 from ev.application.speech import Speaker
 from ev.capabilities.browser.adapters import OpenAdapter
@@ -49,6 +50,8 @@ from ev.capabilities.notes.tools import notes_tools
 from ev.capabilities.reminders.adapters import RemindersAdapter
 from ev.capabilities.reminders.service import RemindersService
 from ev.capabilities.reminders.tools import reminders_tools
+from ev.capabilities.vision.service import LOOK, Vision, VisionService
+from ev.capabilities.vision.tools import vision_tools
 from ev.domain.journal import JournalEntry
 from ev.domain.macro import Macro
 from ev.domain.results import Clarification, ToolResult
@@ -113,6 +116,17 @@ class ConsoleConfirmation:
         return input("run it? [y/N] ").strip().casefold() in {"y", "yes", "s", "sim"}
 
 
+class _NoVision:
+    """For the paths that build a registry without a model.
+
+    A tool that cannot see must say so rather than describing a room it
+    imagined -- the same reasoning as `_NoModel` below.
+    """
+
+    async def describe(self, prompt: str, image: bytes) -> str:  # pragma: no cover
+        raise AssertionError("this path has no vision model")
+
+
 class RefusingJournal:
     """For the read-only paths. Nothing there should reach a tool, so a call
     is a bug rather than something to record quietly."""
@@ -130,6 +144,7 @@ class Application:
     ledger: PermissionLedger
     settings: OllamaSettings
     speaker: Speaker
+    frames: Frames
 
     async def aclose(self) -> None:
         # The journal batches, so the pending tail is only durable once this
@@ -147,6 +162,8 @@ def build_registry(
     ledger: PermissionLedger,
     generation: Completion,
     speaker: Speaker,
+    frames: Frames,
+    vision: Vision,
     macros: Path | None = None,
 ) -> Registry:
     registry = Registry(
@@ -174,6 +191,9 @@ def build_registry(
         *notes_tools(NotesService(NotesAdapter(applescript), speaker)),
         *reminders_tools(RemindersService(RemindersAdapter(applescript), speaker)),
         *language_tools(LanguageService(generation)),
+        # The frame is bound by whichever surface captured it, before the turn.
+        # Nothing in the tool selects an image (invariant 8).
+        *vision_tools(VisionService(frames, vision, speaker)),
         # A macro calls the registry it lives in: same door, once per step.
         *macro_tools(MacroService(saved, registry.call, speaker)),
     ):
@@ -189,6 +209,7 @@ def build(
     model: str | None = None,
     completion: Completion | None = None,
     speaker: Speaker | None = None,
+    vision: Vision | None = None,
 ) -> Application:
     connection: sqlite3.Connection | None = None
     journal: JournalPort
@@ -217,12 +238,24 @@ def build(
     generation_model: Completion = completion or client.bind("generation")  # type: ignore[union-attr]
 
     voice = speaker or Speaker()
+    frames = Frames()
+    # Not a `Completion`: a model that sees takes an image, and the vision role
+    # is loaded per capture rather than held resident.
+    eyes: Vision
+    if vision is not None:
+        eyes = vision
+    elif client is not None:
+        eyes = client.bind("vision")
+    else:
+        eyes = _NoVision()
     registry = build_registry(
         journal=journal,
         confirmation=confirmation or ConsoleConfirmation(),
         ledger=ledger,
         generation=generation_model,
         speaker=voice,
+        frames=frames,
+        vision=eyes,
         macros=macros_path(database.parent) if database is not None else None,
     )
 
@@ -242,6 +275,7 @@ def build(
         ledger=ledger,
         settings=settings,
         speaker=voice,
+        frames=frames,
     )
 
 
@@ -626,6 +660,27 @@ async def serve(
         application.speaker.bind(locale)
         return await application.assistant.handle(text)
 
+    async def look(
+        image: bytes, text: str | None, locale: str | None
+    ) -> ToolResult | Clarification | None:
+        """A frame, bound for one turn.
+
+        With words, it is an ordinary turn that happens to have something to
+        look at -- the router may or may not reach for the camera. Without
+        them, pressing Look is the request, and it goes straight to the tool
+        rather than through a sentence nobody said.
+        """
+        application.speaker.bind(locale)
+        application.frames.bind(image)
+        try:
+            if text:
+                return await application.assistant.handle(text)
+            return await application.registry.call(LOOK, {})
+        finally:
+            # Invariant 8: frames are not persisted. Not to disk, and not in
+            # memory past the turn that asked about them.
+            application.frames.clear()
+
     async def history(
         limit: int, before: int | None, query: str | None = None
     ) -> list[JournalEntry]:
@@ -641,6 +696,7 @@ async def serve(
         handle=handle,  # type: ignore[arg-type]
         confirmation=confirmation,
         transcribe=transcribe,
+        look=look,
         history=history,
         on_close=application.aclose,
         turn_lock=turns,
@@ -660,6 +716,7 @@ async def serve(
             handle=handle,  # type: ignore[arg-type]
             history=history,
             transcribe=transcribe,
+            look=look,
             assets=Path(__file__).resolve().parents[1] / "ui" / "dist",
             port=web_port,
             # The same confirmation port and the same lock as the socket: one

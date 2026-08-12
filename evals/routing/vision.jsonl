@@ -1,0 +1,4 @@
+{"id": "look-at-this", "locale": "en", "tier": 2, "utterance": "what am I holding?", "tool": "vision.look", "arguments": {"question": "what am I holding"}}
+{"id": "look-at-this", "locale": "pt-PT", "tier": 2, "utterance": "o que é isto que tenho na mão?", "tool": "vision.look", "arguments": {"question": "isto que tenho na mão"}}
+{"id": "describe-the-scene", "locale": "en", "tier": 2, "utterance": "describe what the camera sees", "tool": "vision.look", "arguments": {}}
+{"id": "describe-the-scene", "locale": "pt-PT", "tier": 2, "utterance": "descreve o que a câmara vê", "tool": "vision.look", "arguments": {}}

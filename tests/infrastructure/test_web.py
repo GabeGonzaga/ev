@@ -449,3 +449,112 @@ async def test_answering_when_nothing_asked_is_a_conflict(tmp_path: Path) -> Non
             )
 
         assert answer.status_code == 409
+
+
+# --- looking --------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_a_frame_is_answered_and_never_written_down(tmp_path: Path) -> None:
+    """The audio route writes a temporary file, because whisper reads a path.
+    A vision model takes bytes, so there is nothing to write and nothing to
+    delete -- invariant 8, and the shortest life a picture of a room can have.
+    """
+    seen: list[tuple[bytes, str | None, str | None]] = []
+
+    async def look(image: bytes, text: str | None, locale: str | None) -> ToolResult:
+        seen.append((image, text, locale))
+        return ToolResult.success("vision.look", speech="Uma secretária.")
+
+    core = Core()
+    async with (
+        surface(tmp_path, core, look=look) as (web, base),
+        httpx.AsyncClient() as client,
+    ):
+        answer = await client.post(
+            f"{base}/api/vision",
+            json={
+                "image": base64.b64encode(b"a frame").decode(),
+                "text": "o que é isto?",
+                "locale": "pt-PT",
+            },
+            headers=headers(web.token),
+        )
+
+    assert answer.json()["speech"] == "Uma secretária."
+    assert seen == [(b"a frame", "o que é isto?", "pt-PT")]
+    # Nothing typed a sentence on the user's behalf.
+    assert core.asked == []
+    assert list(tmp_path.glob("*.jpg")) == []
+    assert list(tmp_path.glob("*.png")) == []
+
+
+@pytest.mark.asyncio
+async def test_no_words_means_describe_it(tmp_path: Path) -> None:
+    seen: list[str | None] = []
+
+    async def look(image: bytes, text: str | None, locale: str | None) -> ToolResult:
+        seen.append(text)
+        return ToolResult.success("vision.look", speech="A lamp.")
+
+    async with (
+        surface(tmp_path, Core(), look=look) as (web, base),
+        httpx.AsyncClient() as client,
+    ):
+        await client.post(
+            f"{base}/api/vision",
+            json={"image": base64.b64encode(b"a frame").decode(), "text": "  "},
+            headers=headers(web.token),
+        )
+
+    assert seen == [None]
+
+
+@pytest.mark.asyncio
+async def test_a_frame_that_is_not_base64_is_refused(tmp_path: Path) -> None:
+    async def look(image: bytes, text: str | None, locale: str | None) -> ToolResult:
+        raise AssertionError("nothing should have reached the model")
+
+    async with (
+        surface(tmp_path, Core(), look=look) as (web, base),
+        httpx.AsyncClient() as client,
+    ):
+        answer = await client.post(
+            f"{base}/api/vision",
+            json={"image": "not base64 at all!!"},
+            headers=headers(web.token),
+        )
+
+    assert answer.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_a_daemon_that_cannot_see_says_so(tmp_path: Path) -> None:
+    async with (
+        surface(tmp_path, Core()) as (web, base),
+        httpx.AsyncClient() as client,
+    ):
+        answer = await client.post(
+            f"{base}/api/vision",
+            json={"image": base64.b64encode(b"a frame").decode()},
+            headers=headers(web.token),
+        )
+
+    assert answer.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_a_frame_needs_the_token_like_everything_else(tmp_path: Path) -> None:
+    async def look(image: bytes, text: str | None, locale: str | None) -> ToolResult:
+        raise AssertionError("no token, no answer")
+
+    async with (
+        surface(tmp_path, Core(), look=look) as (_web, base),
+        httpx.AsyncClient() as client,
+    ):
+        answer = await client.post(
+            f"{base}/api/vision",
+            json={"image": base64.b64encode(b"a frame").decode()},
+        )
+
+    assert answer.status_code == 401

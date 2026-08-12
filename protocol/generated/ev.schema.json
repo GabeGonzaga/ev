@@ -328,7 +328,8 @@
               "hello": "#/$defs/Hello",
               "history.query": "#/$defs/HistoryQuery",
               "session.cancel": "#/$defs/SessionCancel",
-              "utterance.submit": "#/$defs/UtteranceSubmit"
+              "utterance.submit": "#/$defs/UtteranceSubmit",
+              "vision.submit": "#/$defs/VisionSubmit"
             },
             "propertyName": "type"
           },
@@ -341,6 +342,9 @@
             },
             {
               "$ref": "#/$defs/AudioSubmit"
+            },
+            {
+              "$ref": "#/$defs/VisionSubmit"
             },
             {
               "$ref": "#/$defs/ConfirmationRespond"
@@ -605,6 +609,56 @@
       ],
       "title": "UtteranceSubmit",
       "type": "object"
+    },
+    "VisionSubmit": {
+      "additionalProperties": false,
+      "description": "One frame, and optionally what to ask about it.\n\nThe same shape as `audio.submit` and for the same reason: a surface\ncaptured it because a person asked for it. `CLAUDE.md` invariant 8 -- the\ncamera may not be started by ambiguous model inference -- is why a frame\narrives as a command rather than being fetched by a tool.\n\nNothing here names a file. The frame crosses as bytes, is answered, and is\nnot persisted.",
+      "properties": {
+        "image": {
+          "description": "base64 of a JPEG or PNG frame.",
+          "maxLength": 8000000,
+          "title": "Image",
+          "type": "string"
+        },
+        "locale": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The session locale.",
+          "title": "Locale"
+        },
+        "text": {
+          "anyOf": [
+            {
+              "maxLength": 4000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "What was said while looking, verbatim. Absent means: describe it.",
+          "title": "Text"
+        },
+        "type": {
+          "const": "vision.submit",
+          "default": "vision.submit",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "image"
+      ],
+      "title": "VisionSubmit",
+      "type": "object"
     }
   },
   "$id": "https://ev.local/protocol/ev.schema.json",
@@ -690,5 +744,5 @@
   },
   "title": "Envelope",
   "type": "object",
-  "x-ev-protocol-version": "1.3"
+  "x-ev-protocol-version": "1.4"
 }

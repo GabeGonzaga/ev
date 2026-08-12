@@ -47,7 +47,8 @@ export type RecordedAt = string;
 export type Speech1 = string | null;
 export type Tool2 = string;
 export type Entries = JournalEntry[];
-export type Command = Hello | UtteranceSubmit | AudioSubmit | ConfirmationRespond | HistoryQuery | SessionCancel;
+export type Command =
+  Hello | UtteranceSubmit | AudioSubmit | VisionSubmit | ConfirmationRespond | HistoryQuery | SessionCancel;
 /**
  * Who is connecting, for the log.
  */
@@ -73,12 +74,25 @@ export type Audio = string;
 export type Locale1 = string | null;
 export type SampleRate = number;
 export type Type8 = "audio.submit";
+/**
+ * base64 of a JPEG or PNG frame.
+ */
+export type Image = string;
+/**
+ * The session locale.
+ */
+export type Locale2 = string | null;
+/**
+ * What was said while looking, verbatim. Absent means: describe it.
+ */
+export type Text3 = string | null;
+export type Type9 = "vision.submit";
 export type Granted = boolean;
 /**
  * The id of the confirmation.required event.
  */
 export type Request1 = string;
-export type Type9 = "confirmation.respond";
+export type Type10 = "confirmation.respond";
 /**
  * Only entries older than this id. For paging.
  */
@@ -88,8 +102,8 @@ export type Limit = number;
  * Search the trail instead of paging it: a tool, an album, a note's title. Accents are folded. Ignores `before`, because a search is not a page.
  */
 export type Query = string | null;
-export type Type10 = "history.query";
-export type Type11 = "session.cancel";
+export type Type11 = "history.query";
+export type Type12 = "session.cancel";
 export type Id2 = string;
 export type Code = string;
 export type Message = string;
@@ -213,10 +227,27 @@ export interface AudioSubmit {
   sample_rate?: SampleRate;
   type?: Type8;
 }
+/**
+ * One frame, and optionally what to ask about it.
+ *
+ * The same shape as `audio.submit` and for the same reason: a surface
+ * captured it because a person asked for it. `CLAUDE.md` invariant 8 -- the
+ * camera may not be started by ambiguous model inference -- is why a frame
+ * arrives as a command rather than being fetched by a tool.
+ *
+ * Nothing here names a file. The frame crosses as bytes, is answered, and is
+ * not persisted.
+ */
+export interface VisionSubmit {
+  image: Image;
+  locale?: Locale2;
+  text?: Text3;
+  type?: Type9;
+}
 export interface ConfirmationRespond {
   granted: Granted;
   request: Request1;
-  type?: Type9;
+  type?: Type10;
 }
 /**
  * What E.V. has done, newest first.
@@ -229,10 +260,10 @@ export interface HistoryQuery {
   before?: Before;
   limit?: Limit;
   query?: Query;
-  type?: Type10;
+  type?: Type11;
 }
 export interface SessionCancel {
-  type?: Type11;
+  type?: Type12;
 }
 export interface Response {
   error?: ResponseError | null;

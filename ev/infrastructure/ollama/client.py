@@ -13,6 +13,7 @@ impossible, and the schema is the router's, not the tool's.
 
 from __future__ import annotations
 
+from base64 import b64encode
 from typing import Any
 
 import httpx
@@ -54,6 +55,25 @@ class BoundModel:
     ) -> str:
         return await self._client.chat(self._model, messages, schema=schema)
 
+    async def describe(self, prompt: str, image: bytes) -> str:
+        """One frame and a question about it. Satisfies the vision port.
+
+        The image is base64 in the request body and nowhere else. It is not
+        written to a temporary file on the way -- unlike audio, which whisper
+        can only read from a path -- so a frame exists in this process and in
+        Ollama's, and then it does not exist.
+        """
+        return await self._client.chat(
+            self._model,
+            [
+                {
+                    "role": "user",
+                    "content": prompt,
+                    "images": [b64encode(image).decode("ascii")],
+                }
+            ],
+        )
+
 
 class OllamaClient:
     def __init__(
@@ -87,7 +107,7 @@ class OllamaClient:
     async def chat(
         self,
         model: ModelSettings,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         *,
         schema: dict[str, Any] | None = None,
         options: dict[str, Any] | None = None,

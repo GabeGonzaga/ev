@@ -35,9 +35,13 @@ E.V. is not a general agent. It does twenty things reliably rather than
 anything unreliably. If a request implies unbounded control of the machine,
 push back and propose a bounded adapter instead.
 
-**Current phase: 1 (Ollama structured routing).** Phase 0 (headless core) is
-done. Voice, native host and GUI are not built. Do not scaffold them unless
-the task explicitly says so.
+**Current phase: 5 (camera and vision).** Phases 0 to 4 are done: the core,
+tier 2 routing, the socket daemon, the voice loop, the app and the local web
+page, macros, notes, reminders and journal search. Phase 5 has its core half
+-- `vision.look`, `vision.submit` at protocol 1.4, and a frame taken by the
+browser. The app cannot see yet: capture there is AVFoundation, an indicator
+and a session timeout, and it is its own decision (ADR 0029). Wake word
+(phase 6) is not built. Do not scaffold what a task did not ask for.
 
 ---
 
@@ -226,8 +230,10 @@ ev/
 ├── capabilities/        one directory per capability
 │   ├── browser/
 │   ├── music/
-│   ├── shortcuts/
-│   ├── system/
+│   ├── notes/
+│   ├── reminders/
+│   ├── macros/          a saved list of calls, run through the same door
+│   ├── vision/          a frame the surface captured, a question about it
 │   └── language/        generation path: translate, summarise
 ├── infrastructure/      the only code that touches the outside world
 │   ├── database/
@@ -544,9 +550,9 @@ Do not introduce, and push back if asked:
 | 1 | Ollama tier 2, structured output, evals, confidence policy, translation capability | done |
 | 1.5 | Typed IPC protocol + signed native host skeleton | done |
 | 2 | Push-to-talk, VAD, whisper.cpp, AVSpeechSynthesizer | done |
-| 3 | Tauri, menu bar, NSPanel, settings, history, local web surface | current |
-| 4 | JSON macros, more adapters, retrieval | |
-| 5 | Camera and vision | |
+| 3 | Tauri, menu bar, NSPanel, settings, history, local web surface | done, unproven on device |
+| 4 | JSON macros, more adapters, retrieval | done |
+| 5 | Camera and vision | core and browser done; native capture pending |
 | 6 | Wake word, continuous interaction | |
 
 Camera comes after the UI exists because it needs the indicator and permission

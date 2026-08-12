@@ -90,6 +90,23 @@ export const history = (limit = 20, query: string | null = null) =>
         `/api/history?limit=${limit}` + (query ? `&q=${encodeURIComponent(query)}` : ""),
       );
 
+/// One frame, and optionally what was said while looking at it.
+///
+/// The browser owns the camera here, exactly as it owns the microphone:
+/// getUserMedia asks in the browser's name, the stream is stopped the moment
+/// the frame is taken, and nothing is stored anywhere.
+/// The app has no camera yet -- capture there is AVFoundation and an
+/// indicator, and it is its own decision. Until then this is the browser's.
+export const look = (image: string, text: string | null, locale: string | null) =>
+  inTauri
+    ? Promise.reject(new Error("the app cannot see yet: use the browser surface"))
+    : http<TurnResult>("/api/vision", {
+        method: "POST",
+        body: JSON.stringify({ image, text, locale }),
+      });
+
+export const canSeeHere = !inTauri;
+
 export const setLocale = (locale: string | null) =>
   inTauri ? callTauri<void>("set_locale", { locale }) : Promise.resolve();
 

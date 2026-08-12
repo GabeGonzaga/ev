@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { canBindKeys, canRecordHere } from "./api";
+import { canBindKeys, canRecordHere, canSeeHere } from "./api";
 import { useSession } from "./stores/session";
 
 const session = useSession();
@@ -37,6 +37,12 @@ function find(text: string) {
   session.search = text;
   clearTimeout(pending);
   pending = setTimeout(() => session.refresh(), 150);
+}
+
+async function peek() {
+  const text = typed.value.trim();
+  typed.value = "";
+  await session.look(text || null);
 }
 
 async function send() {
@@ -91,6 +97,16 @@ async function talk() {
         @click="talk()"
       >
         {{ recorder ? "Stop" : "Speak" }}
+      </button>
+      <!-- One frame, then the camera goes off again. What is typed goes with
+           it as the question; empty means "describe it". -->
+      <button
+        v-if="canSeeHere"
+        type="button"
+        :disabled="session.state !== 'idle'"
+        @click="peek()"
+      >
+        Look
       </button>
     </form>
 

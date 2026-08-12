@@ -31,6 +31,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from ev.application.frames import Frames
 from ev.application.policy import PermissionLedger
 from ev.cli import RefusingJournal, build_registry
 from ev.infrastructure.database.connection import default_database_path
@@ -295,6 +296,11 @@ async def evaluate(model: str, host: str, only: str | None) -> None:
         confirmation=NeverConfirms(),
         ledger=PermissionLedger(),
         generation=client.bind("generation"),
+        # The specs are what is being measured, and `vision.look` is one of
+        # them. Nothing here shows it a frame: routing to it is the question,
+        # not answering with it.
+        frames=Frames(),
+        vision=client.bind("vision"),
     )
 
     if only != "translation":

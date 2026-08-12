@@ -42,6 +42,12 @@ mid-question must not park a turn forever, and a turn nobody answers is
 declined -- silence is not consent here either."""
 
 Handler = Callable[..., Awaitable[ToolResult | Clarification | None]]
+Looker = Callable[[bytes, str | None, str | None], Awaitable[Any]]
+"""A frame, what was said while looking, and the locale. The browser owns the
+camera here, the same way it owns the microphone: `getUserMedia` asks in the
+browser's name, and E.V. does not pretend to hold a permission it was not
+given."""
+
 Transcriber = Callable[[Path, str], Awaitable[str]]
 History = Callable[[int, int | None, str | None], Awaitable[list[JournalEntry]]]
 
@@ -103,6 +109,7 @@ class WebSurface:
         handle: Handler,
         history: History | None = None,
         transcribe: Transcriber | None = None,
+        look: Looker | None = None,
         assets: Path | None = None,
         port: int = DEFAULT_PORT,
         confirmation: Any | None = None,
@@ -115,6 +122,7 @@ class WebSurface:
         self._confirmation = confirmation
         self._history = history
         self._transcribe = transcribe
+        self._look = look
         self._assets = assets
         self._port = port
         self._token = ""
@@ -139,6 +147,7 @@ class WebSurface:
         app.router.add_post("/api/turn", self._turn_route)
         app.router.add_post("/api/confirm", self._confirm_route)
         app.router.add_post("/api/audio", self._audio_route)
+        app.router.add_post("/api/vision", self._vision_route)
         app.router.add_get("/api/history", self._history_route)
 
         if self._assets is not None and self._assets.is_dir():
@@ -193,10 +202,19 @@ class WebSurface:
 
     async def _begin(self, text: str, locale: str | None = None) -> dict[str, Any]:
         """Run a turn until it finishes or asks something."""
+        return await self._start(lambda: self._handle(text, locale))
+
+    async def _start(self, turn: Callable[[], Awaitable[Any]]) -> dict[str, Any]:
+        """A turn, whatever started it: typed, spoken, or looked at.
+
+        Taken as a thunk rather than a coroutine so that nothing is created
+        until the lock is held -- a coroutine built and then abandoned because
+        the lock raised is a coroutine nobody awaits.
+        """
         await self._abandon()
         await self._turn.acquire()
 
-        parked = Asked(asyncio.ensure_future(self._handle(text, locale)))
+        parked = Asked(asyncio.ensure_future(turn()))
         self._parked = parked
         if self._confirmation is not None:
             self._confirmation.bind(parked)
@@ -205,6 +223,32 @@ class WebSurface:
         if step["outcome"] != "confirm":
             self._release()
         return step
+
+    async def _vision_route(self, request: web.Request) -> web.StreamResponse:
+        """One frame, one turn, nothing written down.
+
+        The audio route writes a temporary file because whisper reads a path.
+        A vision model takes bytes, so a frame is decoded here, answered, and
+        gone -- invariant 8, and the shortest possible life for a picture of
+        someone's room.
+        """
+        look = self._look
+        if look is None:
+            raise web.HTTPServiceUnavailable(text="this daemon cannot see")
+
+        body = await request.json()
+        try:
+            image = base64.b64decode(str(body.get("image", "")), validate=True)
+        except (ValueError, binascii.Error):
+            raise web.HTTPBadRequest(text="the image is not valid base64") from None
+
+        if not image:
+            raise web.HTTPBadRequest(text="there is no frame here")
+
+        text = str(body.get("text") or "").strip() or None
+        locale = body.get("locale")
+
+        return web.json_response(await self._start(lambda: look(image, text, locale)))
 
     async def _confirm_route(self, request: web.Request) -> web.StreamResponse:
         parked = self._parked

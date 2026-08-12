@@ -36,12 +36,17 @@ MAX_AUDIO_BASE64 = 8_000_000
 push-to-talk utterances are seconds long, and an unbounded field on a socket is
 a promise to buffer whatever arrives."""
 
-PROTOCOL_VERSION = "1.3"
+MAX_IMAGE_BASE64 = 8_000_000
+"""One frame, generously. A 1280x720 JPEG is a few hundred KB encoded; this
+leaves room for a camera that hands over something larger without leaving the
+field unbounded."""
+
+PROTOCOL_VERSION = "1.4"
 """Major.minor. The handshake compares it exactly: a mismatch refuses the
 connection rather than degrading into a conversation neither side understands.
 
-1.1 added `audio.submit`; 1.2 added `history.query`; 1.3 gave it `query`. A
-client that knows an
+1.1 added `audio.submit`; 1.2 added `history.query`; 1.3 gave it `query`; 1.4
+added `vision.submit`. A client that knows an
 earlier version is refused rather than served a subset, because "some of the
 protocol" is not a protocol.
 """
@@ -130,6 +135,33 @@ class HistoryQuery(Message):
     )
 
 
+class VisionSubmit(Message):
+    """One frame, and optionally what to ask about it.
+
+    The same shape as `audio.submit` and for the same reason: a surface
+    captured it because a person asked for it. `CLAUDE.md` invariant 8 -- the
+    camera may not be started by ambiguous model inference -- is why a frame
+    arrives as a command rather than being fetched by a tool.
+
+    Nothing here names a file. The frame crosses as bytes, is answered, and is
+    not persisted.
+    """
+
+    type: Literal["vision.submit"] = "vision.submit"
+    image: str = Field(
+        max_length=MAX_IMAGE_BASE64,
+        description="base64 of a JPEG or PNG frame.",
+    )
+    text: str | None = Field(
+        default=None,
+        max_length=4000,
+        description=(
+            "What was said while looking, verbatim. Absent means: describe it."
+        ),
+    )
+    locale: str | None = Field(default=None, description="The session locale.")
+
+
 class SessionCancel(Message):
     type: Literal["session.cancel"] = "session.cancel"
 
@@ -138,6 +170,7 @@ Command = Annotated[
     Hello
     | UtteranceSubmit
     | AudioSubmit
+    | VisionSubmit
     | ConfirmationRespond
     | HistoryQuery
     | SessionCancel,

@@ -21,12 +21,20 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 SETTINGS_FILE = "models.json"
 
-Role = Literal["router", "generation"]
+Role = Literal["router", "generation", "vision"]
 
 DEFAULT_HOST = "http://127.0.0.1:11434"
 DEFAULT_MODEL = "qwen3:8b"
 """A default, not a requirement. 8B keeps the interactive path inside the
 latency budget; anything installed can replace it."""
+
+DEFAULT_VISION_MODEL = "gemma3:12b"
+"""Bigger than the 9B ceiling, and allowed to be.
+
+`CLAUDE.md` puts that ceiling on the interactive path and says a larger model
+may exist for non-interactive work, provided it is never the voice brain. This
+one is asked a question about one frame, a few times a day, and is unloaded
+immediately afterwards."""
 
 
 class ModelSettings(BaseModel):
@@ -73,16 +81,36 @@ class OllamaSettings(BaseModel):
     generation: ModelSettings = Field(
         default_factory=lambda: ModelSettings(name=DEFAULT_MODEL)
     )
+    vision: ModelSettings = Field(
+        # keep_alive "0" is the rule from the latency budget expressed as
+        # configuration: load the vision model on capture, unload after.
+        # Holding it would evict the router, and a cold router costs 7.5 s.
+        default_factory=lambda: ModelSettings(
+            name=DEFAULT_VISION_MODEL, keep_alive="0", timeout=120.0
+        )
+    )
 
     def for_role(self, role: Role) -> ModelSettings:
-        return self.router if role == "router" else self.generation
+        if role == "router":
+            return self.router
+        return self.generation if role == "generation" else self.vision
 
     def models(self) -> list[str]:
-        """Every distinct model this configuration needs resident."""
+        """Every distinct model this configuration needs resident.
+
+        The vision model is not one of them: it is loaded when a frame arrives
+        and unloaded when it has answered, so counting it here would have
+        `make models` pull weights for something that is never held.
+        """
         return sorted({self.router.name, self.generation.name})
 
     def with_model(self, name: str) -> Self:
-        """Point every role at one model -- what `--model` does for a run."""
+        """Point the two resident roles at one model -- what `--model` does.
+
+        Vision is left alone: `--model llama3.1:8b` is a bake-off between two
+        routers, and pointing a camera at a model that cannot see would fail in
+        a way that says nothing about either.
+        """
         return self.model_copy(
             update={
                 "router": self.router.model_copy(update={"name": name}),

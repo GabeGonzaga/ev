@@ -11,7 +11,7 @@ is right.
 | 2 | Push-to-talk, VAD, whisper.cpp, AVSpeechSynthesizer | done |
 | 3 | Tauri, menu bar, NSPanel, settings, history | done, unproven on device |
 | 4 | JSON macros, more adapters, retrieval | done |
-| 5 | Camera and vision | |
+| 5 | Camera and vision | core and browser done |
 | 6 | Wake word, continuous interaction | |
 
 ## Phase 0
@@ -129,6 +129,22 @@ transcription, the turn -- but the app itself has not been run.
 The bundle is the phase's real prize: launched from a shell the host borrows
 the terminal's microphone grant (ADR 0019), and only a bundled app gets an
 identity macOS decides about.
+
+## Phase 5
+
+| | |
+|---|---|
+| `vision.look`, with the frame bound per turn and never model-chosen | done |
+| `vision.submit` at protocol 1.4, from a surface that captured a frame | done |
+| The vision role: a larger model, loaded on capture and unloaded after | done |
+| A frame in the browser: `getUserMedia`, one still, camera off again | done |
+| Capture in the app: AVFoundation, an indicator, a session timeout | |
+| A frame from the screen rather than the camera | not decided |
+
+Measured, gemma3:12b on an M2 Pro: 14-19 s from frame to answer, most of it
+loading 8 GB of weights that are then dropped. That is the price of not
+evicting the router, and it is why this is not on the voice path. A smaller
+vision model is a line in `models.json`, which is the point of the role.
 
 ## What each phase is waiting for
 

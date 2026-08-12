@@ -33,6 +33,7 @@ from protocol.messages import (
     Hello,
     Request,
     UtteranceSubmit,
+    VisionSubmit,
 )
 
 pytestmark = pytest.mark.asyncio
@@ -421,7 +422,7 @@ async def test_an_unbound_confirmation_declines() -> None:
 async def test_a_refused_handshake_reaches_the_client(state: Path) -> None:
     core = Core()
     async for _ in start(state, core):
-        with pytest.raises(DaemonRefused, match=r"speaks 1\.3"):
+        with pytest.raises(DaemonRefused, match=r"speaks 1\.4"):
             async with IpcClient(socket_path(state), protocol="0.9"):
                 pass
         break
@@ -477,6 +478,78 @@ async def test_audio_is_transcribed_then_routed(state: Path) -> None:
 
         assert heard == [(b"RIFF....fake wav", "pt-PT")]
         assert core.utterances == ["abre example.com"]
+    finally:
+        task.cancel()
+        await server.aclose()
+
+
+async def test_a_frame_reaches_the_turn_that_was_asked_to_look(state: Path) -> None:
+    """A frame arrives as a command, from a surface, because somebody pressed
+    something. Nothing here fetches one."""
+    seen: list[tuple[bytes, str | None, str | None]] = []
+
+    async def look(image: bytes, text: str | None, locale: str | None) -> ToolResult:
+        seen.append((image, text, locale))
+        return ToolResult.success("vision.look", speech="Uma secretária.")
+
+    core = Core(None)
+    server = IpcServer(
+        path=socket_path(state),
+        handle=core.handle,
+        confirmation=SessionConfirmation(),
+        look=look,
+    )
+    await server.start()
+    task = asyncio.create_task(server.serve_forever())
+
+    try:
+        reader, writer = await raw(socket_path(state))
+        await write(
+            writer,
+            Request(id="h", command=Hello(protocol=PROTOCOL_VERSION, client="t")),
+        )
+        await line(reader)
+        await write(
+            writer,
+            Request(
+                id="1",
+                command=VisionSubmit(
+                    image=base64.b64encode(b"a frame").decode(),
+                    text="o que é isto?",
+                    locale="pt-PT",
+                ),
+            ),
+        )
+
+        first = await line(reader)
+        assert first["type"] == "tool.completed"
+        assert first["speech"] == "Uma secretária."
+
+        assert seen == [(b"a frame", "o que é isto?", "pt-PT")]
+        # The daemon did not invent a sentence to route.
+        assert core.utterances == []
+    finally:
+        task.cancel()
+        await server.aclose()
+
+
+async def test_a_daemon_with_no_eyes_says_so(state: Path) -> None:
+    server = IpcServer(
+        path=socket_path(state),
+        handle=Core(None).handle,
+        confirmation=SessionConfirmation(),
+    )
+    await server.start()
+    task = asyncio.create_task(server.serve_forever())
+
+    try:
+        async with IpcClient(socket_path(state)) as client:
+            answer = await client._send(
+                VisionSubmit(image=base64.b64encode(b"a frame").decode())
+            )
+
+        assert answer["ok"] is False
+        assert answer["error"]["code"] == "no_vision"
     finally:
         task.cancel()
         await server.aclose()

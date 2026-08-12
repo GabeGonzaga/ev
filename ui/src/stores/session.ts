@@ -101,6 +101,45 @@ export const useSession = defineStore("session", () => {
     },
   );
 
+  /// Take one frame and ask about it.
+  ///
+  /// The camera is on for as long as it takes to read a single frame and is
+  /// stopped in a `finally`. `CLAUDE.md` invariant 8 asks for a visible
+  /// active state and a session timeout; a session this short is the strongest
+  /// form of both, and the browser shows its own indicator while it lasts.
+  async function look(text: string | null = null) {
+    if (!api.canSeeHere) return;
+    state.value = "listening";
+    trouble.value = null;
+
+    let stream: MediaStream | null = null;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const video = document.createElement("video");
+      video.srcObject = stream;
+      video.muted = true;
+      await video.play();
+      // One frame, once the camera has actually produced one: the first is
+      // often black while the sensor is still waking up.
+      await new Promise((settle) => setTimeout(settle, 300));
+
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext("2d")?.drawImage(video, 0, 0);
+      const frame = canvas.toDataURL("image/jpeg", 0.8).split(",")[1] ?? "";
+
+      state.value = "thinking";
+      apply(await api.look(frame, text, locale.value));
+    } catch (error) {
+      trouble.value = String(error);
+    } finally {
+      stream?.getTracks().forEach((track) => track.stop());
+      state.value = "idle";
+      await refresh();
+    }
+  }
+
   async function load() {
     const saved = await api.settings();
     shortcut.value = saved.shortcut;
@@ -155,6 +194,6 @@ export const useSession = defineStore("session", () => {
   return {
     state, heard, said, trouble, entries, locale, question, search,
     shortcut, shortcutTrouble,
-    ask, speak, answer, refresh, choose, load, bind,
+    ask, speak, look, answer, refresh, choose, load, bind,
   };
 });

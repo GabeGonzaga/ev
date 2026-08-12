@@ -27,7 +27,7 @@ import tempfile
 import uuid
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from pydantic import ValidationError
 
@@ -52,6 +52,7 @@ from protocol.messages import (
     ToolCompleted,
     TranscriptionPartial,
     UtteranceSubmit,
+    VisionSubmit,
 )
 
 SOCKET_FILE = "ev.sock"
@@ -171,6 +172,14 @@ History = Callable[[int, int | None, str | None], Awaitable[list[JournalEntry]]]
 """How the daemon reads the trail back. The journal owns the storage; this is
 the only shape the socket knows about."""
 
+Looker = Callable[[bytes, str | None, str | None], Awaitable[Any]]
+"""A frame, what was said while looking, and the locale.
+
+Separate from `Handler` because a frame is not an utterance: it is bound for
+one turn and cleared afterwards, and the daemon is the only thing that knows
+the turn is over.
+"""
+
 Transcriber = Callable[[Path, str], Awaitable[str]]
 """Audio in, words out. The daemon holds one; what implements it is
 `SpeechRecognizer`, and the daemon never learns which engine that is."""
@@ -184,6 +193,7 @@ class IpcServer:
         handle: Handler,
         confirmation: SessionConfirmation,
         transcribe: Transcriber | None = None,
+        look: Looker | None = None,
         history: History | None = None,
         on_close: Callable[[], Awaitable[None]] | None = None,
         confirmation_timeout: float = CONFIRMATION_TIMEOUT,
@@ -192,6 +202,7 @@ class IpcServer:
         self._path = path
         self._handle = handle
         self._transcribe = transcribe
+        self._look = look
         self._history = history
         self._confirmation = confirmation
         self._on_close = on_close
@@ -353,6 +364,10 @@ class IpcServer:
             await self._audio(session, request.id, command)
             return
 
+        if isinstance(command, VisionSubmit):
+            await self._vision(session, request.id, command)
+            return
+
         if isinstance(command, UtteranceSubmit):
             await self._utterance(session, request.id, command)
 
@@ -405,6 +420,51 @@ class IpcServer:
             request_id,
             UtteranceSubmit(text=said, locale=command.locale),
         )
+
+    async def _vision(
+        self, session: Session, request_id: str, command: VisionSubmit
+    ) -> None:
+        """One frame, one turn.
+
+        The frame never reaches disk. Audio does, because whisper reads a file;
+        a vision model takes bytes in the request body, so there is nothing to
+        write and nothing to delete.
+        """
+        if self._look is None:
+            await self._refuse(
+                session, request_id, "no_vision", "this daemon cannot see"
+            )
+            return
+
+        try:
+            image = base64.b64decode(command.image, validate=True)
+        except (ValueError, binascii.Error):
+            await self._refuse(
+                session, request_id, "malformed_image", "the image is not valid base64"
+            )
+            return
+
+        async with self._turn:
+            self._confirmation.bind(session)
+            try:
+                outcome = await self._look(image, command.text, command.locale)
+            except Exception as error:  # the daemon outlives one bad turn
+                await self._refuse(
+                    session,
+                    request_id,
+                    "turn_failed",
+                    f"{type(error).__name__}: {error}",
+                )
+                return
+            finally:
+                self._confirmation.bind(None)
+
+        await self._announce(
+            session,
+            UtteranceSubmit(text=command.text or "look", locale=command.locale),
+            outcome,
+        )
+        await session.send(Response(id=request_id, ok=True, payload=_payload(outcome)))
 
     async def _history_query(
         self, session: Session, request_id: str, command: HistoryQuery
