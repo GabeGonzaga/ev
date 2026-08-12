@@ -27,6 +27,7 @@ import tempfile
 import uuid
 from collections.abc import Awaitable, Callable
 from pathlib import Path
+from typing import Protocol
 
 from pydantic import ValidationError
 
@@ -132,24 +133,35 @@ class Session:
                 waiting.set_result(False)
 
 
+class Asker(Protocol):
+    """Whoever is in a position to answer right now.
+
+    A socket session is one. A browser turn is another. The registry does not
+    learn which, and does not need to.
+    """
+
+    async def confirm(self, request: ConfirmationRequest) -> bool: ...
+
+
 class SessionConfirmation:
     """The registry's confirmation port, pointed at whoever asked.
 
     The registry is built once and lives as long as the daemon; the person to
-    ask changes per turn. Turns are serialised, so one binding at a time is
+    ask changes per turn, and now also per surface. Turns are serialised
+    across every surface by one shared lock, so one binding at a time is
     enough. Unbound, it declines -- nobody is there to answer.
     """
 
     def __init__(self) -> None:
-        self._session: Session | None = None
+        self._asker: Asker | None = None
 
-    def bind(self, session: Session | None) -> None:
-        self._session = session
+    def bind(self, asker: Asker | None) -> None:
+        self._asker = asker
 
     async def confirm(self, request: ConfirmationRequest) -> bool:
-        if self._session is None:
+        if self._asker is None:
             return False
-        return await self._session.confirm(request)
+        return await self._asker.confirm(request)
 
 
 Handler = Callable[[str], Awaitable[ToolResult | Clarification | None]]
@@ -173,6 +185,7 @@ class IpcServer:
         history: History | None = None,
         on_close: Callable[[], Awaitable[None]] | None = None,
         confirmation_timeout: float = CONFIRMATION_TIMEOUT,
+        turn_lock: asyncio.Lock | None = None,
     ) -> None:
         self._path = path
         self._handle = handle
@@ -181,7 +194,10 @@ class IpcServer:
         self._confirmation = confirmation
         self._on_close = on_close
         self._confirmation_timeout = confirmation_timeout
-        self._turn = asyncio.Lock()
+        # Shared with every other surface. One core, one turn at a time: a
+        # socket turn and a browser turn interleaving would race for the
+        # registry, the journal and the person being asked to confirm.
+        self._turn = turn_lock or asyncio.Lock()
         self._server: asyncio.AbstractServer | None = None
         self._connections: set[asyncio.StreamWriter] = set()
 

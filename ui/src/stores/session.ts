@@ -13,9 +13,21 @@ export const useSession = defineStore("session", () => {
   const said = ref<string[]>([]);
   const trouble = ref<string | null>(null);
   const entries = ref<JournalEntry[]>([]);
+  // A question the core is waiting on. While this is set, a turn is parked on
+  // the other side and nothing has run.
+  const question = ref<{ tool: string; risk: string; arguments: Record<string, unknown> } | null>(null);
   const locale = ref<string>("pt-PT");
 
   function apply(result: api.TurnResult) {
+    if (result.outcome === "confirm") {
+      question.value = {
+        tool: String(result.tool ?? ""),
+        risk: String(result.risk ?? ""),
+        arguments: (result.arguments ?? {}) as Record<string, unknown>,
+      };
+      return;
+    }
+    question.value = null;
     heard.value = result.heard ?? null;
     // The app returns the spoken lines; the web surface returns the result
     // itself. One shape here rather than two branches everywhere above.
@@ -65,10 +77,28 @@ export const useSession = defineStore("session", () => {
     }
   }
 
+  async function answer(granted: boolean) {
+    const asked = question.value;
+    question.value = null;
+    if (!asked) return;
+    state.value = "thinking";
+    try {
+      apply(await api.confirm(granted));
+    } catch (error) {
+      trouble.value = String(error);
+    } finally {
+      state.value = "idle";
+      await refresh();
+    }
+  }
+
   async function choose(tag: string) {
     locale.value = tag;
     await api.setLocale(tag);
   }
 
-  return { state, heard, said, trouble, entries, locale, ask, speak, refresh, choose };
+  return {
+    state, heard, said, trouble, entries, locale, question,
+    ask, speak, answer, refresh, choose,
+  };
 });

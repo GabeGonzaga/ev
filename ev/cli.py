@@ -489,6 +489,7 @@ async def serve(
     port follows whoever is currently asking rather than being a terminal.
     """
     confirmation = SessionConfirmation()
+    turns = asyncio.Lock()
     application = build(
         database=database, confirmation=confirmation, model=model, completion=completion
     )
@@ -513,6 +514,7 @@ async def serve(
         transcribe=transcribe,
         history=history,
         on_close=application.aclose,
+        turn_lock=turns,
     )
 
     try:
@@ -531,6 +533,10 @@ async def serve(
             transcribe=transcribe,
             assets=Path(__file__).resolve().parents[1] / "ui" / "dist",
             port=web_port,
+            # The same confirmation port and the same lock as the socket: one
+            # core, one turn at a time, and one person being asked.
+            confirmation=confirmation,
+            turn_lock=turns,
         )
         try:
             await surface.start()

@@ -66,6 +66,18 @@ async function talk() {
 
     <!-- What E.V. heard, shown even when it is right: being misheard should be
          visible in the words rather than inferred from the wrong action. -->
+    <!-- A question, not a notice: nothing has run, and it will not until this
+         is answered. Declining is what happens if the page simply closes. -->
+    <div v-if="session.question" class="asking">
+      <span>
+        <strong>{{ session.question.tool }}</strong>
+        <em>{{ session.question.risk }}</em>
+        {{ JSON.stringify(session.question.arguments) }}
+      </span>
+      <button type="button" @click="session.answer(true)">Run it</button>
+      <button type="button" @click="session.answer(false)">Cancel</button>
+    </div>
+
     <p v-if="session.heard" class="heard">heard: {{ session.heard }}</p>
     <p v-for="line in session.said" :key="line" class="said">{{ line }}</p>
     <p v-if="session.trouble" class="trouble">{{ session.trouble }}</p>
@@ -107,6 +119,12 @@ button:disabled { opacity: 0.4; }
 .heard { color: #8e8e93; margin: 0; }
 .said { margin: 0; }
 .trouble { color: #ff9f0a; margin: 0; }
+.asking {
+  display: flex; align-items: center; gap: 8px;
+  background: #3a2a00; border: 1px solid #ffd60a; border-radius: 6px; padding: 8px;
+}
+.asking span { flex: 1; }
+.asking em { color: #ffd60a; font-style: normal; margin: 0 6px; }
 .history { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
 .history li { display: flex; gap: 8px; padding: 3px 0; border-top: 1px solid #2c2c2e; }
 .ok { color: #30d158; }

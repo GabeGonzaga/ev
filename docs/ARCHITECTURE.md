@@ -13,8 +13,11 @@ browser page ─────┘  loopback HTTP, token, Origin checked, off by de
                      Registry.call()      the only thing that authorises
 ```
 
-No surface executes anything. The web page is the weakest of the three and the
-one written most carefully: a socket cannot be addressed by a tab, a port can,
+No surface executes anything, and no two surfaces act at once: one lock is
+shared by the socket and the page, so a browser turn and a voice turn cannot
+race for the registry, the journal, or the person being asked to confirm.
+
+The web page is the weakest of the three and the one written most carefully: a socket cannot be addressed by a tab, a port can,
 so `ev/infrastructure/web/security.py` is what stands there and it is tested
 against a real server rather than a fake.
 

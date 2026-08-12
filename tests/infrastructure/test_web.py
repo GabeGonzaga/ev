@@ -12,13 +12,16 @@ import socket
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Protocol
 
 import httpx
 import pytest
 
+from ev.application.confirmation import ConfirmationRequest
 from ev.domain.journal import JournalEntry
-from ev.domain.results import Clarification, ToolResult
+from ev.domain.results import Clarification, ToolErrorCode, ToolResult
 from ev.domain.risk import RiskLevel
+from ev.infrastructure.ipc.server import SessionConfirmation
 from ev.infrastructure.web.security import local_host, matches, same_origin
 from ev.infrastructure.web.server import WebSurface
 
@@ -39,9 +42,15 @@ class Core:
         return self._outcome
 
 
+class Answers(Protocol):
+    """Anything that can take a turn. The helper does not care which fake."""
+
+    async def handle(self, text: str) -> ToolResult | Clarification | None: ...
+
+
 @asynccontextmanager
 async def surface(
-    tmp_path: Path, core: Core, **extra: object
+    tmp_path: Path, core: Answers, **extra: object
 ) -> AsyncIterator[tuple[WebSurface, str]]:
     """A running surface, closed deterministically.
 
@@ -287,3 +296,126 @@ def test_token_comparison_does_not_short_circuit() -> None:
     assert not matches("abc", "abd")
     assert not matches("abc", "")
     assert not matches("abc", None)
+
+
+# --- confirmation ---------------------------------------------------------
+
+
+class Destructive:
+    """A core whose turn asks before it acts, the way a destructive tool does."""
+
+    def __init__(self, confirmation: SessionConfirmation) -> None:
+        self.confirmation = confirmation
+        self.granted: bool | None = None
+
+    async def handle(self, text: str) -> ToolResult | Clarification | None:
+        self.granted = await self.confirmation.confirm(
+            ConfirmationRequest(
+                tool="system.empty_trash",
+                risk=RiskLevel.DESTRUCTIVE,
+                arguments={"count": 3},
+            )
+        )
+        if not self.granted:
+            return ToolResult.failure(
+                "system.empty_trash",
+                ToolErrorCode.CONFIRMATION_DECLINED,
+                "user declined",
+            )
+        return ToolResult.success("system.empty_trash", speech="Emptied")
+
+
+@pytest.mark.asyncio
+async def test_a_turn_asks_before_it_acts(tmp_path: Path) -> None:
+    """The question comes back as the turn's answer, and the turn waits.
+
+    HTTP cannot hold a question open, so the turn runs as a task: /api/turn
+    returns the question, /api/confirm resumes it.
+    """
+    confirmation = SessionConfirmation()
+    core = Destructive(confirmation)
+
+    async with surface(tmp_path, core, confirmation=confirmation) as (web, base):
+        async with httpx.AsyncClient() as client:
+            asked = await client.post(
+                f"{base}/api/turn",
+                json={"text": "empty the trash"},
+                headers=headers(web.token),
+            )
+            assert asked.json() == {
+                "outcome": "confirm",
+                "tool": "system.empty_trash",
+                "risk": "destructive",
+                "arguments": {"count": 3},
+            }
+            assert core.granted is None, "nothing ran while the question stood"
+
+            done = await client.post(
+                f"{base}/api/confirm",
+                json={"granted": True},
+                headers=headers(web.token),
+            )
+
+        assert core.granted is True
+        assert done.json()["outcome"] == "ran"
+        assert done.json()["speech"] == "Emptied"
+
+
+@pytest.mark.asyncio
+async def test_a_declined_question_stops_the_call(tmp_path: Path) -> None:
+    confirmation = SessionConfirmation()
+    core = Destructive(confirmation)
+
+    async with surface(tmp_path, core, confirmation=confirmation) as (web, base):
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                f"{base}/api/turn",
+                json={"text": "empty the trash"},
+                headers=headers(web.token),
+            )
+            done = await client.post(
+                f"{base}/api/confirm",
+                json={"granted": False},
+                headers=headers(web.token),
+            )
+
+        assert core.granted is False
+        assert done.json()["ok"] is False
+
+
+@pytest.mark.asyncio
+async def test_a_page_that_walks_away_declines(tmp_path: Path) -> None:
+    # The browser equivalent of a closed socket: the next turn abandons the
+    # unanswered one, and abandoning is a no.
+    confirmation = SessionConfirmation()
+    core = Destructive(confirmation)
+
+    async with surface(tmp_path, core, confirmation=confirmation) as (web, base):
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                f"{base}/api/turn",
+                json={"text": "empty the trash"},
+                headers=headers(web.token),
+            )
+            # No answer. Someone asks for something else instead.
+            second = await client.post(
+                f"{base}/api/turn",
+                json={"text": "empty the trash"},
+                headers=headers(web.token),
+            )
+
+        assert second.json()["outcome"] == "confirm", "the new turn asks in its turn"
+
+
+@pytest.mark.asyncio
+async def test_answering_when_nothing_asked_is_a_conflict(tmp_path: Path) -> None:
+    core = Core()
+    async with surface(tmp_path, core) as (web, base):
+        async with httpx.AsyncClient() as client:
+            answer = await client.post(
+                f"{base}/api/confirm",
+                json={"granted": True},
+                headers=headers(web.token),
+            )
+
+        assert answer.status_code == 409

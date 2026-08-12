@@ -106,6 +106,8 @@ which is not built.
 | TypeScript generated from the schema, CI-checked | done |
 | Tauri shell: menu bar, panel, four commands | done |
 | History in the panel; settings beyond locale | partial |
+| Confirmation in the browser page, sharing the core's turn lock | done |
+| Confirmation in the Tauri panel | |
 | Local web surface: loopback, token, `Origin` checked, off by default | done |
 | The same Vue app served by the daemon and embedded in the app | done |
 | App bundle, signed, with entitlements and usage strings | done, unproven |

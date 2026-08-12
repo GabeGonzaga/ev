@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import binascii
+import contextlib
 import json
 import os
 import tempfile
@@ -22,6 +23,7 @@ from typing import Any
 
 from aiohttp import web
 
+from ev.application.confirmation import ConfirmationRequest
 from ev.domain.journal import JournalEntry
 from ev.domain.results import Clarification, ToolResult
 from ev.infrastructure.web.security import (
@@ -34,6 +36,10 @@ from ev.infrastructure.web.security import (
 
 DEFAULT_PORT = 8765
 LOOPBACK = "127.0.0.1"
+ABANDONED_AFTER = 120.0
+"""How long a turn waits for an answer it was promised. A page that closed
+mid-question must not park a turn forever, and a turn nobody answers is
+declined -- silence is not consent here either."""
 
 Handler = Callable[[str], Awaitable[ToolResult | Clarification | None]]
 Transcriber = Callable[[Path, str], Awaitable[str]]
@@ -48,6 +54,47 @@ def _outcome(result: ToolResult | Clarification | None) -> dict[str, Any]:
     return {"outcome": "ran", **json.loads(result.model_dump_json())}
 
 
+class Asked:
+    """One turn, parked mid-way because it needs an answer.
+
+    HTTP has no way to hold a question open and keep talking, so the turn runs
+    as a task: `/api/turn` returns either its outcome or its first question,
+    and `/api/confirm` resumes it. The turn itself is unaware -- it is awaiting
+    a confirmation port exactly as it does on the socket.
+    """
+
+    def __init__(self, task: asyncio.Task[Any]) -> None:
+        self.task = task
+        self.questions: asyncio.Queue[ConfirmationRequest] = asyncio.Queue()
+        self.answers: asyncio.Queue[bool] = asyncio.Queue()
+
+    async def confirm(self, request: ConfirmationRequest) -> bool:
+        await self.questions.put(request)
+        try:
+            return await asyncio.wait_for(self.answers.get(), ABANDONED_AFTER)
+        except (TimeoutError, asyncio.CancelledError):
+            return False
+
+    async def next_step(self) -> dict[str, Any]:
+        """Whichever comes first: a question, or the end of the turn."""
+        question = asyncio.ensure_future(self.questions.get())
+        done, _ = await asyncio.wait(
+            {question, self.task}, return_when=asyncio.FIRST_COMPLETED
+        )
+
+        if question in done:
+            asked = question.result()
+            return {
+                "outcome": "confirm",
+                "tool": asked.tool,
+                "risk": asked.risk.value,
+                "arguments": dict(asked.arguments),
+            }
+
+        question.cancel()
+        return _outcome(self.task.result())
+
+
 class WebSurface:
     def __init__(
         self,
@@ -58,15 +105,21 @@ class WebSurface:
         transcribe: Transcriber | None = None,
         assets: Path | None = None,
         port: int = DEFAULT_PORT,
+        confirmation: Any | None = None,
+        turn_lock: asyncio.Lock | None = None,
     ) -> None:
         self._state_dir = state_dir
         self._handle = handle
+        # Shared with the socket: one core, one turn at a time, one person
+        # being asked.
+        self._confirmation = confirmation
         self._history = history
         self._transcribe = transcribe
         self._assets = assets
         self._port = port
         self._token = ""
-        self._turn = asyncio.Lock()
+        self._turn = turn_lock or asyncio.Lock()
+        self._parked: Asked | None = None
         self._runner: web.AppRunner | None = None
 
     @property
@@ -84,6 +137,7 @@ class WebSurface:
 
         app = web.Application(middlewares=[self._guard])
         app.router.add_post("/api/turn", self._turn_route)
+        app.router.add_post("/api/confirm", self._confirm_route)
         app.router.add_post("/api/audio", self._audio_route)
         app.router.add_get("/api/history", self._history_route)
 
@@ -135,9 +189,57 @@ class WebSurface:
         if not text:
             raise web.HTTPBadRequest(text="nothing to do")
 
-        async with self._turn:
-            outcome = await self._handle(text)
-        return web.json_response(_outcome(outcome))
+        return web.json_response(await self._begin(text))
+
+    async def _begin(self, text: str) -> dict[str, Any]:
+        """Run a turn until it finishes or asks something."""
+        await self._abandon()
+        await self._turn.acquire()
+
+        parked = Asked(asyncio.ensure_future(self._handle(text)))
+        self._parked = parked
+        if self._confirmation is not None:
+            self._confirmation.bind(parked)
+
+        step = await parked.next_step()
+        if step["outcome"] != "confirm":
+            self._release()
+        return step
+
+    async def _confirm_route(self, request: web.Request) -> web.StreamResponse:
+        parked = self._parked
+        if parked is None:
+            raise web.HTTPConflict(text="nothing is waiting on an answer")
+
+        body = await request.json()
+        await parked.answers.put(bool(body.get("granted")))
+
+        step = await parked.next_step()
+        if step["outcome"] != "confirm":
+            self._release()
+        return web.json_response(step)
+
+    def _release(self) -> None:
+        if self._confirmation is not None:
+            self._confirmation.bind(None)
+        self._parked = None
+        if self._turn.locked():
+            self._turn.release()
+
+    async def _abandon(self) -> None:
+        """A previous turn still waiting on an answer nobody gave.
+
+        Cancelling it declines the question, which is the same answer a closed
+        socket and an empty pipe get.
+        """
+        parked = self._parked
+        if parked is None:
+            return
+
+        parked.task.cancel()
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await parked.task
+        self._release()
 
     async def _audio_route(self, request: web.Request) -> web.StreamResponse:
         if self._transcribe is None:
@@ -163,10 +265,7 @@ class WebSurface:
             # A recording of someone's voice does not outlive the sentence.
             path.unlink(missing_ok=True)
 
-        async with self._turn:
-            outcome = await self._handle(said)
-
-        return web.json_response({"heard": said, **_outcome(outcome)})
+        return web.json_response({"heard": said, **await self._begin(said)})
 
     async def _history_route(self, request: web.Request) -> web.StreamResponse:
         if self._history is None:

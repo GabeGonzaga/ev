@@ -11,9 +11,13 @@ export interface TurnResult {
   heard?: string | null;
   spoken?: string[];
   ok?: boolean;
-  outcome: "ran" | "unsure" | "not_understood" | string;
+  outcome: "ran" | "unsure" | "not_understood" | "confirm" | string;
   speech?: string | null;
   error?: string | null;
+  // Present only when outcome is "confirm": the turn is parked, waiting.
+  tool?: string;
+  risk?: string;
+  arguments?: Record<string, unknown>;
 }
 
 const inTauri = "__TAURI_INTERNALS__" in window;
@@ -86,3 +90,13 @@ export const setLocale = (locale: string | null) =>
   inTauri ? callTauri<void>("set_locale", { locale }) : Promise.resolve();
 
 export const canRecordHere = !inTauri;
+
+/// Answering a question the core asked mid-turn. The page decides nothing on
+/// the user's behalf: this only carries what they clicked.
+export const confirm = (granted: boolean) =>
+  inTauri
+    ? callTauri<TurnResult>("confirm", { granted })
+    : http<TurnResult>("/api/confirm", {
+        method: "POST",
+        body: JSON.stringify({ granted }),
+      });
