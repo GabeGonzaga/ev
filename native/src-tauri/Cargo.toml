@@ -18,6 +18,10 @@ tauri-build = { version = "2.6.3", features = [] }
 # than written twice. Capture lives in the app because TCC attributes a
 # permission to the app, not to a helper it launches (ADR 0019).
 ev-host = { path = "../host" }
+# One call: SIGTERM to the daemon the app started, so its journal flushes.
+# std's Child::kill is SIGKILL, which would take the last few turns with it,
+# and libc::kill is unsafe -- which this crate forbids.
+nix = { version = "0.31.3", features = ["signal"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tauri = { version = "2.11.3", features = ["tray-icon"] }

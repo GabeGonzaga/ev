@@ -8,11 +8,12 @@
 //! permission to the app (ADR 0019), and because a menu bar is a place to
 //! show state that a terminal has nowhere to put.
 
+mod daemon;
 mod settings;
 
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Sender};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use ev_host::client::Client;
@@ -357,6 +358,18 @@ fn reveal(window: &WebviewWindow) {
 pub fn run() {
     let saved = settings::load();
 
+    // Before the window, before the tray: everything the app does is a
+    // conversation with the core, and the core is now the app's own child --
+    // which is what makes macOS attribute its Apple Events to E.V. rather
+    // than to whatever terminal used to start it (ADR 0031).
+    let core = Arc::new(Mutex::new(daemon::ensure(&socket())));
+    eprintln!(
+        "{}",
+        core.lock().map(|it| it.describe()).unwrap_or_default()
+    );
+
+    let ending = core.clone();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(Session {
@@ -384,7 +397,10 @@ pub fn run() {
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().cloned().ok_or("no icon")?)
                 .menu(&menu)
-                .tooltip("E.V.")
+                .tooltip(format!(
+                    "E.V.\n{}",
+                    core.lock().map(|it| it.describe()).unwrap_or_default()
+                ))
                 .on_menu_event(|app: &AppHandle, event| match event.id().as_ref() {
                     "show" => {
                         if let Some(window) = app.get_webview_window("panel") {
@@ -421,6 +437,15 @@ pub fn run() {
                 let _ = window.hide();
             }
         })
-        .run(tauri::generate_context!())
-        .expect("the app failed to start");
+        .build(tauri::generate_context!())
+        .expect("the app failed to start")
+        .run(move |_app, event| {
+            // What the app started, the app stops. An adopted daemon --
+            // someone's terminal, watching it -- is left running.
+            if matches!(event, tauri::RunEvent::Exit) {
+                if let Ok(mut state) = ending.lock() {
+                    daemon::stop(&mut state);
+                }
+            }
+        });
 }

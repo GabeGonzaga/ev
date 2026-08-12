@@ -95,10 +95,13 @@ people actually use; the misses were transcription writing "github dot com" or
 E.V.'s own policy rather than by macOS -- no `permissions.json`, so it denied
 before asking, exactly as ADR 0003 describes.
 
-Correction worth carrying: the app bundle does **not** make Apple Events
-attributable to E.V. `music.play` runs in the daemon, which spawns `osascript`,
-so the TCC subject is whatever launched the daemon. That only changes when the
-daemon is bundled as the app's sidecar.
+Correction worth carrying, now acted on: the app bundle does not by itself
+make Apple Events attributable to E.V. `music.play` runs in the daemon, which
+spawns `osascript`, so the TCC subject is whatever launched the daemon --
+a terminal, until ADR 0031 made the app start it. Started from the app, the
+responsible process is `EV.app`; started from a terminal and adopted, it is
+still the terminal, and that is worth knowing when a prompt names the wrong
+thing.
 
 Closed: tool responses are composed in the language of the request. A phrasebook
 per locale, looked up rather than generated, because these lines are written by
@@ -114,6 +117,7 @@ nothing.
 | Tauri shell: menu bar, panel, four commands | done |
 | History in the panel, searchable | done |
 | A global hotkey: hold to talk, anywhere | done, unproven on device |
+| The app spawns the daemon and owns its lifetime | done, unproven on device |
 | Settings: the shortcut and the locale, remembered | done |
 | Confirmation in the browser page, sharing the core's turn lock | done |
 | Confirmation in the Tauri panel | done |
