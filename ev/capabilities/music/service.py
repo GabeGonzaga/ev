@@ -14,12 +14,18 @@ import re
 from ev.capabilities.music.adapters import MusicAdapter
 from ev.capabilities.music.args import ControlArgs, PlayArgs, VolumeArgs
 from ev.domain.results import ToolErrorCode, ToolResult
+from ev.infrastructure.macos.applescript import AppleScriptError
 
 PLAY = "music.play"
 CONTROL = "music.control"
 VOLUME = "music.volume"
 
 _NOISE = re.compile(r"[^\w]+", re.UNICODE)
+
+NOT_FOUND = "nothing in the library matches"
+"""What the album and track scripts say when a name is not in the library.
+Matched here so a miss can be turned into something useful rather than
+repeated back at the user."""
 
 SPOKEN = {
     "pause": "Paused",
@@ -73,7 +79,10 @@ class MusicService:
             return await self._playlist(args.name)
 
         if args.kind == "album":
-            started_at = await self._adapter.play_album(args.name)
+            try:
+                started_at = await self._adapter.play_album(args.name)
+            except AppleScriptError as error:
+                return await self._not_an_album(args.name, error)
             # An album plays through now: E.V. builds its own playlist, which
             # is the only thing Music will play in order. Saying where it
             # started is still honest -- the queue begins somewhere.
@@ -86,11 +95,44 @@ class MusicService:
                 speech=speech,
             )
 
-        started_at = await self._adapter.play_track(args.name)
+        try:
+            started_at = await self._adapter.play_track(args.name)
+        except AppleScriptError as error:
+            return await self._not_an_album(args.name, error)
+
         return ToolResult.success(
             PLAY,
             data={"name": args.name, "kind": "track", "started_at": started_at},
             speech=f"Playing {args.name}",
+        )
+
+    async def _not_an_album(self, spoken: str, error: AppleScriptError) -> ToolResult:
+        """Nothing by that name -- but the name may be a playlist.
+
+        This is the case that actually happened: a playlist called
+        `Indie kid??`, asked for as an album, answered with "nothing in the
+        library matches Indie Kid" while the thing sat in the sidebar. When
+        exactly one playlist matches and no album does, there is no second
+        reading to guess between, so it plays -- and says which, so a wrong
+        guess is visible rather than silent.
+        """
+        if NOT_FOUND not in str(error):
+            raise error
+
+        name = closest(spoken, await self._adapter.playlists())
+        if name is None:
+            return ToolResult.failure(PLAY, ToolErrorCode.ADAPTER_FAILED, str(error))
+
+        started_at = await self._adapter.play_playlist(name)
+        return ToolResult.success(
+            PLAY,
+            data={
+                "name": name,
+                "kind": "playlist",
+                "started_at": started_at,
+                "asked_for": spoken,
+            },
+            speech=f"No album called {spoken}. Playing the playlist {name}",
         )
 
     async def _playlist(self, spoken: str) -> ToolResult:

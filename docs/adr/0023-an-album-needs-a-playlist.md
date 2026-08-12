@@ -58,6 +58,19 @@ what is there.
 honest: five names for five verbs on the same object would make the manifest
 longer without making anything clearer.
 
+**A name that is not an album, but is a playlist, plays.** Reported straight
+after the controls landed: `toca ... Indie kid` answered "nothing in the
+library matches Indie Kid" while `Indie kid??` sat in the sidebar. Nothing in
+the library has that album, so there is no second reading to guess between --
+one playlist matches and nothing else does. It plays, and it says so:
+*"No album called Indie Kid. Playing the playlist Indie kid??"*. A wrong guess
+should be audible rather than silent.
+
+The fallback is narrow on purpose. Two plausible playlists is a guess and is
+refused. And it only triggers on "nothing in the library matches": a refused
+Apple Event is a permission problem, not a missing album, and must not be
+turned into playing something else.
+
 ## Consequences
 
 `E.V. queue` appears in the user's sidebar the first time an album is played,
