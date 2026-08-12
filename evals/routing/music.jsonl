@@ -26,3 +26,13 @@
 {"id": "volume-set", "locale": "pt-PT", "utterance": "põe o volume a 40", "tool": "music.volume", "arguments": {"level": 40}}
 {"id": "escalate-impossible-volume", "locale": "en", "utterance": "volume 900", "tool": null, "arguments": {}}
 {"id": "escalate-impossible-volume", "locale": "pt-PT", "utterance": "volume 900", "tool": null, "arguments": {}}
+{"id": "control-play-means-resume", "locale": "en", "utterance": "play", "tool": "music.control", "arguments": {"action": "resume"}}
+{"id": "control-play-means-resume", "locale": "pt-PT", "utterance": "continua", "tool": "music.control", "arguments": {"action": "resume"}}
+{"id": "control-skip-this", "locale": "en", "utterance": "skip this song", "tool": "music.control", "arguments": {"action": "next"}}
+{"id": "control-skip-this", "locale": "pt-PT", "utterance": "salta esta música", "tool": "music.control", "arguments": {"action": "next"}}
+{"id": "volume-louder", "locale": "en", "utterance": "turn it up", "tool": "music.volume", "arguments": {"change": "up"}}
+{"id": "volume-louder", "locale": "pt-PT", "utterance": "mais alto", "tool": "music.volume", "arguments": {"change": "up"}}
+{"id": "volume-quieter", "locale": "en", "utterance": "turn the volume down", "tool": "music.volume", "arguments": {"change": "down"}}
+{"id": "volume-quieter", "locale": "pt-PT", "utterance": "baixa o volume", "tool": "music.volume", "arguments": {"change": "down"}}
+{"id": "volume-mute", "locale": "en", "utterance": "mute", "tool": "music.volume", "arguments": {"change": "mute"}}
+{"id": "volume-mute", "locale": "pt-PT", "utterance": "silencia", "tool": "music.volume", "arguments": {"change": "mute"}}

@@ -100,6 +100,24 @@ VOLUME: Final = """on run argv
 	end tell
 end run"""
 
+STEP: Final = """on run argv
+	set theStep to (item 1 of argv) as integer
+	tell application "Music"
+		set wanted to (sound volume) + theStep
+		if wanted > 100 then set wanted to 100
+		if wanted < 0 then set wanted to 0
+		set sound volume to wanted
+		return (sound volume as text)
+	end tell
+end run"""
+
+MUTE: Final = """on run argv
+	tell application "Music"
+		set mute to (item 1 of argv is "true")
+		return (sound volume as text)
+	end tell
+end run"""
+
 
 class MusicAdapter:
     def __init__(self, applescript: AppleScriptClient) -> None:
@@ -126,3 +144,14 @@ class MusicAdapter:
 
     async def volume(self, level: int) -> str:
         return await self._applescript.run(VOLUME, str(level))
+
+    async def step(self, by: int) -> str:
+        """Relative, and clamped by Music rather than by guessing what it is
+        set to now: reading and then writing would race with the person
+        holding the volume key."""
+        return await self._applescript.run(STEP, str(by))
+
+    async def mute(self, silent: bool) -> str:
+        """Music's own mute, so unmuting restores the level rather than
+        inventing one."""
+        return await self._applescript.run(MUTE, "true" if silent else "false")

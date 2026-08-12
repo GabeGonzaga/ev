@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 
 from ev.capabilities.music.adapters import MusicAdapter
-from ev.capabilities.music.args import ControlArgs, PlayArgs, VolumeArgs
+from ev.capabilities.music.args import STEP, ControlArgs, PlayArgs, VolumeArgs
 from ev.domain.results import ToolErrorCode, ToolResult
 from ev.infrastructure.macos.applescript import AppleScriptError
 
@@ -172,7 +172,24 @@ class MusicService:
         )
 
     async def volume(self, args: VolumeArgs) -> ToolResult:
-        level = await self._adapter.volume(args.level)
+        if args.level is not None:
+            now = await self._adapter.volume(args.level)
+        elif args.change == "up":
+            now = await self._adapter.step(STEP)
+        elif args.change == "down":
+            now = await self._adapter.step(-STEP)
+        else:
+            now = await self._adapter.mute(args.change == "mute")
+
+        if args.change in {"mute", "unmute"}:
+            return ToolResult.success(
+                VOLUME,
+                data={"change": args.change},
+                speech="Muted" if args.change == "mute" else "Sound back on",
+            )
+
         return ToolResult.success(
-            VOLUME, data={"level": args.level}, speech=f"Volume {level or args.level}"
+            VOLUME,
+            data={"level": now or args.level, "change": args.change},
+            speech=f"Volume {now}" if now else "Volume set",
         )

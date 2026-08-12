@@ -159,6 +159,10 @@ _ACTIONS = {
     "pause": "pause",
     "resume": "resume",
     "continue": "resume",
+    # Every music app's play button means resume. `music.play` needs a name,
+    # so a bare "play" cannot be asking for one.
+    "play": "resume",
+    "keep going": "resume",
     "next": "next",
     "skip": "next",
     "previous": "previous",
@@ -185,6 +189,39 @@ _ACTION = "|".join(sorted(_ACTIONS, key=len, reverse=True))
 def _control(groups: Mapping[str, str]) -> dict[str, object] | None:
     action = _ACTIONS.get(groups["action"].casefold())
     return None if action is None else {"action": action}
+
+
+_CHANGES = {
+    # English
+    "up": "up",
+    "louder": "up",
+    "turn it up": "up",
+    "volume up": "up",
+    "down": "down",
+    "quieter": "down",
+    "turn it down": "down",
+    "volume down": "down",
+    "lower": "down",
+    "mute": "mute",
+    "silence": "mute",
+    "unmute": "unmute",
+    # Portuguese
+    "mais alto": "up",
+    "aumenta": "up",
+    "aumenta o volume": "up",
+    "mais baixo": "down",
+    "baixa": "down",
+    "baixa o volume": "down",
+    "silencia": "mute",
+    "sem som": "mute",
+    "com som": "unmute",
+}
+_CHANGE = "|".join(sorted(_CHANGES, key=len, reverse=True))
+
+
+def _step(groups: Mapping[str, str]) -> dict[str, object] | None:
+    change = _CHANGES.get(groups["change"].casefold())
+    return None if change is None else {"change": change}
 
 
 def _volume(groups: Mapping[str, str]) -> dict[str, object] | None:
@@ -240,14 +277,21 @@ RULES: tuple[Rule, ...] = (
     _rule(
         "music.control",
         rf"^(?:please\s+|por\s+favor\s+)?(?P<action>{_ACTION})"
-        rf"(?:\s+(?:the\s+|a\s+|o\s+)?(?:music|song|track|música|musica|"
-        rf"canção|cancao))?$",
+        rf"(?:\s+(?:the\s+|this\s+|that\s+|a\s+|o\s+|esta\s+|esa\s+)?"
+        rf"(?:music|song|track|música|musica|canção|cancao))?$",
         _control,
     ),
     _rule(
         "music.volume",
         r"^(?:set\s+)?(?:the\s+)?volume\s+(?:to\s+)?(?P<level>\d{1,3})$",
         _volume,
+    ),
+    # Relative, because nobody says "set the volume to 60" out loud.
+    _rule(
+        "music.volume",
+        rf"^(?:please\s+|por\s+favor\s+)?(?:turn\s+(?:it|the\s+volume)\s+)?"
+        rf"(?P<change>{_CHANGE})(?:\s+(?:o\s+)?volume)?$",
+        _step,
     ),
     _rule(
         "music.volume",

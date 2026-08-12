@@ -420,3 +420,62 @@ async def test_a_real_failure_is_not_swallowed_by_the_fallback() -> None:
     # one -- nor turned into playing something else.
     with pytest.raises(AppleScriptError, match="Not authorized"):
         await service.play(PlayArgs(name="Blonde", kind="album"))
+
+
+# --- volume, relative and absolute ----------------------------------------
+
+
+def test_a_volume_is_a_level_or_a_change_and_not_both() -> None:
+    # "Set it to 40 and also turn it up" is not a request, and a model sending
+    # both should be corrected rather than obeyed in some order.
+    with pytest.raises(ValidationError):
+        VolumeArgs.model_validate({"level": 40, "change": "up"})
+
+    with pytest.raises(ValidationError):
+        VolumeArgs.model_validate({})
+
+
+@pytest.mark.asyncio
+async def test_louder_steps_rather_than_setting(fake_bin: FakeBin) -> None:
+    # Reading the volume and then writing it back would race with whoever is
+    # holding the volume key. Music does the arithmetic and the clamping.
+    await MusicAdapter(AppleScriptClient(ProcessRunner())).step(10)
+
+    source = fake_bin.argv()[1]
+    assert "(sound volume) + theStep" in source
+    assert "if wanted > 100 then set wanted to 100" in source
+    assert fake_bin.argv()[-1] == "10"
+
+
+@pytest.mark.asyncio
+async def test_mute_uses_musics_own_mute(fake_bin: FakeBin) -> None:
+    # Not "volume 0": unmuting should restore the level the person chose, not
+    # a number E.V. invented.
+    await MusicAdapter(AppleScriptClient(ProcessRunner())).mute(True)
+
+    assert "set mute to" in fake_bin.argv()[1]
+    assert fake_bin.argv()[-1] == "true"
+
+
+@pytest.mark.asyncio
+async def test_the_spoken_answer_names_the_new_volume(
+    fake_bin: FakeBin, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("EV_FAKE_STDOUT", "60")
+    registry, _ = build(granted=True)
+
+    result = await registry.call("music.volume", {"change": "up"})
+
+    assert result.speech == "Volume 60"
+
+
+@pytest.mark.asyncio
+async def test_muting_says_so_rather_than_naming_a_number(
+    fake_bin: FakeBin, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("EV_FAKE_STDOUT", "60")
+    registry, _ = build(granted=True)
+
+    result = await registry.call("music.volume", {"change": "mute"})
+
+    assert result.speech == "Muted"
