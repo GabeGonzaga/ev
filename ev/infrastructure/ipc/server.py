@@ -32,7 +32,7 @@ from typing import Any, Protocol
 from pydantic import ValidationError
 
 from ev.application.confirmation import ConfirmationRequest, satisfiable
-from ev.domain.access import AccessLevel
+from ev.domain.access import AccessLevel, Assurance
 from ev.domain.journal import JournalEntry
 from ev.domain.permissions import Permission, PermissionState
 from ev.domain.results import Clarification, ToolResult
@@ -175,6 +175,13 @@ class Asker(Protocol):
     async def confirm(self, request: ConfirmationRequest) -> bool: ...
 
 
+Verified = Callable[[str], None]
+"""Told when the owner has just proved who they are, for one application.
+
+The surface knows: it asked for `owner` and got a yes back, and only macOS
+could have produced that yes. The policy is what does something with it."""
+
+
 class SessionConfirmation:
     """The registry's confirmation port, pointed at whoever asked.
 
@@ -184,18 +191,38 @@ class SessionConfirmation:
     enough. Unbound, it declines -- nobody is there to answer.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, verified: Verified | None = None) -> None:
         self._asker: Asker | None = None
+        self._verified = verified
 
     def bind(self, asker: Asker | None) -> None:
         self._asker = asker
+
+    def observe(self, verified: Verified) -> None:
+        """Where verifications are reported. Set once, at startup: the ledger
+        does not exist yet when this port is built."""
+        self._verified = verified
 
     async def confirm(self, request: ConfirmationRequest) -> bool:
         if self._asker is None:
             return False
         if not satisfiable(request, self._asker):
             return False
-        return await self._asker.confirm(request)
+
+        granted = await self._asker.confirm(request)
+
+        # A yes to `owner` came from macOS, not from a button, so it opens a
+        # short window for this application (ADR 0035). `owner_and_password`
+        # opens nothing: what needs both is what should be asked every time.
+        if (
+            granted
+            and request.assurance is Assurance.OWNER
+            and request.application
+            and self._verified is not None
+        ):
+            self._verified(request.application)
+
+        return granted
 
 
 Handler = Callable[..., Awaitable[ToolResult | Clarification | None]]

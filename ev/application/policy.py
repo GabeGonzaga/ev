@@ -256,7 +256,21 @@ class PermissionPolicy:
         # each set a minimum and the stronger wins. An application the user
         # trusts does not make emptying the Trash reversible, and a harmless
         # tool does not get a pass into a locked application.
-        assurance = strongest(FROM_LEVEL[level], FROM_RISK[spec.risk], spec.assurance)
+        from_level = FROM_LEVEL[level]
+        if (
+            from_level is Assurance.OWNER
+            and application
+            and self._applications.recently_verified(application)
+        ):
+            # Verified a moment ago, for this application. Asking again is not
+            # more security, it is the same answer at a worse moment.
+            #
+            # Only `owner`. The strongest level is for what cannot be undone,
+            # and "I did this five minutes ago" is not a reason to skip asking
+            # about something irreversible.
+            from_level = Assurance.NONE
+
+        assurance = strongest(from_level, FROM_RISK[spec.risk], spec.assurance)
 
         destructive = _ORDER[spec.risk] >= _ORDER[self._confirm_at]
         if destructive:

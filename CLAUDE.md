@@ -110,7 +110,9 @@ enables.
    the user allowed**: `open`, `ask`, `verify`, `blocked`. Unknown means `ask`.
    The level and the tool's risk are both floors and the stronger wins. A
    surface that cannot satisfy what was asked for — a terminal, a browser page
-   — declines rather than substituting a weaker yes (ADR 0033).
+   — declines rather than substituting a weaker yes (ADR 0033). One `verify`
+   covers five minutes for that application; the strongest tier covers
+   nothing and is asked every time (ADR 0035).
 
 ### Data
 

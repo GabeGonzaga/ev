@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
 from pydantic import BaseModel, ConfigDict
 
 from ev.application.applications import (
+    VERIFIED_FOR,
     ApplicationLedger,
     applications_path,
     load_levels,
@@ -250,3 +252,70 @@ def test_a_click_does_not_answer_a_password() -> None:
 def test_only_a_surface_that_can_verify_may_answer_verify() -> None:
     assert satisfiable(request(Assurance.OWNER), SignedApp())
     assert satisfiable(request(Assurance.OWNER_AND_PASSWORD), SignedApp())
+
+
+# --- one verification covers a burst --------------------------------------
+
+
+def test_a_verification_covers_the_next_few_minutes() -> None:
+    """The complaint this fixes.
+
+    Music at `verify` asked for a fingerprint to play an album, again to skip
+    a track, again to pause. Three prompts for one intent teaches people to
+    authenticate without reading, which is the habit the prompt exists to
+    interrupt.
+    """
+    ledger = ApplicationLedger({"music": AccessLevel.VERIFY})
+    guarded = PermissionPolicy(
+        PermissionLedger({Permission.APPLE_EVENTS: PermissionState.GRANTED}),
+        applications=ledger,
+    )
+
+    assert guarded.decide(spec(), "Music").assurance is Assurance.OWNER
+
+    ledger.verified("Music")
+
+    assert guarded.decide(spec(), "Music").decision is PolicyDecision.ALLOW
+
+
+def test_the_window_closes(monkeypatch: pytest.MonkeyPatch) -> None:
+    # A window, not a session: it does not renew on use, so a long afternoon
+    # is a fresh prompt every five minutes rather than one at the start.
+    ledger = ApplicationLedger({"music": AccessLevel.VERIFY})
+    ledger.verified("Music", at=datetime.now() - VERIFIED_FOR - timedelta(seconds=1))
+
+    assert not ledger.recently_verified("Music")
+
+
+def test_a_window_covers_one_application_only() -> None:
+    ledger = ApplicationLedger(
+        {"music": AccessLevel.VERIFY, "mail": AccessLevel.VERIFY}
+    )
+    ledger.verified("Music")
+
+    assert ledger.recently_verified("Music")
+    assert not ledger.recently_verified("Mail")
+
+
+def test_the_strongest_level_is_asked_every_time() -> None:
+    """What needs both factors is what cannot be undone.
+
+    "I did this five minutes ago" is not a reason to skip asking about
+    something irreversible, so the window does not apply.
+    """
+    ledger = ApplicationLedger({"messages": AccessLevel.OPEN})
+    ledger.verified("Messages")
+    guarded = PermissionPolicy(PermissionLedger(), applications=ledger)
+
+    verdict = guarded.decide(spec(assurance=Assurance.OWNER_AND_PASSWORD), "Messages")
+
+    assert verdict.assurance is Assurance.OWNER_AND_PASSWORD
+
+
+def test_changing_a_level_closes_any_window_under_the_old_one() -> None:
+    ledger = ApplicationLedger({"music": AccessLevel.VERIFY})
+    ledger.verified("Music")
+
+    ledger.remember("Music", AccessLevel.VERIFY)
+
+    assert not ledger.recently_verified("Music")

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Mapping
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from ev.domain.access import AccessLevel
@@ -26,6 +27,20 @@ APPLICATIONS_FILE = "applications.json"
 
 DEFAULT = AccessLevel.ASK
 """What an application nobody has decided about gets."""
+
+VERIFIED_FOR = timedelta(minutes=5)
+"""How long one verification covers, for the same application.
+
+`verify` means "prove it is you", not "prove it is you once per keystroke".
+Playing an album, skipping a track and pausing it are one intent, and asking
+three times for a fingerprint teaches people to authenticate without reading,
+which is the habit the prompt exists to interrupt.
+
+Five minutes is `sudo`'s figure and the ceiling macOS itself puts on reusing a
+recent Touch ID. It is a window, not a session: it does not renew on use, so a
+long afternoon of asking is a fresh prompt every five minutes rather than one
+at the start.
+"""
 
 
 def applications_path(state_dir: Path) -> Path:
@@ -118,6 +133,9 @@ class ApplicationLedger:
         self._default = default
         self._refresh = refresh
         self._persist = persist
+        # In memory only, and per application. A window that survived a
+        # restart would be a window nobody watched open.
+        self._verified: dict[str, datetime] = {}
 
     def _reload(self) -> None:
         if self._refresh is None:
@@ -139,10 +157,26 @@ class ApplicationLedger:
         self._reload()
         return self._levels.get(key(application), self._default)
 
+    def verified(self, application: str, at: datetime | None = None) -> None:
+        """The owner just proved who they are, for this application."""
+        self._verified[key(application)] = at or datetime.now()
+
+    def recently_verified(self, application: str, now: datetime | None = None) -> bool:
+        when = self._verified.get(key(application))
+        if when is None:
+            return False
+        return (now or datetime.now()) - when < VERIFIED_FOR
+
+    def forget_verification(self, application: str) -> None:
+        """Used when a level changes: a window opened under the old level says
+        nothing about the new one."""
+        self._verified.pop(key(application), None)
+
     def remember(self, application: str, level: AccessLevel) -> None:
         """Write down an answer the user just gave."""
         self._reload()
         self._levels[key(application)] = level
+        self.forget_verification(application)
         if self._persist is not None:
             self._persist(self._levels)
 

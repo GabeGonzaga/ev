@@ -22,7 +22,7 @@ import json
 import signal
 import sqlite3
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -115,8 +115,11 @@ class ConsoleConfirmation:
     not be approved by a pipe that happened to be empty.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self, remember: Callable[[str, AccessLevel], None] | None = None
+    ) -> None:
         self._interactive = sys.stdin.isatty()
+        self._remember = remember
 
     async def confirm(self, request: ConfirmationRequest) -> bool:
         detail = ", ".join(f"{key}={value}" for key, value in request.arguments.items())
@@ -141,7 +144,23 @@ class ConsoleConfirmation:
 
         # input() blocks the loop, which is correct here: there is nothing else
         # for E.V. to do while it waits for the person in front of it.
-        return input("run it? [y/N] ").strip().casefold() in {"y", "yes", "s", "sim"}
+        prompt = "run it? [y]es / [n]o"
+        if request.application:
+            prompt += " / [a]lways / ne[v]er"
+        answered = input(f"{prompt} ").strip().casefold()
+
+        if request.application and self._remember is not None:
+            # The terminal could only ever say yes or no, so the only way to
+            # stop being asked was to go and edit a file. "Always" and "never"
+            # belong wherever the question is put.
+            if answered in {"a", "always", "sempre"}:
+                self._remember(request.application, AccessLevel.OPEN)
+                return True
+            if answered in {"v", "never", "nunca"}:
+                self._remember(request.application, AccessLevel.BLOCKED)
+                return False
+
+        return answered in {"y", "yes", "s", "sim"}
 
 
 class _NoVision:
@@ -306,7 +325,7 @@ def build(
         eyes = _NoVision()
     registry = build_registry(
         journal=journal,
-        confirmation=confirmation or ConsoleConfirmation(),
+        confirmation=confirmation or ConsoleConfirmation(access.remember),
         ledger=ledger,
         access=access,
         generation=generation_model,
@@ -768,11 +787,14 @@ async def serve(
     The registry is built once and outlives every client, so its confirmation
     port follows whoever is currently asking rather than being a terminal.
     """
+    # Built before the application, and told where to report a verification
+    # once there is somewhere to report it to.
     confirmation = SessionConfirmation()
     turns = asyncio.Lock()
     application = build(
         database=database, confirmation=confirmation, model=model, completion=completion
     )
+    confirmation.observe(application.access.verified)
     # The recogniser is spawned per utterance rather than held resident:
     # CLAUDE.md does not hold the LLM and the STT model in memory at once, and
     # the measured cost of that choice is in the latency table.
