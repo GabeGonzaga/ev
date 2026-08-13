@@ -78,8 +78,8 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
   --page: #060b14;
-  --panel: rgba(var(--accent), 0.045);
-  --panel-edge: rgba(var(--accent), 0.32);
+  --panel: rgba(var(--accent), 0.03);
+  --panel-edge: rgba(var(--accent), 0.22);
   --panel-lit: rgba(var(--accent), 0.75);
   --field: rgba(4, 10, 18, 0.55);
   --text: #e8f4ff;
@@ -92,7 +92,7 @@
      accent taken towards ink instead. */
   --ink: rgb(var(--accent-lit));
   --glow: 0 0 18px rgba(var(--accent), 0.35);
-  --grid: rgba(var(--accent), 0.13);
+  --grid: rgba(var(--accent), 0.09);
   --ok: #46d39a;
   --bad: #ff6b6b;
   --live: #ff4d4d;
@@ -116,7 +116,7 @@
   --ink: color-mix(in srgb, rgb(var(--accent)) 72%, #04121c);
   /* A shadow rather than a glow: light does not read as light on white. */
   --glow: 0 2px 14px rgba(var(--accent), 0.28);
-  --grid: rgba(var(--accent), 0.1);
+  --grid: rgba(var(--accent), 0.08);
   --ok: #0f8a5f;
   --bad: #c92a2a;
   --live: #e03131;
@@ -209,12 +209,14 @@ button {
   background: var(--panel);
   border: 1px solid var(--panel-edge);
   border-radius: var(--radius);
-  padding: 12px 14px;
+  padding: 12px 16px 14px;
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
 
+/* The brackets are the signature, so they are the one thing that stays
+   bright while everything around them quietens down. */
 .hud::before,
 .hud::after {
   content: "";
@@ -222,6 +224,7 @@ button {
   width: var(--bracket);
   height: var(--bracket);
   border: 1px solid var(--panel-lit);
+  opacity: 0.7;
   pointer-events: none;
 }
 
@@ -243,19 +246,12 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   font-family: var(--mono);
   font-size: 9.5px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--faint);
-}
-
-.hud > header::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: linear-gradient(90deg, var(--line), transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {

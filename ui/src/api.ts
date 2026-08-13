@@ -197,6 +197,15 @@ export const canBindKeys = inTauri;
 export const dismiss = () =>
   inTauri ? callTauri<void>("dismiss") : Promise.resolve();
 
+export type WindowAction = "minimise" | "fullscreen" | "close";
+
+/// What the traffic lights would do, drawn by E.V. because the window has no
+/// title bar to hang them from. A browser tab has its own and needs none.
+export const windowControl = (action: WindowAction) =>
+  inTauri ? callTauri<void>("window_control", { action }) : Promise.resolve();
+
+export const hasWindowControls = inTauri;
+
 export async function onQuestion(
   handle: (question: Record<string, unknown>) => void,
 ): Promise<void> {

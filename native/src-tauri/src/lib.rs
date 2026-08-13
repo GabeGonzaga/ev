@@ -461,6 +461,30 @@ fn frost(window: &WebviewWindow) {
     }
 }
 
+/// The three things a macOS window can do to itself.
+///
+/// Drawn by E.V. rather than by the system: the window has no title bar to
+/// hang traffic lights from, and a title bar is the one piece of chrome a
+/// head-up display cannot wear. Closing hides -- E.V. lives in the menu bar,
+/// and the close button is not a quit button.
+#[tauri::command]
+fn window_control(window: WebviewWindow, action: String) -> Result<(), String> {
+    match action.as_str() {
+        "minimise" => window.minimize().map_err(|error| error.to_string()),
+        "fullscreen" => {
+            let full = window.is_fullscreen().map_err(|error| error.to_string())?;
+            // Always-on-top and fullscreen together put the panel over the
+            // menu bar of every other space. It goes back on the way out.
+            let _ = window.set_always_on_top(full);
+            window
+                .set_fullscreen(!full)
+                .map_err(|error| error.to_string())
+        }
+        "close" => window.hide().map_err(|error| error.to_string()),
+        other => Err(format!("no such window action: {other}")),
+    }
+}
+
 /// Put the panel away.
 ///
 /// Escape, and losing focus. Hiding is not answering: a turn waiting on a
@@ -497,6 +521,7 @@ pub fn run() {
             listen,
             confirm,
             dismiss,
+            window_control,
             look,
             history,
             set_locale,

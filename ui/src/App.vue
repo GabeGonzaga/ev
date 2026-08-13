@@ -1,21 +1,24 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { canBindKeys, dismiss, inApp } from "./api";
+import { canBindKeys, dismiss, hasWindowControls, inApp, windowControl } from "./api";
 import HudPanel from "./components/HudPanel.vue";
 import StateDot from "./components/StateDot.vue";
 import TheAnswer from "./components/TheAnswer.vue";
 import TheAppearance from "./components/TheAppearance.vue";
 import TheComposer from "./components/TheComposer.vue";
+import TheConsole from "./components/TheConsole.vue";
 import TheCore from "./components/TheCore.vue";
 import TheHints from "./components/TheHints.vue";
 import TheHistory from "./components/TheHistory.vue";
 import TheQuestion from "./components/TheQuestion.vue";
 import TheSettings from "./components/TheSettings.vue";
 import { useAppearance } from "./stores/appearance";
+import { useLayout } from "./stores/layout";
 import { useSession } from "./stores/session";
 
 const session = useSession();
 const appearance = useAppearance();
+const layout = useLayout();
 const composer = ref<InstanceType<typeof TheComposer> | null>(null);
 
 const quiet = computed(
@@ -57,6 +60,22 @@ onMounted(() => {
   <main :class="{ app: inApp }">
     <!-- The chrome is the handle: there is no title bar to drag. -->
     <header class="chrome" data-drag>
+      <div v-if="hasWindowControls" class="lights">
+        <button class="close" type="button" title="close" @click="windowControl('close')" />
+        <button
+          class="minimise"
+          type="button"
+          title="minimise"
+          @click="windowControl('minimise')"
+        />
+        <button
+          class="full"
+          type="button"
+          title="full screen"
+          @click="windowControl('fullscreen')"
+        />
+      </div>
+
       <span class="mark">E.V.</span>
       <StateDot :state="session.state" />
       <span class="state">{{ session.state }}</span>
@@ -66,7 +85,7 @@ onMounted(() => {
     </header>
 
     <div class="grid">
-      <div class="column stage">
+      <div v-if="layout.focused === null" class="column stage">
         <!-- The middle of the display: a ring that turns while E.V. is doing
              something, with whatever it has to say inside it. -->
         <TheCore :state="session.state">
@@ -89,15 +108,19 @@ onMounted(() => {
       </div>
 
       <div class="column side">
-        <HudPanel label="Trail" class="grows">
+        <HudPanel v-if="layout.shown('Trail')" label="Trail" class="grows">
           <TheHistory />
         </HudPanel>
 
-        <HudPanel label="Settings">
+        <HudPanel v-if="layout.shown('Console')" label="Console" class="grows">
+          <TheConsole />
+        </HudPanel>
+
+        <HudPanel v-if="layout.shown('Settings')" label="Settings">
           <TheSettings />
         </HudPanel>
 
-        <HudPanel label="Appearance">
+        <HudPanel v-if="layout.shown('Appearance')" label="Appearance">
           <TheAppearance />
         </HudPanel>
       </div>
@@ -142,6 +165,38 @@ main:not(.app) {
   border-bottom: 1px solid var(--line);
 }
 
+/* Squared, because everything here is. In the same order macOS uses them,
+   so the muscle memory works. */
+.lights {
+  display: flex;
+  gap: 6px;
+  margin-right: 4px;
+}
+
+.lights button {
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--line);
+  opacity: 0.75;
+  transition: opacity 0.15s, box-shadow 0.15s;
+}
+
+.lights button:hover {
+  opacity: 1;
+}
+
+.lights .close {
+  background: rgba(255, 95, 87, 0.85);
+}
+
+.lights .minimise {
+  background: rgba(255, 189, 46, 0.85);
+}
+
+.lights .full {
+  background: rgba(39, 201, 63, 0.85);
+}
+
 .mark {
   color: var(--ink);
   font-weight: var(--display);
@@ -173,6 +228,12 @@ main:not(.app) {
   flex-direction: column;
   gap: var(--gap);
   min-height: 0;
+}
+
+/* A widget given the floor takes the display, and the grid stops being a
+   grid until it gives it back. */
+.grid:has(.focused) {
+  grid-template-columns: 1fr;
 }
 
 .grows {
