@@ -170,6 +170,7 @@ class Application:
     journal: JournalPort
     connection: sqlite3.Connection | None
     ledger: PermissionLedger
+    access: ApplicationLedger
     settings: OllamaSettings
     speaker: Speaker
     frames: Frames
@@ -329,6 +330,7 @@ def build(
         journal=journal,
         connection=connection,
         ledger=ledger,
+        access=access,
         settings=settings,
         speaker=voice,
         frames=frames,
@@ -826,6 +828,8 @@ async def serve(
         # The host is the only process macOS answers about the microphone and
         # the camera, so it is the only one that can say (invariant 7).
         report=application.ledger.update,
+        # "Always" and "never", from whoever was asked.
+        remember=application.access.remember,
         history=history,
         on_close=application.aclose,
         turn_lock=turns,
@@ -846,6 +850,7 @@ async def serve(
             history=history,
             transcribe=transcribe,
             look=look,
+            remember=application.access.remember,
             assets=Path(__file__).resolve().parents[1] / "ui" / "dist",
             port=web_port,
             # The same confirmation port and the same lock as the socket: one

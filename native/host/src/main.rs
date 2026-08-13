@@ -19,6 +19,7 @@ use std::process::{Command, ExitCode};
 use serde_json::Value;
 
 use ev_host::audio;
+use ev_host::client::Answer;
 use ev_host::client::{Client, Error};
 
 const EXIT_FAILED: u8 = 1;
@@ -35,7 +36,7 @@ fn default_socket() -> PathBuf {
 
 /// Ask on the terminal. Anything other than an explicit yes is a no, and a
 /// stdin that is not a terminal is not consent.
-fn ask(event: &Value) -> bool {
+fn ask(event: &Value) -> Answer {
     let tool = event["tool"].as_str().unwrap_or("?");
     let risk = event["risk"].as_str().unwrap_or("?");
     eprintln!("{tool} ({risk}) {}", event["arguments"]);
@@ -43,13 +44,13 @@ fn ask(event: &Value) -> bool {
     let mut answer = String::new();
     if io::stdin().read_line(&mut answer).unwrap_or(0) == 0 {
         eprintln!("declined: nothing answered");
-        return false;
+        return Answer::once(false);
     }
 
-    matches!(
+    Answer::once(matches!(
         answer.trim().to_lowercase().as_str(),
         "y" | "yes" | "s" | "sim"
-    )
+    ))
 }
 
 /// The pt-PT voice. Without naming her, macOS reads a Portuguese sentence

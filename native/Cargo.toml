@@ -3,7 +3,8 @@
 # is the alternative to keeping two copies honest by hand.
 [workspace]
 resolver = "2"
-members = ["host", "src-tauri"]
+members = [
+    "auth","host", "src-tauri"]
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }

@@ -24,6 +24,7 @@ from typing import Any
 from aiohttp import web
 
 from ev.application.confirmation import ConfirmationRequest, satisfiable
+from ev.domain.access import AccessLevel
 from ev.domain.journal import JournalEntry
 from ev.domain.results import Clarification, ToolResult
 from ev.infrastructure.web.security import (
@@ -52,6 +53,19 @@ Transcriber = Callable[[Path, str], Awaitable[str]]
 History = Callable[[int, int | None, str | None], Awaitable[list[JournalEntry]]]
 
 
+def _asking(request: ConfirmationRequest) -> dict[str, Any]:
+    """A question, as the page receives it. The application and the assurance
+    travel with it: the page decides what it can answer, and what to offer."""
+    return {
+        "outcome": "confirm",
+        "tool": request.tool,
+        "risk": request.risk.value,
+        "arguments": dict(request.arguments),
+        "application": request.application,
+        "assurance": request.assurance.value,
+    }
+
+
 def _outcome(result: ToolResult | Clarification | None) -> dict[str, Any]:
     if result is None:
         return {"outcome": "not_understood"}
@@ -73,6 +87,9 @@ class Asked:
         self.task = task
         self.questions: asyncio.Queue[ConfirmationRequest] = asyncio.Queue()
         self.answers: asyncio.Queue[bool] = asyncio.Queue()
+        self.asked: ConfirmationRequest | None = None
+        """The question waiting to be answered, so an answer that also sets a
+        level can only set it for the application that was asked about."""
 
     verifies = False
     """A page cannot raise macOS's authentication: `getUserMedia` asks in the
@@ -82,6 +99,7 @@ class Asked:
     async def confirm(self, request: ConfirmationRequest) -> bool:
         if not satisfiable(request, self):
             return False
+        self.asked = request
         await self.questions.put(request)
         try:
             return await asyncio.wait_for(self.answers.get(), ABANDONED_AFTER)
@@ -96,13 +114,7 @@ class Asked:
         )
 
         if question in done:
-            asked = question.result()
-            return {
-                "outcome": "confirm",
-                "tool": asked.tool,
-                "risk": asked.risk.value,
-                "arguments": dict(asked.arguments),
-            }
+            return _asking(question.result())
 
         question.cancel()
         return _outcome(self.task.result())
@@ -117,6 +129,7 @@ class WebSurface:
         history: History | None = None,
         transcribe: Transcriber | None = None,
         look: Looker | None = None,
+        remember: Callable[[str, AccessLevel], None] | None = None,
         assets: Path | None = None,
         port: int = DEFAULT_PORT,
         confirmation: Any | None = None,
@@ -130,6 +143,7 @@ class WebSurface:
         self._history = history
         self._transcribe = transcribe
         self._look = look
+        self._remember_level = remember
         self._assets = assets
         self._port = port
         self._token = ""
@@ -263,6 +277,17 @@ class WebSurface:
             raise web.HTTPConflict(text="nothing is waiting on an answer")
 
         body = await request.json()
+        level = body.get("remember")
+        # "Always" and "never" are answers about the application, not about
+        # this call, and the application comes from the question -- never from
+        # the answer, which is the shape of every confused-deputy bug there is.
+        if (
+            level is not None
+            and parked.asked is not None
+            and parked.asked.application
+            and self._remember_level is not None
+        ):
+            self._remember_level(parked.asked.application, AccessLevel(str(level)))
         await parked.answers.put(bool(body.get("granted")))
 
         step = await parked.next_step()

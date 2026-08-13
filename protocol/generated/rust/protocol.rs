@@ -29,6 +29,174 @@ pub mod error {
         }
     }
 }
+#[doc = "What the user has said about one application."]
+#[doc = r""]
+#[doc = r" <details><summary>JSON schema</summary>"]
+#[doc = r""]
+#[doc = r" ```json"]
+#[doc = "{"]
+#[doc = "  \"title\": \"AccessLevel\","]
+#[doc = "  \"description\": \"What the user has said about one application.\","]
+#[doc = "  \"type\": \"string\","]
+#[doc = "  \"enum\": ["]
+#[doc = "    \"open\","]
+#[doc = "    \"ask\","]
+#[doc = "    \"verify\","]
+#[doc = "    \"blocked\""]
+#[doc = "  ]"]
+#[doc = "}"]
+#[doc = r" ```"]
+#[doc = r" </details>"]
+#[derive(
+    :: serde :: Deserialize,
+    :: serde :: Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd,
+)]
+pub enum AccessLevel {
+    #[serde(rename = "open")]
+    Open,
+    #[serde(rename = "ask")]
+    Ask,
+    #[serde(rename = "verify")]
+    Verify,
+    #[serde(rename = "blocked")]
+    Blocked,
+}
+impl ::std::fmt::Display for AccessLevel {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        match *self {
+            Self::Open => f.write_str("open"),
+            Self::Ask => f.write_str("ask"),
+            Self::Verify => f.write_str("verify"),
+            Self::Blocked => f.write_str("blocked"),
+        }
+    }
+}
+impl ::std::str::FromStr for AccessLevel {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        match value {
+            "open" => Ok(Self::Open),
+            "ask" => Ok(Self::Ask),
+            "verify" => Ok(Self::Verify),
+            "blocked" => Ok(Self::Blocked),
+            _ => Err("invalid value".into()),
+        }
+    }
+}
+impl ::std::convert::TryFrom<&str> for AccessLevel {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<&::std::string::String> for AccessLevel {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for AccessLevel {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+#[doc = "What a call must satisfy before it runs."]
+#[doc = r""]
+#[doc = r" <details><summary>JSON schema</summary>"]
+#[doc = r""]
+#[doc = r" ```json"]
+#[doc = "{"]
+#[doc = "  \"title\": \"Assurance\","]
+#[doc = "  \"description\": \"What a call must satisfy before it runs.\","]
+#[doc = "  \"type\": \"string\","]
+#[doc = "  \"enum\": ["]
+#[doc = "    \"none\","]
+#[doc = "    \"ack\","]
+#[doc = "    \"owner\","]
+#[doc = "    \"owner_and_password\""]
+#[doc = "  ]"]
+#[doc = "}"]
+#[doc = r" ```"]
+#[doc = r" </details>"]
+#[derive(
+    :: serde :: Deserialize,
+    :: serde :: Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd,
+)]
+pub enum Assurance {
+    #[serde(rename = "none")]
+    None,
+    #[serde(rename = "ack")]
+    Ack,
+    #[serde(rename = "owner")]
+    Owner,
+    #[serde(rename = "owner_and_password")]
+    OwnerAndPassword,
+}
+impl ::std::fmt::Display for Assurance {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        match *self {
+            Self::None => f.write_str("none"),
+            Self::Ack => f.write_str("ack"),
+            Self::Owner => f.write_str("owner"),
+            Self::OwnerAndPassword => f.write_str("owner_and_password"),
+        }
+    }
+}
+impl ::std::str::FromStr for Assurance {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        match value {
+            "none" => Ok(Self::None),
+            "ack" => Ok(Self::Ack),
+            "owner" => Ok(Self::Owner),
+            "owner_and_password" => Ok(Self::OwnerAndPassword),
+            _ => Err("invalid value".into()),
+        }
+    }
+}
+impl ::std::convert::TryFrom<&str> for Assurance {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<&::std::string::String> for Assurance {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for Assurance {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
 #[doc = "base64 of a mono 16-bit PCM WAV."]
 #[doc = r""]
 #[doc = r" <details><summary>JSON schema</summary>"]
@@ -268,13 +436,14 @@ impl ::std::convert::From<SessionCancel> for Command {
         Self::SessionCancel(value)
     }
 }
-#[doc = "`ConfirmationRequired`"]
+#[doc = "A question, and what would answer it.\n\n`assurance` is not decoration. A surface that cannot satisfy it must\ndecline rather than answer with something weaker, and it can only know\nthat if it is told -- a click is not macOS verifying the owner."]
 #[doc = r""]
 #[doc = r" <details><summary>JSON schema</summary>"]
 #[doc = r""]
 #[doc = r" ```json"]
 #[doc = "{"]
 #[doc = "  \"title\": \"ConfirmationRequired\","]
+#[doc = "  \"description\": \"A question, and what would answer it.\\n\\n`assurance` is not decoration. A surface that cannot satisfy it must\\ndecline rather than answer with something weaker, and it can only know\\nthat if it is told -- a click is not macOS verifying the owner.\","]
 #[doc = "  \"type\": \"object\","]
 #[doc = "  \"required\": ["]
 #[doc = "    \"id\","]
@@ -282,10 +451,28 @@ impl ::std::convert::From<SessionCancel> for Command {
 #[doc = "    \"tool\""]
 #[doc = "  ],"]
 #[doc = "  \"properties\": {"]
+#[doc = "    \"application\": {"]
+#[doc = "      \"title\": \"Application\","]
+#[doc = "      \"description\": \"Which application would be touched, when one would. The question should name it: the user set a level for it, and the answer can change that level.\","]
+#[doc = "      \"default\": null,"]
+#[doc = "      \"anyOf\": ["]
+#[doc = "        {"]
+#[doc = "          \"type\": \"string\""]
+#[doc = "        },"]
+#[doc = "        {"]
+#[doc = "          \"type\": \"null\""]
+#[doc = "        }"]
+#[doc = "      ]"]
+#[doc = "    },"]
 #[doc = "    \"arguments\": {"]
 #[doc = "      \"title\": \"Arguments\","]
 #[doc = "      \"type\": \"object\","]
 #[doc = "      \"additionalProperties\": true"]
+#[doc = "    },"]
+#[doc = "    \"assurance\": {"]
+#[doc = "      \"description\": \"How the yes has to be given for this call to run.\","]
+#[doc = "      \"default\": \"ack\","]
+#[doc = "      \"$ref\": \"#/$defs/Assurance\""]
 #[doc = "    },"]
 #[doc = "    \"id\": {"]
 #[doc = "      \"title\": \"Id\","]
@@ -313,8 +500,14 @@ impl ::std::convert::From<SessionCancel> for Command {
 #[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ConfirmationRequired {
+    #[doc = "Which application would be touched, when one would. The question should name it: the user set a level for it, and the answer can change that level."]
+    #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+    pub application: ::std::option::Option<::std::string::String>,
     #[serde(default, skip_serializing_if = "::serde_json::Map::is_empty")]
     pub arguments: ::serde_json::Map<::std::string::String, ::serde_json::Value>,
+    #[doc = "How the yes has to be given for this call to run."]
+    #[serde(default = "defaults::confirmation_required_assurance")]
+    pub assurance: Assurance,
     #[doc = "Echoed back in confirmation.respond."]
     pub id: ::std::string::String,
     pub risk: RiskLevel,
@@ -344,6 +537,18 @@ impl ConfirmationRequired {
 #[doc = "      \"title\": \"Granted\","]
 #[doc = "      \"type\": \"boolean\""]
 #[doc = "    },"]
+#[doc = "    \"remember\": {"]
+#[doc = "      \"description\": \"Also set this application's level. `open` for 'always', `blocked` for 'never', absent for 'just this once'. The application is the one named in the question -- a client cannot set a level for something it was not asked about.\","]
+#[doc = "      \"default\": null,"]
+#[doc = "      \"anyOf\": ["]
+#[doc = "        {"]
+#[doc = "          \"$ref\": \"#/$defs/AccessLevel\""]
+#[doc = "        },"]
+#[doc = "        {"]
+#[doc = "          \"type\": \"null\""]
+#[doc = "        }"]
+#[doc = "      ]"]
+#[doc = "    },"]
 #[doc = "    \"request\": {"]
 #[doc = "      \"title\": \"Request\","]
 #[doc = "      \"description\": \"The id of the confirmation.required event.\","]
@@ -364,6 +569,9 @@ impl ConfirmationRequired {
 #[serde(deny_unknown_fields)]
 pub struct ConfirmationRespond {
     pub granted: bool,
+    #[doc = "Also set this application's level. `open` for 'always', `blocked` for 'never', absent for 'just this once'. The application is the one named in the question -- a client cannot set a level for something it was not asked about."]
+    #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+    pub remember: ::std::option::Option<AccessLevel>,
     #[doc = "The id of the confirmation.required event."]
     pub request: ::std::string::String,
     #[serde(rename = "type", default = "defaults::confirmation_respond_type")]
@@ -462,7 +670,7 @@ impl ConfirmationRespond {
 #[doc = "    }"]
 #[doc = "  },"]
 #[doc = "  \"additionalProperties\": false,"]
-#[doc = "  \"x-ev-protocol-version\": \"1.5\""]
+#[doc = "  \"x-ev-protocol-version\": \"1.6\""]
 #[doc = "}"]
 #[doc = r" ```"]
 #[doc = r" </details>"]
@@ -602,6 +810,12 @@ impl ::std::convert::From<PermissionChanged> for EnvelopeEvent {
 #[doc = "      \"default\": \"hello\","]
 #[doc = "      \"type\": \"string\","]
 #[doc = "      \"const\": \"hello\""]
+#[doc = "    },"]
+#[doc = "    \"verifies\": {"]
+#[doc = "      \"title\": \"Verifies\","]
+#[doc = "      \"description\": \"Whether this client can ask macOS to verify the owner. Only the signed app can. A client that says no is never asked a question it could only answer with something weaker, and saying yes falsely gains nothing: macOS does the asking, not the client.\","]
+#[doc = "      \"default\": false,"]
+#[doc = "      \"type\": \"boolean\""]
 #[doc = "    }"]
 #[doc = "  },"]
 #[doc = "  \"additionalProperties\": false"]
@@ -617,6 +831,9 @@ pub struct Hello {
     pub protocol: ::std::string::String,
     #[serde(rename = "type", default = "defaults::hello_type")]
     pub type_: ::std::string::String,
+    #[doc = "Whether this client can ask macOS to verify the owner. Only the signed app can. A client that says no is never asked a question it could only answer with something weaker, and saying yes falsely gains nothing: macOS does the asking, not the client."]
+    #[serde(default)]
+    pub verifies: bool,
 }
 impl Hello {
     pub fn builder() -> builder::Hello {
@@ -2193,10 +2410,15 @@ pub mod builder {
     }
     #[derive(Clone, Debug)]
     pub struct ConfirmationRequired {
+        application: ::std::result::Result<
+            ::std::option::Option<::std::string::String>,
+            ::std::string::String,
+        >,
         arguments: ::std::result::Result<
             ::serde_json::Map<::std::string::String, ::serde_json::Value>,
             ::std::string::String,
         >,
+        assurance: ::std::result::Result<super::Assurance, ::std::string::String>,
         id: ::std::result::Result<::std::string::String, ::std::string::String>,
         risk: ::std::result::Result<super::RiskLevel, ::std::string::String>,
         tool: ::std::result::Result<::std::string::String, ::std::string::String>,
@@ -2205,7 +2427,9 @@ pub mod builder {
     impl ::std::default::Default for ConfirmationRequired {
         fn default() -> Self {
             Self {
+                application: Ok(Default::default()),
                 arguments: Ok(Default::default()),
+                assurance: Ok(super::defaults::confirmation_required_assurance()),
                 id: Err("no value supplied for id".to_string()),
                 risk: Err("no value supplied for risk".to_string()),
                 tool: Err("no value supplied for tool".to_string()),
@@ -2214,6 +2438,16 @@ pub mod builder {
         }
     }
     impl ConfirmationRequired {
+        pub fn application<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<::std::option::Option<::std::string::String>>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.application = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for application: {e}"));
+            self
+        }
         pub fn arguments<T>(mut self, value: T) -> Self
         where
             T: ::std::convert::TryInto<
@@ -2224,6 +2458,16 @@ pub mod builder {
             self.arguments = value
                 .try_into()
                 .map_err(|e| format!("error converting supplied value for arguments: {e}"));
+            self
+        }
+        pub fn assurance<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<super::Assurance>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.assurance = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for assurance: {e}"));
             self
         }
         pub fn id<T>(mut self, value: T) -> Self
@@ -2273,7 +2517,9 @@ pub mod builder {
             value: ConfirmationRequired,
         ) -> ::std::result::Result<Self, super::error::ConversionError> {
             Ok(Self {
+                application: value.application?,
                 arguments: value.arguments?,
+                assurance: value.assurance?,
                 id: value.id?,
                 risk: value.risk?,
                 tool: value.tool?,
@@ -2284,7 +2530,9 @@ pub mod builder {
     impl ::std::convert::From<super::ConfirmationRequired> for ConfirmationRequired {
         fn from(value: super::ConfirmationRequired) -> Self {
             Self {
+                application: Ok(value.application),
                 arguments: Ok(value.arguments),
+                assurance: Ok(value.assurance),
                 id: Ok(value.id),
                 risk: Ok(value.risk),
                 tool: Ok(value.tool),
@@ -2295,6 +2543,8 @@ pub mod builder {
     #[derive(Clone, Debug)]
     pub struct ConfirmationRespond {
         granted: ::std::result::Result<bool, ::std::string::String>,
+        remember:
+            ::std::result::Result<::std::option::Option<super::AccessLevel>, ::std::string::String>,
         request: ::std::result::Result<::std::string::String, ::std::string::String>,
         type_: ::std::result::Result<::std::string::String, ::std::string::String>,
     }
@@ -2302,6 +2552,7 @@ pub mod builder {
         fn default() -> Self {
             Self {
                 granted: Err("no value supplied for granted".to_string()),
+                remember: Ok(Default::default()),
                 request: Err("no value supplied for request".to_string()),
                 type_: Ok(super::defaults::confirmation_respond_type()),
             }
@@ -2316,6 +2567,16 @@ pub mod builder {
             self.granted = value
                 .try_into()
                 .map_err(|e| format!("error converting supplied value for granted: {e}"));
+            self
+        }
+        pub fn remember<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<::std::option::Option<super::AccessLevel>>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.remember = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for remember: {e}"));
             self
         }
         pub fn request<T>(mut self, value: T) -> Self
@@ -2346,6 +2607,7 @@ pub mod builder {
         ) -> ::std::result::Result<Self, super::error::ConversionError> {
             Ok(Self {
                 granted: value.granted?,
+                remember: value.remember?,
                 request: value.request?,
                 type_: value.type_?,
             })
@@ -2355,6 +2617,7 @@ pub mod builder {
         fn from(value: super::ConfirmationRespond) -> Self {
             Self {
                 granted: Ok(value.granted),
+                remember: Ok(value.remember),
                 request: Ok(value.request),
                 type_: Ok(value.type_),
             }
@@ -2451,6 +2714,7 @@ pub mod builder {
         client: ::std::result::Result<::std::string::String, ::std::string::String>,
         protocol: ::std::result::Result<::std::string::String, ::std::string::String>,
         type_: ::std::result::Result<::std::string::String, ::std::string::String>,
+        verifies: ::std::result::Result<bool, ::std::string::String>,
     }
     impl ::std::default::Default for Hello {
         fn default() -> Self {
@@ -2458,6 +2722,7 @@ pub mod builder {
                 client: Err("no value supplied for client".to_string()),
                 protocol: Err("no value supplied for protocol".to_string()),
                 type_: Ok(super::defaults::hello_type()),
+                verifies: Ok(Default::default()),
             }
         }
     }
@@ -2492,6 +2757,16 @@ pub mod builder {
                 .map_err(|e| format!("error converting supplied value for type_: {e}"));
             self
         }
+        pub fn verifies<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<bool>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.verifies = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for verifies: {e}"));
+            self
+        }
     }
     impl ::std::convert::TryFrom<Hello> for super::Hello {
         type Error = super::error::ConversionError;
@@ -2500,6 +2775,7 @@ pub mod builder {
                 client: value.client?,
                 protocol: value.protocol?,
                 type_: value.type_?,
+                verifies: value.verifies?,
             })
         }
     }
@@ -2509,6 +2785,7 @@ pub mod builder {
                 client: Ok(value.client),
                 protocol: Ok(value.protocol),
                 type_: Ok(value.type_),
+                verifies: Ok(value.verifies),
             }
         }
     }
@@ -3643,6 +3920,9 @@ pub mod defaults {
     }
     pub(super) fn audio_submit_type() -> ::std::string::String {
         "audio.submit".to_string()
+    }
+    pub(super) fn confirmation_required_assurance() -> super::Assurance {
+        super::Assurance::Ack
     }
     pub(super) fn confirmation_required_type() -> ::std::string::String {
         "confirmation.required".to_string()

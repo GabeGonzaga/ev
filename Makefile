@@ -104,8 +104,8 @@ rust: protocol-check-rust
 # The app is a macOS app: a menu bar, a panel, TCC, Apple Events. Building it
 # on Linux would prove nothing and needs GTK and WebKit to prove it.
 app-check:
-	cd native && $(CARGO) clippy -p ev-app --all-targets -- -D warnings
-	cd native && $(CARGO) test -p ev-app
+	cd native && $(CARGO) clippy -p ev-app -p ev-auth --all-targets -- -D warnings
+	cd native && $(CARGO) test -p ev-app -p ev-auth
 	cd native && $(CARGO) build -p ev-app --release
 
 # Local only. TCC keys its grants to a code signature, so an unsigned host is

@@ -27,7 +27,7 @@ mod client;
 #[allow(dead_code, clippy::derivable_impls, clippy::to_string_trait_impl)]
 mod protocol;
 
-use client::{Client, Error, PROTOCOL_VERSION};
+use client::{Answer, Client, Error, PROTOCOL_VERSION};
 use serde_json::{json, Value};
 
 /// A socket path short enough for `sockaddr_un`, which the Python side learned
@@ -139,7 +139,7 @@ fn the_daemons_own_payloads_deserialise() {
 
     let mut client = Client::connect(&path).expect("connect");
     let turn = client
-        .submit("open github.com", Some("pt-PT"), &mut |_| true)
+        .submit("open github.com", Some("pt-PT"), &mut |_| Answer::once(true))
         .expect("turn");
 
     assert_eq!(turn.speech.len(), 1);
@@ -173,7 +173,7 @@ fn a_confirmation_is_answered_by_the_caller_not_the_client() {
     let turn = client
         .submit("empty the trash", None, &mut |event| {
             asked.push(event["tool"].as_str().unwrap_or_default().to_string());
-            false
+            Answer::once(false)
         })
         .expect("turn");
 

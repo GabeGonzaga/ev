@@ -11,6 +11,14 @@ export type Type1 = "speech.requested";
  */
 export type Voice = string;
 /**
+ * Which application would be touched, when one would. The question should name it: the user set a level for it, and the answer can change that level.
+ */
+export type Application = string | null;
+/**
+ * How the yes has to be given for this call to run.
+ */
+export type Assurance = "none" | "ack" | "owner" | "owner_and_password";
+/**
  * Echoed back in confirmation.respond.
  */
 export type Id = string;
@@ -66,6 +74,10 @@ export type Client = string;
 export type Protocol = string;
 export type Type6 = "hello";
 /**
+ * Whether this client can ask macOS to verify the owner. Only the signed app can. A client that says no is never asked a question it could only answer with something weaker, and saying yes falsely gains nothing: macOS does the asking, not the client.
+ */
+export type Verifies = boolean;
+/**
  * The session locale, e.g. pt-PT. Carried, never used to translate the utterance before routing.
  */
 export type Locale = string | null;
@@ -95,6 +107,10 @@ export type Locale2 = string | null;
 export type Text3 = string | null;
 export type Type9 = "vision.submit";
 export type Granted = boolean;
+/**
+ * What the user has said about one application.
+ */
+export type AccessLevel = "open" | "ask" | "verify" | "blocked";
 /**
  * The id of the confirmation.required event.
  */
@@ -143,8 +159,17 @@ export interface SpeechRequested {
   type?: Type1;
   voice: Voice;
 }
+/**
+ * A question, and what would answer it.
+ *
+ * `assurance` is not decoration. A surface that cannot satisfy it must
+ * decline rather than answer with something weaker, and it can only know
+ * that if it is told -- a click is not macOS verifying the owner.
+ */
 export interface ConfirmationRequired {
+  application?: Application;
   arguments?: Arguments;
+  assurance?: Assurance;
   id: Id;
   risk: RiskLevel;
   tool: Tool;
@@ -211,6 +236,7 @@ export interface Hello {
   client: Client;
   protocol: Protocol;
   type?: Type6;
+  verifies?: Verifies;
 }
 export interface UtteranceSubmit {
   locale?: Locale;
@@ -254,6 +280,10 @@ export interface VisionSubmit {
 }
 export interface ConfirmationRespond {
   granted: Granted;
+  /**
+   * Also set this application's level. `open` for 'always', `blocked` for 'never', absent for 'just this once'. The application is the one named in the question -- a client cannot set a level for something it was not asked about.
+   */
+  remember?: AccessLevel | null;
   request: Request1;
   type?: Type10;
 }

@@ -103,6 +103,10 @@ Each subsystem has one public port. Today there are eight:
 
 `AppleScriptClient` goes through `ProcessRunner` rather than around it.
 
+`native/auth` is the only crate in the workspace that allows `unsafe`. It
+exports one function -- ask macOS to verify the owner -- so that `ev-app` and
+`ev-host` can go on forbidding it (ADR 0034).
+
 `AccessibilityClient`, `ShortcutsClient` and `NativeBridge` are named in
 `CLAUDE.md` and do not exist yet. They arrive with the capability that needs
 them, not before.

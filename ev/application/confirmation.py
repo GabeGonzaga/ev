@@ -45,4 +45,7 @@ def satisfiable(request: ConfirmationRequest, asker: object) -> bool:
     """
     if request.assurance in {Assurance.NONE, Assurance.ACK}:
         return True
+    # Claimed by the client at the handshake, and claiming it falsely gains
+    # nothing: macOS does the asking, and a client that cannot raise the dialog
+    # gets no answer to send back.
     return bool(getattr(asker, "verifies", False))

@@ -1,5 +1,27 @@
 {
   "$defs": {
+    "AccessLevel": {
+      "description": "What the user has said about one application.",
+      "enum": [
+        "open",
+        "ask",
+        "verify",
+        "blocked"
+      ],
+      "title": "AccessLevel",
+      "type": "string"
+    },
+    "Assurance": {
+      "description": "What a call must satisfy before it runs.",
+      "enum": [
+        "none",
+        "ack",
+        "owner",
+        "owner_and_password"
+      ],
+      "title": "Assurance",
+      "type": "string"
+    },
     "AudioSubmit": {
       "additionalProperties": false,
       "description": "Recorded speech, on its way to be transcribed.\n\nThe host captures, because the microphone is a TCC surface and TCC grants\nattach to a code signature. The core transcribes, because that is where\n`SpeechRecognizer` lives and where the engine stays replaceable (ADR 0018).\n\nBase64 rather than a file path: a path means the audio is written to disk\nby one process and read by another, and neither owns deleting it. ~2.5\nseconds of 16 kHz mono is about 100 KB encoded, which is nothing on a local\nsocket.",
@@ -45,11 +67,30 @@
     },
     "ConfirmationRequired": {
       "additionalProperties": false,
+      "description": "A question, and what would answer it.\n\n`assurance` is not decoration. A surface that cannot satisfy it must\ndecline rather than answer with something weaker, and it can only know\nthat if it is told -- a click is not macOS verifying the owner.",
       "properties": {
+        "application": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Which application would be touched, when one would. The question should name it: the user set a level for it, and the answer can change that level.",
+          "title": "Application"
+        },
         "arguments": {
           "additionalProperties": true,
           "title": "Arguments",
           "type": "object"
+        },
+        "assurance": {
+          "$ref": "#/$defs/Assurance",
+          "default": "ack",
+          "description": "How the yes has to be given for this call to run."
         },
         "id": {
           "description": "Echoed back in confirmation.respond.",
@@ -84,6 +125,18 @@
         "granted": {
           "title": "Granted",
           "type": "boolean"
+        },
+        "remember": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AccessLevel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Also set this application's level. `open` for 'always', `blocked` for 'never', absent for 'just this once'. The application is the one named in the question -- a client cannot set a level for something it was not asked about."
         },
         "request": {
           "description": "The id of the confirmation.required event.",
@@ -123,6 +176,12 @@
           "default": "hello",
           "title": "Type",
           "type": "string"
+        },
+        "verifies": {
+          "default": false,
+          "description": "Whether this client can ask macOS to verify the owner. Only the signed app can. A client that says no is never asked a question it could only answer with something weaker, and saying yes falsely gains nothing: macOS does the asking, not the client.",
+          "title": "Verifies",
+          "type": "boolean"
         }
       },
       "required": [
@@ -772,5 +831,5 @@
   },
   "title": "Envelope",
   "type": "object",
-  "x-ev-protocol-version": "1.5"
+  "x-ev-protocol-version": "1.6"
 }

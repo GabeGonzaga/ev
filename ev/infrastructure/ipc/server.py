@@ -32,6 +32,7 @@ from typing import Any, Protocol
 from pydantic import ValidationError
 
 from ev.application.confirmation import ConfirmationRequest, satisfiable
+from ev.domain.access import AccessLevel
 from ev.domain.journal import JournalEntry
 from ev.domain.permissions import Permission, PermissionState
 from ev.domain.results import Clarification, ToolResult
@@ -86,12 +87,21 @@ class Session:
     """One connected client. Owns its writer and its pending confirmations."""
 
     def __init__(
-        self, writer: asyncio.StreamWriter, *, timeout: float = CONFIRMATION_TIMEOUT
+        self,
+        writer: asyncio.StreamWriter,
+        *,
+        timeout: float = CONFIRMATION_TIMEOUT,
+        remember: Rememberer | None = None,
     ) -> None:
         self._writer = writer
         self._timeout = timeout
+        self._remember = remember
         self._pending: dict[str, asyncio.Future[bool]] = {}
+        self._asked: dict[str, ConfirmationRequest] = {}
         self.greeted = False
+        self.verifies = False
+        """Set at the handshake. `satisfiable` reads it: a surface that cannot
+        raise macOS's own dialog is never asked to."""
 
     async def emit(self, event: Event) -> None:
         self._writer.write(event.model_dump_json().encode() + b"\n")
@@ -106,12 +116,18 @@ class Session:
         waiting: asyncio.Future[bool] = asyncio.get_running_loop().create_future()
         self._pending[identifier] = waiting
 
+        # Remembered on the session, so an answer that also sets a level can
+        # only set it for the application that was actually asked about.
+        self._asked[identifier] = request
+
         await self.emit(
             ConfirmationRequired(
                 id=identifier,
                 tool=request.tool,
                 risk=request.risk,
                 arguments=dict(request.arguments),
+                application=request.application,
+                assurance=request.assurance,
             )
         )
 
@@ -122,11 +138,24 @@ class Session:
             return False
         finally:
             self._pending.pop(identifier, None)
+            self._asked.pop(identifier, None)
 
     def answer(self, message: ConfirmationRespond) -> bool:
         waiting = self._pending.get(message.request)
         if waiting is None or waiting.done():
             return False
+
+        # "Always" and "never" are answers about the application, not about
+        # this call, so they are written down before this call is let through.
+        asked = self._asked.get(message.request)
+        if (
+            message.remember is not None
+            and asked is not None
+            and asked.application
+            and self._remember is not None
+        ):
+            self._remember(asked.application, message.remember)
+
         waiting.set_result(message.granted)
         return True
 
@@ -188,6 +217,10 @@ Reporter = Callable[[Permission, PermissionState], None]
 """Where the host's answer about a permission goes. The core does not ask for
 these and cannot: only the process macOS answered knows."""
 
+Rememberer = Callable[[str, AccessLevel], None]
+"""Where "always" and "never" go. The application is the one the question named,
+so a client cannot set a level for something it was not asked about."""
+
 Transcriber = Callable[[Path, str], Awaitable[str]]
 """Audio in, words out. The daemon holds one; what implements it is
 `SpeechRecognizer`, and the daemon never learns which engine that is."""
@@ -203,6 +236,7 @@ class IpcServer:
         transcribe: Transcriber | None = None,
         look: Looker | None = None,
         report: Reporter | None = None,
+        remember: Rememberer | None = None,
         history: History | None = None,
         on_close: Callable[[], Awaitable[None]] | None = None,
         confirmation_timeout: float = CONFIRMATION_TIMEOUT,
@@ -213,6 +247,7 @@ class IpcServer:
         self._transcribe = transcribe
         self._look = look
         self._report = report
+        self._remember_level = remember
         self._history = history
         self._confirmation = confirmation
         self._on_close = on_close
@@ -293,7 +328,11 @@ class IpcServer:
     async def _connection(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ) -> None:
-        session = Session(writer, timeout=self._confirmation_timeout)
+        session = Session(
+            writer,
+            timeout=self._confirmation_timeout,
+            remember=self._remember_level,
+        )
         self._connections.add(writer)
         # Each line is handled in its own task, and this matters: a turn
         # awaiting a confirmation is blocked inside one of them, and the answer
@@ -513,6 +552,7 @@ class IpcServer:
             return
 
         session.greeted = True
+        session.verifies = hello.verifies
         await session.send(
             Response(id=request_id, ok=True, payload={"protocol": PROTOCOL_VERSION})
         )

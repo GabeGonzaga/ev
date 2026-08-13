@@ -19,18 +19,21 @@ from typing import Any
 import pytest
 
 from ev.application.confirmation import ConfirmationRequest
+from ev.domain.access import AccessLevel
 from ev.domain.permissions import Permission, PermissionState
 from ev.domain.results import Clarification, ToolErrorCode, ToolResult
 from ev.domain.risk import RiskLevel
 from ev.infrastructure.ipc.client import DaemonRefused, DaemonUnavailable, IpcClient
 from ev.infrastructure.ipc.server import (
     IpcServer,
+    Session,
     SessionConfirmation,
     socket_path,
 )
 from protocol.messages import (
     PROTOCOL_VERSION,
     AudioSubmit,
+    ConfirmationRespond,
     Hello,
     PermissionReport,
     Request,
@@ -424,7 +427,7 @@ async def test_an_unbound_confirmation_declines() -> None:
 async def test_a_refused_handshake_reaches_the_client(state: Path) -> None:
     core = Core()
     async for _ in start(state, core):
-        with pytest.raises(DaemonRefused, match=r"speaks 1\.5"):
+        with pytest.raises(DaemonRefused, match=r"speaks 1\.6"):
             async with IpcClient(socket_path(state), protocol="0.9"):
                 pass
         break
@@ -804,3 +807,114 @@ async def test_a_report_is_not_a_turn(state: Path) -> None:
     finally:
         task.cancel()
         await server.aclose()
+
+
+async def test_always_and_never_set_the_level(state: Path) -> None:
+    """An answer about the application, not about this call.
+
+    "Always" is the panel's way of saying `open`, and it is written down
+    before the call it was asked about is let through.
+    """
+    remembered: list[tuple[str, AccessLevel]] = []
+    writer = _Discarding()
+    session = Session(
+        writer,  # type: ignore[arg-type]
+        remember=lambda name, level: remembered.append((name, level)),
+    )
+
+    asking = asyncio.create_task(
+        session.confirm(
+            ConfirmationRequest(
+                tool="applications.open",
+                risk=RiskLevel.SENSITIVE,
+                application="Photos",
+            )
+        )
+    )
+    await asyncio.sleep(0)
+    identifier = writer.identifier()
+
+    assert session.answer(
+        ConfirmationRespond(request=identifier, granted=True, remember=AccessLevel.OPEN)
+    )
+
+    assert await asking is True
+    assert remembered == [("Photos", AccessLevel.OPEN)]
+
+
+async def test_just_this_once_remembers_nothing(state: Path) -> None:
+    remembered: list[tuple[str, AccessLevel]] = []
+    writer = _Discarding()
+    session = Session(
+        writer,  # type: ignore[arg-type]
+        remember=lambda name, level: remembered.append((name, level)),
+    )
+
+    asking = asyncio.create_task(
+        session.confirm(
+            ConfirmationRequest(
+                tool="applications.open",
+                risk=RiskLevel.SENSITIVE,
+                application="Photos",
+            )
+        )
+    )
+    await asyncio.sleep(0)
+
+    session.answer(
+        ConfirmationRespond(request=writer.identifier(), granted=True, remember=None)
+    )
+
+    assert await asking is True
+    assert remembered == []
+
+
+async def test_a_client_cannot_set_a_level_it_was_not_asked_about(
+    state: Path,
+) -> None:
+    """The application comes from the question, never from the answer.
+
+    Otherwise a client could answer a question about Photos by setting Mail to
+    `open`, which is the shape of every confused-deputy bug there is.
+    """
+    remembered: list[tuple[str, AccessLevel]] = []
+    writer = _Discarding()
+    session = Session(
+        writer,  # type: ignore[arg-type]
+        remember=lambda name, level: remembered.append((name, level)),
+    )
+
+    asking = asyncio.create_task(
+        session.confirm(
+            ConfirmationRequest(
+                tool="language.translate", risk=RiskLevel.SAFE, application=None
+            )
+        )
+    )
+    await asyncio.sleep(0)
+
+    session.answer(
+        ConfirmationRespond(
+            request=writer.identifier(), granted=True, remember=AccessLevel.OPEN
+        )
+    )
+
+    await asking
+    # Nothing to remember: the question named no application.
+    assert remembered == []
+
+
+class _Discarding:
+    """A writer that keeps what was written, so a test can read the id back."""
+
+    def __init__(self) -> None:
+        self.lines: list[bytes] = []
+
+    def write(self, data: bytes) -> None:
+        self.lines.append(data)
+
+    async def drain(self) -> None:
+        return None
+
+    def identifier(self) -> str:
+        return str(json.loads(self.lines[-1])["id"])

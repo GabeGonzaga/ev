@@ -27,6 +27,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ev.domain.access import AccessLevel, Assurance
 from ev.domain.journal import JournalEntry
 from ev.domain.permissions import Permission, PermissionState
 from ev.domain.risk import RiskLevel
@@ -41,12 +42,14 @@ MAX_IMAGE_BASE64 = 8_000_000
 leaves room for a camera that hands over something larger without leaving the
 field unbounded."""
 
-PROTOCOL_VERSION = "1.5"
+PROTOCOL_VERSION = "1.6"
 """Major.minor. The handshake compares it exactly: a mismatch refuses the
 connection rather than degrading into a conversation neither side understands.
 
 1.1 added `audio.submit`; 1.2 added `history.query`; 1.3 gave it `query`; 1.4
-added `vision.submit`; 1.5 added `permission.report`. A client that knows an
+added `vision.submit`; 1.5 added `permission.report`; 1.6 carried the
+application and the assurance into a confirmation, and an answer back. A client
+that knows an
 earlier version is refused rather than served a subset, because "some of the
 protocol" is not a protocol.
 """
@@ -66,6 +69,15 @@ class Hello(Message):
     type: Literal["hello"] = "hello"
     protocol: str = Field(description="The protocol version the client speaks.")
     client: str = Field(description="Who is connecting, for the log.")
+    verifies: bool = Field(
+        default=False,
+        description=(
+            "Whether this client can ask macOS to verify the owner. Only the "
+            "signed app can. A client that says no is never asked a question "
+            "it could only answer with something weaker, and saying yes "
+            "falsely gains nothing: macOS does the asking, not the client."
+        ),
+    )
 
 
 class UtteranceSubmit(Message):
@@ -109,6 +121,15 @@ class ConfirmationRespond(Message):
     type: Literal["confirmation.respond"] = "confirmation.respond"
     request: str = Field(description="The id of the confirmation.required event.")
     granted: bool
+    remember: AccessLevel | None = Field(
+        default=None,
+        description=(
+            "Also set this application's level. `open` for 'always', "
+            "`blocked` for 'never', absent for 'just this once'. The "
+            "application is the one named in the question -- a client cannot "
+            "set a level for something it was not asked about."
+        ),
+    )
 
 
 class HistoryQuery(Message):
@@ -234,11 +255,30 @@ class SpeechRequested(Message):
 
 
 class ConfirmationRequired(Message):
+    """A question, and what would answer it.
+
+    `assurance` is not decoration. A surface that cannot satisfy it must
+    decline rather than answer with something weaker, and it can only know
+    that if it is told -- a click is not macOS verifying the owner.
+    """
+
     type: Literal["confirmation.required"] = "confirmation.required"
     id: str = Field(description="Echoed back in confirmation.respond.")
     tool: str
     risk: RiskLevel
     arguments: dict[str, object] = Field(default_factory=dict)
+    application: str | None = Field(
+        default=None,
+        description=(
+            "Which application would be touched, when one would. The question "
+            "should name it: the user set a level for it, and the answer can "
+            "change that level."
+        ),
+    )
+    assurance: Assurance = Field(
+        default=Assurance.ACK,
+        description="How the yes has to be given for this call to run.",
+    )
 
 
 class ToolCompleted(Message):

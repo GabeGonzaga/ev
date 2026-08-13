@@ -11,7 +11,7 @@ is right.
 | 2 | Push-to-talk, VAD, whisper.cpp, AVSpeechSynthesizer | done |
 | 3 | Tauri, menu bar, NSPanel, settings, history | done, unproven on device |
 | 4 | JSON macros, more adapters, retrieval | done |
-| 4.5 | Per-application access levels, launching and quitting | core done; `verify` needs the app |
+| 4.5 | Per-application access levels, launching and quitting | done, `verify` unproven on device |
 | 5 | Camera and vision | done, unproven on device |
 | 6 | Wake word, continuous interaction | |
 

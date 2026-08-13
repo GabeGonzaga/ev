@@ -8,6 +8,8 @@
 import type { JournalEntry } from "./protocol";
 
 export interface TurnResult {
+  application?: string | null;
+  assurance?: string;
   heard?: string | null;
   spoken?: string[];
   ok?: boolean;
@@ -125,14 +127,21 @@ export const canRecordHere = !inTauri;
 /// returned to us as a question, so answering it produces the outcome. In the
 /// app the original call is still pending and resolves with the outcome
 /// itself, so there is nothing to return here.
-export const confirm = async (granted: boolean): Promise<TurnResult | null> => {
+/// What an answer also says about the application it was asked about.
+/// `open` is "always", `blocked` is "never", null is "just this once".
+export type Remember = "open" | "blocked" | null;
+
+export const confirm = async (
+  granted: boolean,
+  remember: Remember = null,
+): Promise<TurnResult | null> => {
   if (inTauri) {
-    await callTauri<void>("confirm", { granted });
+    await callTauri<void>("confirm", { granted, remember });
     return null;
   }
   return http<TurnResult>("/api/confirm", {
     method: "POST",
-    body: JSON.stringify({ granted }),
+    body: JSON.stringify({ granted, remember }),
   });
 };
 

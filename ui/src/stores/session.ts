@@ -22,7 +22,13 @@ export const useSession = defineStore("session", () => {
   const shortcutTrouble = ref<string | null>(null);
   // A question the core is waiting on. While this is set, a turn is parked on
   // the other side and nothing has run.
-  const question = ref<{ tool: string; risk: string; arguments: Record<string, unknown> } | null>(null);
+  const question = ref<{
+    tool: string;
+    risk: string;
+    arguments: Record<string, unknown>;
+    application: string | null;
+    assurance: string;
+  } | null>(null);
   const locale = ref<string>("pt-PT");
   // What the history is filtered by. Empty is the whole trail: a search box
   // someone cleared is not a search for nothing.
@@ -34,6 +40,8 @@ export const useSession = defineStore("session", () => {
         tool: String(result.tool ?? ""),
         risk: String(result.risk ?? ""),
         arguments: (result.arguments ?? {}) as Record<string, unknown>,
+        application: (result.application as string) ?? null,
+        assurance: String(result.assurance ?? "ack"),
       };
       return;
     }
@@ -85,6 +93,8 @@ export const useSession = defineStore("session", () => {
       tool: String(asked.tool ?? ""),
       risk: String(asked.risk ?? ""),
       arguments: (asked.arguments ?? {}) as Record<string, unknown>,
+      application: (asked.application as string) ?? null,
+      assurance: String(asked.assurance ?? "ack"),
     };
   });
 
@@ -192,7 +202,7 @@ export const useSession = defineStore("session", () => {
     }
   }
 
-  async function answer(granted: boolean) {
+  async function answer(granted: boolean, remember: api.Remember = null) {
     const asked = question.value;
     question.value = null;
     if (!asked) return;
@@ -200,7 +210,7 @@ export const useSession = defineStore("session", () => {
     try {
       // Null in the app: the turn that asked is still pending and will
       // resolve with the outcome itself.
-      const result = await api.confirm(granted);
+      const result = await api.confirm(granted, remember);
       if (result) apply(result);
     } catch (error) {
       trouble.value = String(error);

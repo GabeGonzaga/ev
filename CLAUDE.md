@@ -263,7 +263,10 @@ docs/
 ├── ARCHITECTURE.md
 ├── ROADMAP.md
 └── adr/                 one file per architectural decision
-native/                  phase 1.5+
+native/
+├── host/                the socket client, audio, camera. Forbids unsafe
+├── auth/                asks macOS to verify the owner. The only unsafe crate
+└── src-tauri/           the app: menu bar, panel, hotkey. Forbids unsafe
 ui/                      phase 3+
 protocol/                phase 1.5
 ```

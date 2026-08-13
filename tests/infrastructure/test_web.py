@@ -18,6 +18,7 @@ import httpx
 import pytest
 
 from ev.application.confirmation import ConfirmationRequest
+from ev.domain.access import AccessLevel, Assurance
 from ev.domain.journal import JournalEntry
 from ev.domain.results import Clarification, ToolErrorCode, ToolResult
 from ev.domain.risk import RiskLevel
@@ -372,11 +373,16 @@ async def test_a_turn_asks_before_it_acts(tmp_path: Path) -> None:
                 json={"text": "empty the trash"},
                 headers=headers(web.token),
             )
+            # The application and the assurance travel with the question: the
+            # page decides what it can answer and what to offer, and cannot
+            # decide either without being told.
             assert asked.json() == {
                 "outcome": "confirm",
                 "tool": "system.empty_trash",
                 "risk": "destructive",
                 "arguments": {"count": 3},
+                "application": None,
+                "assurance": "ack",
             }
             assert core.granted is None, "nothing ran while the question stood"
 
@@ -558,3 +564,85 @@ async def test_a_frame_needs_the_token_like_everything_else(tmp_path: Path) -> N
         )
 
     assert answer.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_always_sets_the_level_for_the_application_asked_about(
+    tmp_path: Path,
+) -> None:
+    remembered: list[tuple[str, AccessLevel]] = []
+    confirmation = SessionConfirmation()
+
+    class Asking:
+        async def handle(
+            self, text: str, locale: str | None = None
+        ) -> ToolResult | Clarification | None:
+            await confirmation.confirm(
+                ConfirmationRequest(
+                    tool="applications.open",
+                    risk=RiskLevel.SENSITIVE,
+                    application="Photos",
+                )
+            )
+            return ToolResult.success("applications.open", speech="Opening Photos")
+
+    async with (
+        surface(
+            tmp_path,
+            Asking(),
+            confirmation=confirmation,
+            remember=lambda name, level: remembered.append((name, level)),
+        ) as (web, base),
+        httpx.AsyncClient() as client,
+    ):
+        asked = await client.post(
+            f"{base}/api/turn", json={"text": "open Photos"}, headers=headers(web.token)
+        )
+        assert asked.json()["application"] == "Photos"
+
+        await client.post(
+            f"{base}/api/confirm",
+            json={"granted": True, "remember": "open"},
+            headers=headers(web.token),
+        )
+
+    assert remembered == [("Photos", AccessLevel.OPEN)]
+
+
+@pytest.mark.asyncio
+async def test_a_page_cannot_answer_what_only_the_app_can(tmp_path: Path) -> None:
+    """`verify` asks macOS to establish who is at the machine.
+
+    A browser page cannot do that -- `getUserMedia` asks in the browser's name
+    and there is no equivalent for the owner's password -- so it declines
+    rather than answering with a click.
+    """
+    confirmation = SessionConfirmation()
+    reached: list[bool] = []
+
+    class Asking:
+        async def handle(
+            self, text: str, locale: str | None = None
+        ) -> ToolResult | Clarification | None:
+            granted = await confirmation.confirm(
+                ConfirmationRequest(
+                    tool="mail.send",
+                    risk=RiskLevel.SENSITIVE,
+                    application="Mail",
+                    assurance=Assurance.OWNER,
+                )
+            )
+            reached.append(granted)
+            return ToolResult.success("mail.send")
+
+    async with (
+        surface(tmp_path, Asking(), confirmation=confirmation) as (web, base),
+        httpx.AsyncClient() as client,
+    ):
+        answer = await client.post(
+            f"{base}/api/turn", json={"text": "send it"}, headers=headers(web.token)
+        )
+
+    # The turn finished without ever asking the page.
+    assert answer.json()["outcome"] == "ran"
+    assert reached == [False]

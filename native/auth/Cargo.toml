@@ -1,0 +1,28 @@
+[package]
+name = "ev-auth"
+version = "0.1.0"
+edition = "2021"
+description = "Ask macOS to verify the owner. The one crate here that speaks Objective-C"
+publish = false
+
+[dependencies]
+block2 = "0.6"
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSString", "NSError"] }
+objc2-core-foundation = "0.3"
+objc2-local-authentication = { version = "0.3", features = [
+    "LAContext",
+    "LAError",
+    "objc2-security",
+] }
+objc2-security = { version = "0.3.2", features = ["SecAccessControl", "SecBase", "SecItem"] }
+
+# Deliberately not `forbid`, unlike every other crate here. LocalAuthentication
+# is an Objective-C framework and a C function, and reaching them is unsafe by
+# construction. It is contained to this crate, which does one thing, so that
+# `ev-app` and `ev-host` can keep forbidding it outright.
+[lints.rust]
+unsafe_code = "allow"
+
+[lints.clippy]
+all = "deny"

@@ -16,7 +16,7 @@ use std::sync::mpsc::{self, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use ev_host::client::Client;
+use ev_host::client::{Answer, Client};
 use ev_host::{audio, camera};
 use serde::Serialize;
 use tauri::menu::{Menu, MenuItem};
@@ -74,7 +74,7 @@ struct Session {
     locale: Mutex<Option<String>>,
     /// Where an answer goes when the panel gives one. Present only while a
     /// turn is parked on a question; the app decides nothing itself.
-    answering: Mutex<Option<Sender<bool>>>,
+    answering: Mutex<Option<Sender<Answer>>>,
     /// Where the key-up goes. Present only while a hold is recording, which
     /// is also how a key repeat is told from a second press.
     holding: Mutex<Option<Sender<()>>>,
@@ -102,32 +102,47 @@ enum Input {
 }
 
 fn run_turn(app: &AppHandle, input: Input, locale: Option<String>) -> Result<TurnResult, String> {
-    let mut client = Client::connect(&socket()).map_err(|error| error.to_string())?;
+    // `true`: this is the signed app, and it can put macOS's own
+    // authentication on screen. The daemon needs to know before it decides
+    // whether a question can be asked here at all.
+    let mut client =
+        Client::connect_as(&socket(), true).map_err(|error| error.to_string())?;
 
     // The question goes to the panel and this thread waits for the answer.
     // The app decides nothing: no answer within the window is a decline, the
     // same rule the socket has for a closed connection and the terminal has
     // for a pipe.
-    let mut ask = |question: &serde_json::Value| -> bool {
+    let mut ask = |question: &serde_json::Value| -> Answer {
+        // Some questions are not the window's to answer. `verify` means macOS
+        // has to establish who is at the machine, and a button in a window
+        // E.V. drew cannot do that -- so the system is asked instead, and the
+        // panel never sees the question at all.
+        let assurance = question["assurance"].as_str().unwrap_or("ack");
+        if let Some(requirement) = requirement(assurance) {
+            return Answer::once(verified(question, requirement));
+        }
+
         let (sender, receiver) = mpsc::channel();
         {
             let session = app.state::<Session>();
             let Ok(mut slot) = session.answering.lock() else {
-                return false;
+                return Answer::once(false);
             };
             *slot = Some(sender);
         }
 
         if app.emit("confirmation.required", question.clone()).is_err() {
-            return false;
+            return Answer::once(false);
         }
 
-        let granted = receiver.recv_timeout(ANSWER_WITHIN).unwrap_or(false);
+        let answered = receiver
+            .recv_timeout(ANSWER_WITHIN)
+            .unwrap_or_else(|_| Answer::once(false));
 
         if let Ok(mut slot) = app.state::<Session>().answering.lock() {
             *slot = None;
         }
-        granted
+        answered
     };
 
     let turn = match input {
@@ -184,8 +199,16 @@ async fn submit(
 
 /// What the person clicked. Nothing else may call this into being: the sender
 /// exists only while a turn is actually waiting.
+///
+/// `remember` is "always" (`open`) or "never" (`blocked`), and the daemon
+/// applies it to the application *it* asked about -- the window cannot name a
+/// different one.
 #[tauri::command]
-fn confirm(granted: bool, session: State<'_, Session>) -> Result<(), String> {
+fn confirm(
+    granted: bool,
+    remember: Option<String>,
+    session: State<'_, Session>,
+) -> Result<(), String> {
     let sender = session
         .answering
         .lock()
@@ -193,8 +216,41 @@ fn confirm(granted: bool, session: State<'_, Session>) -> Result<(), String> {
         .take();
 
     match sender {
-        Some(sender) => sender.send(granted).map_err(|_| "nobody is waiting".into()),
+        Some(sender) => sender
+            .send(Answer { granted, remember })
+            .map_err(|_| "nobody is waiting".into()),
         None => Err("nothing is waiting on an answer".into()),
+    }
+}
+
+/// Which strength a question asked for, if it asked for one at all.
+fn requirement(assurance: &str) -> Option<ev_auth::Requirement> {
+    match assurance {
+        "owner" => Some(ev_auth::Requirement::Owner),
+        "owner_and_password" => Some(ev_auth::Requirement::OwnerAndPassword),
+        _ => None,
+    }
+}
+
+/// Put the question to macOS.
+///
+/// The reason is what the person reads in the system's own dialog, so it says
+/// what is about to happen rather than what the policy called it.
+fn verified(question: &serde_json::Value, requirement: ev_auth::Requirement) -> bool {
+    let tool = question["tool"].as_str().unwrap_or("act");
+    let reason = match question["application"].as_str() {
+        Some(application) => format!("let E.V. use {application} ({tool})"),
+        None => format!("let E.V. run {tool}"),
+    };
+
+    match ev_auth::verify(&reason, requirement) {
+        Ok(()) => true,
+        Err(error) => {
+            // A refusal and a Mac that cannot ask look the same from here, and
+            // both mean the same thing: it does not run.
+            eprintln!("not verified: {error}");
+            false
+        }
     }
 }
 

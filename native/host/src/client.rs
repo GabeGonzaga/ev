@@ -15,6 +15,26 @@ use serde_json::{json, Value};
 
 use crate::protocol::{ConfirmationRequired, Response, SpeechRequested};
 
+/// What came back from whoever was asked.
+#[derive(Debug, Clone, Default)]
+pub struct Answer {
+    pub granted: bool,
+    /// A level for the application the question named: `open` for "always",
+    /// `blocked` for "never", `None` for "just this once". The daemon applies
+    /// it to the application it asked about, never to one named here.
+    pub remember: Option<String>,
+}
+
+impl Answer {
+    /// A yes or a no about this call and nothing else.
+    pub fn once(granted: bool) -> Self {
+        Self {
+            granted,
+            remember: None,
+        }
+    }
+}
+
 // The version this host speaks. A mismatch is refused by the daemon, and
 // refusing is the point: a protocol neither side agrees on is not a
 // conversation worth having.
@@ -76,6 +96,14 @@ pub struct Client {
 impl Client {
     /// Connect and shake hands. Nothing else is served until that succeeds.
     pub fn connect(path: &Path) -> Result<Self, Error> {
+        Self::connect_as(path, false)
+    }
+
+    /// Connect, saying whether this client can ask macOS to verify the owner.
+    ///
+    /// Only the signed app can, and only the app says so. The daemon does not
+    /// offer a question to a client that cannot answer it properly.
+    pub fn connect_as(path: &Path, verifies: bool) -> Result<Self, Error> {
         let stream = UnixStream::connect(path)
             .map_err(|_| Error::Unavailable(path.display().to_string()))?;
         let reader = BufReader::new(stream.try_clone()?);
@@ -85,15 +113,16 @@ impl Client {
             reader,
             counter: 0,
         };
-        client.hello()?;
+        client.hello(verifies)?;
         Ok(client)
     }
 
-    fn hello(&mut self) -> Result<(), Error> {
+    fn hello(&mut self, verifies: bool) -> Result<(), Error> {
         let response = self.request(json!({
             "type": "hello",
             "protocol": PROTOCOL_VERSION,
-            "client": "ev-host",
+            "client": if verifies { "ev-app" } else { "ev-host" },
+            "verifies": verifies,
         }))?;
 
         if !response.ok {
@@ -153,7 +182,7 @@ impl Client {
         &mut self,
         text: &str,
         locale: Option<&str>,
-        answer: &mut dyn FnMut(&Value) -> bool,
+        answer: &mut dyn FnMut(&Value) -> Answer,
     ) -> Result<Turn, Error> {
         self.turn(
             json!({ "type": "utterance.submit", "text": text, "locale": locale }),
@@ -168,7 +197,7 @@ impl Client {
         &mut self,
         wav: &[u8],
         locale: Option<&str>,
-        answer: &mut dyn FnMut(&Value) -> bool,
+        answer: &mut dyn FnMut(&Value) -> Answer,
     ) -> Result<Turn, Error> {
         use base64::Engine as _;
         let encoded = base64::engine::general_purpose::STANDARD.encode(wav);
@@ -188,7 +217,7 @@ impl Client {
         image: &[u8],
         text: Option<&str>,
         locale: Option<&str>,
-        answer: &mut dyn FnMut(&Value) -> bool,
+        answer: &mut dyn FnMut(&Value) -> Answer,
     ) -> Result<Turn, Error> {
         use base64::Engine as _;
         let encoded = base64::engine::general_purpose::STANDARD.encode(image);
@@ -231,7 +260,7 @@ impl Client {
     fn turn(
         &mut self,
         command: Value,
-        answer: &mut dyn FnMut(&Value) -> bool,
+        answer: &mut dyn FnMut(&Value) -> Answer,
     ) -> Result<Turn, Error> {
         let id = self.next_id();
         self.write(&id, command)?;
@@ -259,7 +288,7 @@ impl Client {
                 Some("confirmation.required") => {
                     let asked: ConfirmationRequired = serde_json::from_value(message.clone())
                         .map_err(|error| Error::Malformed(error.to_string()))?;
-                    let granted = answer(&message);
+                    let Answer { granted, remember } = answer(&message);
                     let reply = self.next_id();
                     self.write(
                         &reply,
@@ -267,6 +296,11 @@ impl Client {
                             "type": "confirmation.respond",
                             "request": asked.id,
                             "granted": granted,
+                            // "always" and "never" are answers about the
+                            // application, not about this call. The daemon
+                            // applies them to the application it asked about,
+                            // never to one named here.
+                            "remember": remember,
                         }),
                     )?;
                 }
