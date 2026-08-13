@@ -70,6 +70,8 @@ def test_specs_are_json_and_name_the_tools(capsys: pytest.CaptureFixture[str]) -
     specs = json.loads(capsys.readouterr().out)
 
     assert [spec["function"]["name"] for spec in specs] == [
+        "applications.open",
+        "applications.quit",
         "browser.open_url",
         "language.translate",
         "macro.run",

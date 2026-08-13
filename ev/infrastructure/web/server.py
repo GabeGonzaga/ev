@@ -23,7 +23,7 @@ from typing import Any
 
 from aiohttp import web
 
-from ev.application.confirmation import ConfirmationRequest
+from ev.application.confirmation import ConfirmationRequest, satisfiable
 from ev.domain.journal import JournalEntry
 from ev.domain.results import Clarification, ToolResult
 from ev.infrastructure.web.security import (
@@ -74,7 +74,14 @@ class Asked:
         self.questions: asyncio.Queue[ConfirmationRequest] = asyncio.Queue()
         self.answers: asyncio.Queue[bool] = asyncio.Queue()
 
+    verifies = False
+    """A page cannot raise macOS's authentication: `getUserMedia` asks in the
+    browser's name and there is no equivalent for the owner's password. An
+    application set to `verify` is answered in the app or not at all."""
+
     async def confirm(self, request: ConfirmationRequest) -> bool:
+        if not satisfiable(request, self):
+            return False
         await self.questions.put(request)
         try:
             return await asyncio.wait_for(self.answers.get(), ABANDONED_AFTER)

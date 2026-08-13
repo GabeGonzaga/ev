@@ -7,6 +7,7 @@ from ev.application.policy import (
     PermissionPolicy,
     PolicyDecision,
 )
+from ev.domain.access import Assurance
 from ev.domain.permissions import Permission, PermissionState
 from ev.domain.results import ToolResult
 from ev.domain.risk import RiskLevel
@@ -138,12 +139,15 @@ def test_a_cautious_threshold_confirms_sensitive_too() -> None:
     assert policy.decide(spec(risk=RiskLevel.SAFE)).decision is PolicyDecision.ALLOW
 
 
-def test_a_missing_permission_outranks_the_risk_threshold() -> None:
-    """The verdict says the most specific true thing about the call.
+def test_an_undecided_permission_does_not_skip_the_asking() -> None:
+    """Asking to be let through to macOS is not a reason to skip asking the
+    person.
 
-    It is still confirmed: `Registry.call()` enforces invariant 5 itself,
-    whatever the policy answered, so that a policy bug cannot let a
-    destructive action run unasked.
+    The first version of this ordering returned the permission request first,
+    and an application set to `ask` was waved past on its first call because
+    the permission behind it happened to be undecided. The confirmation comes
+    first now; the permission is still undecided afterwards, and macOS still
+    gets to answer when the call reaches it.
     """
     policy = PermissionPolicy(PermissionLedger())
 
@@ -151,4 +155,5 @@ def test_a_missing_permission_outranks_the_risk_threshold() -> None:
         spec(risk=RiskLevel.DESTRUCTIVE, permissions=frozenset({Permission.CAMERA}))
     )
 
-    assert verdict.decision is PolicyDecision.REQUEST_PERMISSION
+    assert verdict.decision is PolicyDecision.CONFIRM
+    assert verdict.assurance is Assurance.OWNER

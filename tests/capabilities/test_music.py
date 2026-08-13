@@ -3,12 +3,14 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from ev.application.applications import ApplicationLedger
 from ev.application.policy import PermissionLedger, PermissionPolicy
 from ev.application.speech import Speaker
 from ev.capabilities.music.adapters import MusicAdapter
 from ev.capabilities.music.args import ControlArgs, PlayArgs, VolumeArgs
 from ev.capabilities.music.service import MusicService
 from ev.capabilities.music.tools import music_tools
+from ev.domain.access import AccessLevel
 from ev.domain.naming import closest
 from ev.domain.permissions import Permission, PermissionState
 from ev.domain.results import ToolErrorCode
@@ -58,7 +60,13 @@ def build(
     service = MusicService(MusicAdapter(AppleScriptClient(ProcessRunner())))
     journal = CollectingJournal()
     registry = Registry(
-        policy=PermissionPolicy(PermissionLedger(states)),
+        # Music at `open`: these tests are about what music does, not about
+        # whether the user has let E.V. near it. The access levels have their
+        # own tests.
+        policy=PermissionPolicy(
+            PermissionLedger(states),
+            applications=ApplicationLedger(default=AccessLevel.OPEN),
+        ),
         confirmation=RefusingConfirmation(),
         journal=journal,
     )

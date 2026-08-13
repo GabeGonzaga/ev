@@ -1,0 +1,4 @@
+{"id": "open-an-application", "locale": "en", "tier": 2, "utterance": "open Safari", "tool": "applications.open", "arguments": {"name": "Safari"}}
+{"id": "open-an-application", "locale": "pt-PT", "tier": 2, "utterance": "abre o Visual Studio Code", "tool": "applications.open", "arguments": {"name": "Visual Studio Code"}}
+{"id": "quit-an-application", "locale": "en", "utterance": "quit Spotify", "tool": "applications.quit", "arguments": {"name": "Spotify"}}
+{"id": "quit-an-application", "locale": "pt-PT", "utterance": "fecha o Spotify", "tool": "applications.quit", "arguments": {"name": "Spotify"}}

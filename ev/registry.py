@@ -23,6 +23,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ev.application.confirmation import ConfirmationRequest
 from ev.application.policy import PolicyDecision, PolicyVerdict
+from ev.domain.access import FROM_RISK, Assurance, strongest
 from ev.domain.permissions import Permission
 from ev.domain.results import ToolErrorCode, ToolResult
 from ev.domain.risk import RiskLevel
@@ -44,9 +45,26 @@ class ToolSpec[ArgsT: BaseModel]:
     handler: Callable[[ArgsT], Awaitable[ToolResult]]
     permissions: frozenset[Permission] = field(default_factory=frozenset)
 
+    application: Callable[[ArgsT], str | None] | None = None
+    """Which application this call reaches into, from the validated arguments.
+
+    A constant for most tools -- `music.play` is always Music -- and a function
+    because some are told which: opening an application takes the name as an
+    argument. Read after validation, never from the raw proposal, so the
+    application checked is the one that would actually be touched.
+    """
+
+    assurance: Assurance = Assurance.NONE
+    """A floor the tool sets for itself, whatever the application's level says.
+    For what cannot be undone, or what speaks to other people in the user's
+    name."""
+
     @property
     def capability(self) -> str:
         return self.name.split(".", 1)[0]
+
+    def targets(self, args: ArgsT) -> str | None:
+        return self.application(args) if self.application is not None else None
 
 
 class CallRecord(BaseModel):
@@ -65,7 +83,9 @@ class CallRecord(BaseModel):
 
 
 class PolicyPort(Protocol):
-    def decide(self, spec: ToolSpec[Any]) -> PolicyVerdict: ...
+    def decide(
+        self, spec: ToolSpec[Any], application: str | None = None
+    ) -> PolicyVerdict: ...
 
 
 class ConfirmationPort(Protocol):
@@ -174,7 +194,10 @@ class Registry:
 
         normalised: dict[str, object] = validated.model_dump(mode="json")
 
-        verdict = self._policy.decide(spec)
+        # From the validated arguments, so what is checked is what would run.
+        application = spec.targets(validated)
+
+        verdict = self._policy.decide(spec, application)
         # REQUEST_PERMISSION reaches the handler exactly as ALLOW does. The
         # difference is who answers: macOS raises its own dialog on the first
         # attempt, and E.V. records what it said rather than guessing first.
@@ -196,7 +219,13 @@ class Registry:
             or spec.risk is RiskLevel.DESTRUCTIVE
         ):
             request = ConfirmationRequest(
-                tool=spec.name, risk=spec.risk, arguments=normalised
+                tool=spec.name,
+                risk=spec.risk,
+                arguments=normalised,
+                application=application,
+                # A destructive tool is confirmed whatever the policy said, so
+                # it needs an assurance even when the verdict carried none.
+                assurance=strongest(verdict.assurance, FROM_RISK[spec.risk]),
             )
             if not await self._confirmation.confirm(request):
                 return await self._finish(

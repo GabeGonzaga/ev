@@ -29,11 +29,23 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from ev.application.applications import DEFAULT as DEFAULT_LEVEL
+from ev.application.applications import (
+    ApplicationLedger,
+    applications_path,
+    load_levels,
+    save_levels,
+)
+from ev.application.applications import key as application_key
+from ev.application.applications import reloader as level_reloader
 from ev.application.assistant import Assistant
 from ev.application.confirmation import ConfirmationRequest
 from ev.application.frames import Frames
 from ev.application.policy import ConfidencePolicy, PermissionLedger, PermissionPolicy
 from ev.application.speech import Speaker
+from ev.capabilities.applications.adapters import ApplicationAdapter
+from ev.capabilities.applications.service import ApplicationService
+from ev.capabilities.applications.tools import application_tools
 from ev.capabilities.browser.adapters import OpenAdapter
 from ev.capabilities.browser.service import BrowserService
 from ev.capabilities.browser.tools import browser_tools
@@ -52,8 +64,10 @@ from ev.capabilities.reminders.service import RemindersService
 from ev.capabilities.reminders.tools import reminders_tools
 from ev.capabilities.vision.service import LOOK, Vision, VisionService
 from ev.capabilities.vision.tools import vision_tools
+from ev.domain.access import AccessLevel, Assurance
 from ev.domain.journal import JournalEntry
 from ev.domain.macro import Macro
+from ev.domain.naming import closest
 from ev.domain.results import Clarification, ToolResult
 from ev.infrastructure.database.connection import connect, default_database_path
 from ev.infrastructure.database.journal import SqliteJournal
@@ -61,6 +75,7 @@ from ev.infrastructure.database.migrations import migrate
 from ev.infrastructure.ipc.client import DaemonRefused, DaemonUnavailable, IpcClient
 from ev.infrastructure.ipc.server import IpcServer, SessionConfirmation, socket_path
 from ev.infrastructure.macos.applescript import AppleScriptClient
+from ev.infrastructure.macos.applications import Applications
 from ev.infrastructure.macos.processes import ProcessRunner
 from ev.infrastructure.macros import load_macros, macros_path
 from ev.infrastructure.ollama.client import OllamaClient, OllamaError
@@ -106,6 +121,19 @@ class ConsoleConfirmation:
     async def confirm(self, request: ConfirmationRequest) -> bool:
         detail = ", ".join(f"{key}={value}" for key, value in request.arguments.items())
         print(f"{request.tool} ({request.risk.value}) {detail}", file=sys.stderr)
+
+        if request.assurance not in {Assurance.NONE, Assurance.ACK}:
+            # A click is not a password. A terminal cannot raise the system's
+            # own dialog, and substituting a weaker answer for a stronger one
+            # is the whole failure this exists to prevent.
+            print(
+                f"{request.application or request.tool} is set to "
+                f"{request.assurance.value}, which only the app can satisfy. "
+                f"Open E.V. and ask there, or lower it: "
+                f"ev --app '{request.application}' ask",
+                file=sys.stderr,
+            )
+            return False
 
         if not self._interactive:
             print("declined: not a terminal", file=sys.stderr)
@@ -160,6 +188,7 @@ def build_registry(
     journal: JournalPort,
     confirmation: ConfirmationPort,
     ledger: PermissionLedger,
+    access: ApplicationLedger,
     generation: Completion,
     speaker: Speaker,
     frames: Frames,
@@ -167,7 +196,9 @@ def build_registry(
     macros: Path | None = None,
 ) -> Registry:
     registry = Registry(
-        policy=PermissionPolicy(ledger), confirmation=confirmation, journal=journal
+        policy=PermissionPolicy(ledger, applications=access),
+        confirmation=confirmation,
+        journal=journal,
     )
 
     processes = ProcessRunner()
@@ -187,8 +218,16 @@ def build_registry(
             # every other tool from working.
             return {}
 
+    applications = Applications()
+
     for spec in (
         *browser_tools(BrowserService(OpenAdapter(processes), speaker)),
+        *application_tools(
+            ApplicationService(
+                ApplicationAdapter(processes, applescript), applications, speaker
+            ),
+            applications,
+        ),
         *music_tools(MusicService(MusicAdapter(applescript), speaker)),
         *notes_tools(NotesService(NotesAdapter(applescript), speaker)),
         *reminders_tools(RemindersService(RemindersAdapter(applescript), speaker)),
@@ -220,6 +259,7 @@ def build(
     if database is None:
         journal = RefusingJournal()
         ledger = PermissionLedger()
+        access = ApplicationLedger()
     else:
         connection = connect(database)
         migrate(connection)
@@ -236,6 +276,12 @@ def build(
             persist=lambda granted: save_grants(grants, sorted(granted)),
         )
         settings = load_settings(settings_path(database.parent))
+        levels = applications_path(database.parent)
+        access = ApplicationLedger(
+            load_levels(levels),
+            refresh=level_reloader(levels),
+            persist=lambda known: save_levels(levels, known),
+        )
 
     if model is not None:
         settings = settings.with_model(model)
@@ -261,6 +307,7 @@ def build(
         journal=journal,
         confirmation=confirmation or ConsoleConfirmation(),
         ledger=ledger,
+        access=access,
         generation=generation_model,
         speaker=voice,
         frames=frames,
@@ -427,6 +474,19 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         help="undo a --grant. Repeatable.",
     )
     parser.add_argument(
+        "--apps",
+        action="store_true",
+        help="what E.V. may do with each application on this Mac",
+    )
+    parser.add_argument(
+        "--app",
+        nargs=2,
+        metavar=("NAME", "LEVEL"),
+        default=None,
+        help="set one: open (act freely), ask (every time), verify (macOS asks "
+        "for you), blocked (never)",
+    )
+    parser.add_argument(
         "--macros",
         action="store_true",
         help="list the saved macros and check them against the tools that "
@@ -515,6 +575,12 @@ async def run(args: argparse.Namespace, completion: Completion | None = None) ->
     if args.history is not None:
         return await show_history(database, args.history)
 
+    if args.app is not None:
+        return set_level(database.parent, args.app[0], args.app[1])
+
+    if args.apps:
+        return show_applications(database.parent)
+
     if args.macros:
         application = build(database=database, completion=_NoModel())
         try:
@@ -593,6 +659,57 @@ def show_macros(database: Path, registry: Registry) -> int:
                 print(f"  {number}. {step.tool} {step.arguments}")
 
     return EXIT_FAILED if broken else EXIT_OK
+
+
+def set_level(state_dir: Path, name: str, level: str) -> int:
+    """Say what E.V. may do with one application."""
+    try:
+        wanted = AccessLevel(level)
+    except ValueError:
+        known = ", ".join(item.value for item in AccessLevel)
+        print(f"unknown level {level!r}. Known: {known}", file=sys.stderr)
+        return EXIT_FAILED
+
+    installed = Applications().installed()
+    # Matched against what is here, so a typo is caught now rather than
+    # becoming a level that silently applies to nothing.
+    matched = closest(name, installed) if installed else name
+    if matched is None:
+        print(f"no application called {name!r} on this Mac", file=sys.stderr)
+        return EXIT_FAILED
+
+    path = applications_path(state_dir)
+    levels = load_levels(path)
+    levels[application_key(matched)] = wanted
+    save_levels(path, levels)
+
+    print(f"{matched}: {wanted.value}")
+    return EXIT_OK
+
+
+def show_applications(state_dir: Path) -> int:
+    """What has been decided, and what has not.
+
+    Everything installed is listed, because a control you have to remember to
+    look for is one nobody looks for.
+    """
+    levels = load_levels(applications_path(state_dir))
+    installed = Applications().installed()
+
+    for name in installed:
+        level = levels.get(application_key(name))
+        mark = level.value if level is not None else f"{DEFAULT_LEVEL.value} (default)"
+        print(f"{name:<34} {mark}")
+
+    known = {application_key(name) for name in installed}
+    for name, level in sorted(levels.items()):
+        # A level for something that is not installed any more: worth showing
+        # rather than silently dropping, because it will start applying again
+        # the day it is reinstalled.
+        if name not in known:
+            print(f"{name:<34} {level.value} (not installed)")
+
+    return EXIT_OK
 
 
 async def show_history(database: Path, limit: int, *, search: str | None = None) -> int:

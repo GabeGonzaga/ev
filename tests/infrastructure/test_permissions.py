@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from ev.application.policy import PermissionLedger, PermissionPolicy, PolicyDecision
+from ev.domain.access import Assurance
 from ev.domain.permissions import Permission, PermissionState
 from ev.domain.risk import RiskLevel
 from ev.infrastructure.macos.applescript import AppleScriptClient, AppleScriptError
@@ -83,6 +84,7 @@ def test_an_asserted_permission_is_believed_without_asking_anyone(
         name = "music.play"
         risk = RiskLevel.SENSITIVE
         permissions = frozenset({Permission.APPLE_EVENTS})
+        assurance = Assurance.NONE
 
     unknown = PermissionPolicy(PermissionLedger()).decide(Guarded())
     asserted = PermissionPolicy(PermissionLedger(load_grants(path))).decide(Guarded())
@@ -107,6 +109,7 @@ def test_a_grant_counts_without_a_restart(tmp_path: Path) -> None:
         name = "music.play"
         risk = RiskLevel.SENSITIVE
         permissions = frozenset({Permission.APPLE_EVENTS})
+        assurance = Assurance.NONE
 
     assert policy.decide(Guarded()).decision is PolicyDecision.REQUEST_PERMISSION
 
@@ -163,6 +166,7 @@ def test_the_refusal_says_how_to_fix_itself(tmp_path: Path) -> None:
         name = "music.play"
         risk = RiskLevel.SENSITIVE
         permissions = frozenset({Permission.APPLE_EVENTS})
+        assurance = Assurance.NONE
 
     verdict = policy.decide(Guarded())
 

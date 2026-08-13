@@ -21,6 +21,10 @@ Four parts, four responsibilities:
 | **Rust/Swift native host** | The nervous system: TCC-facing capabilities, audio, camera, NSPanel, global hotkeys |
 | **Ollama** | Proposes intent and generates content. Never receives authority over the machine |
 
+Applications are reached through named adapters and never through a generic
+controller. What E.V. may do with each one is the user's decision, recorded per
+application (invariant 8a).
+
 Three surfaces, one core: a CLI, a menu bar app, and a page served to this
 machine's browser. None of them executes anything — they all speak to the core,
 and the core owns the door.
@@ -102,6 +106,11 @@ enables.
 8. **Camera and microphone require explicit permission and a visible
    active-state indicator.** Neither may be started by ambiguous model
    inference. Sessions have a timeout. Frames are not persisted by default.
+8a. **Every application has a level, and E.V. reaches no further into it than
+   the user allowed**: `open`, `ask`, `verify`, `blocked`. Unknown means `ask`.
+   The level and the tool's risk are both floors and the stronger wins. A
+   surface that cannot satisfy what was asked for — a terminal, a browser page
+   — declines rather than substituting a weaker yes (ADR 0033).
 
 ### Data
 
@@ -229,6 +238,7 @@ ev/
 │   ├── policy.py
 │   └── sessions.py
 ├── capabilities/        one directory per capability
+│   ├── applications/    launch and quit, by name, resolved against what exists
 │   ├── browser/
 │   ├── music/
 │   ├── notes/

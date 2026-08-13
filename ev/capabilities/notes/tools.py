@@ -29,5 +29,7 @@ def notes_tools(service: NotesService) -> tuple[ToolSpec[Any], ...]:
             risk=RiskLevel.SENSITIVE,
             handler=service.create,
             permissions=APPLE_EVENTS,
+            # Always this one, so the level set for it governs every call.
+            application=lambda _args: "Notes",
         ),
     )

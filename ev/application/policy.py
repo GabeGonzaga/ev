@@ -18,6 +18,8 @@ from typing import Protocol, Self
 
 from pydantic import BaseModel, ConfigDict
 
+from ev.application.applications import ApplicationLedger
+from ev.domain.access import FROM_LEVEL, FROM_RISK, AccessLevel, Assurance, strongest
 from ev.domain.permissions import Permission, PermissionState
 from ev.domain.resolution import Resolution
 from ev.domain.risk import RiskLevel
@@ -51,6 +53,9 @@ class PolicyVerdict(BaseModel):
 
     decision: PolicyDecision
     reason: str | None = None
+    assurance: Assurance = Assurance.NONE
+    """What a CONFIRM must be satisfied with: a yes from whoever is there, or
+    macOS verifying the owner. Meaningless on the other decisions."""
 
     @classmethod
     def allow(cls) -> Self:
@@ -61,8 +66,8 @@ class PolicyVerdict(BaseModel):
         return cls(decision=PolicyDecision.DENY, reason=reason)
 
     @classmethod
-    def confirm(cls, reason: str) -> Self:
-        return cls(decision=PolicyDecision.CONFIRM, reason=reason)
+    def confirm(cls, reason: str, assurance: Assurance = Assurance.ACK) -> Self:
+        return cls(decision=PolicyDecision.CONFIRM, reason=reason, assurance=assurance)
 
     @classmethod
     def request(cls, reason: str) -> Self:
@@ -116,6 +121,12 @@ class Guarded(Protocol):
 
     @property
     def permissions(self) -> frozenset[Permission]: ...
+
+    @property
+    def assurance(self) -> Assurance:
+        """A floor the tool sets for itself, whatever an application's level
+        says. Sending a message to another person is not made reversible by
+        trusting the application it is sent from."""
 
 
 class PermissionLedger:
@@ -202,18 +213,24 @@ where to undo it is a dead end, and the pane names are not guessable."""
 
 
 class PermissionPolicy:
-    """The default policy: run what is permitted, ask above a risk threshold."""
+    """The default policy: run what is permitted, ask above a risk threshold,
+    and never reach further into an application than the user allowed."""
 
     def __init__(
         self,
         ledger: PermissionLedger,
         *,
         confirm_at: RiskLevel = RiskLevel.DESTRUCTIVE,
+        applications: ApplicationLedger | None = None,
     ) -> None:
         self._ledger = ledger
         self._confirm_at = confirm_at
+        # Absent on the read-only paths and in tests that predate it. An empty
+        # ledger answers `ask` for every application, which is the safe reading
+        # of "nobody has said".
+        self._applications = applications or ApplicationLedger()
 
-    def decide(self, spec: Guarded) -> PolicyVerdict:
+    def decide(self, spec: Guarded, application: str | None = None) -> PolicyVerdict:
         refused = self._ledger.refused(spec.permissions)
         if refused:
             missing = ", ".join(permission.value for permission in refused)
@@ -227,14 +244,49 @@ class PermissionPolicy:
         # most specific true thing about the call. A destructive tool is
         # confirmed either way: `Registry.call()` enforces that itself, so that
         # a policy bug cannot let one run unasked.
+        level = self._applications.level(application)
+        if level is AccessLevel.BLOCKED:
+            # Nothing to satisfy and nothing offered: an assurance here would
+            # turn a refusal into a challenge to be got around.
+            return PolicyVerdict.deny(
+                f"{application} is blocked. Change it with: ev --app {application} ask"
+            )
+
+        # Floors, never ceilings: the application's level and the tool's risk
+        # each set a minimum and the stronger wins. An application the user
+        # trusts does not make emptying the Trash reversible, and a harmless
+        # tool does not get a pass into a locked application.
+        assurance = strongest(FROM_LEVEL[level], FROM_RISK[spec.risk], spec.assurance)
+
+        destructive = _ORDER[spec.risk] >= _ORDER[self._confirm_at]
+        if destructive:
+            assurance = strongest(assurance, Assurance.ACK)
+
+        if assurance is not Assurance.NONE:
+            # Before the permission check on purpose. Asking to be let through
+            # to macOS is not a reason to skip asking the person first, and the
+            # first version did exactly that: an application set to `ask` was
+            # waved past on the first call, because the permission behind it
+            # happened to be undecided.
+            #
+            # Say which of the two floors is doing the asking, too: "is
+            # destructive" and "touches Mail" call for different answers from
+            # whoever reads them.
+            if destructive:
+                reason = f"{spec.name} is {spec.risk.value}"
+            elif application:
+                reason = f"{spec.name} touches {application}"
+            else:
+                reason = spec.name
+            return PolicyVerdict.confirm(reason, assurance)
+
+        # Nobody has decided the permission yet, so let the system be the one
+        # to ask.
         undecided = self._ledger.withheld(spec.permissions)
         if undecided:
             missing = ", ".join(permission.value for permission in undecided)
             return PolicyVerdict.request(
                 f"{spec.name} needs {missing}, which macOS has not been asked for yet"
             )
-
-        if _ORDER[spec.risk] >= _ORDER[self._confirm_at]:
-            return PolicyVerdict.confirm(f"{spec.name} is {spec.risk.value}")
 
         return PolicyVerdict.allow()

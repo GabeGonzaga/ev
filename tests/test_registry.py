@@ -23,8 +23,12 @@ class OpenArgs(BaseModel):
 class FixedPolicy:
     def __init__(self, decision: PolicyDecision, reason: str | None = None) -> None:
         self.verdict = PolicyVerdict(decision=decision, reason=reason)
+        self.asked_about: str | None = None
 
-    def decide(self, spec: ToolSpec[Any]) -> PolicyVerdict:
+    def decide(
+        self, spec: ToolSpec[Any], application: str | None = None
+    ) -> PolicyVerdict:
+        self.asked_about = application
         return self.verdict
 
 

@@ -48,7 +48,7 @@ Assistant.handle()              ToolResult | Clarification | None
 Registry.call()                 the single door
     │
     ├── args model validation   raw input never goes further than this
-    ├── PermissionPolicy        permission state, then risk
+    ├── PermissionPolicy        the application's level, permission state, risk
     ├── ConfirmationPort        always for DESTRUCTIVE, whatever the policy said
     ├── handler                 the capability's service, given a model instance
     └── JournalPort             every outcome, urgent when destructive
@@ -92,6 +92,7 @@ Each subsystem has one public port. Today there are eight:
 | Port | Owns |
 |---|---|
 | `ProcessRunner` | every subprocess. argv only — no shell, no `cwd`, no `env` |
+| `Applications` | what is installed. A spoken name is matched against it, never obeyed |
 | `AppleScriptClient` | every AppleScript. Constant source, values as `argv` |
 | `OllamaClient` | every model call, both paths. Local HTTP, model from config |
 | `Speaker` | what E.V. says, in the language it was asked in. No model |

@@ -28,6 +28,8 @@ def music_tools(service: MusicService) -> tuple[ToolSpec[Any], ...]:
             risk=RiskLevel.SENSITIVE,
             handler=service.play,
             permissions=APPLE_EVENTS,
+            # Always this one, so the level set for it governs every call.
+            application=lambda _args: "Music",
         ),
         ToolSpec(
             name=CONTROL,
@@ -38,6 +40,8 @@ def music_tools(service: MusicService) -> tuple[ToolSpec[Any], ...]:
             risk=RiskLevel.SENSITIVE,
             handler=service.control,
             permissions=APPLE_EVENTS,
+            # Always this one, so the level set for it governs every call.
+            application=lambda _args: "Music",
         ),
         ToolSpec(
             name=VOLUME,
@@ -46,5 +50,7 @@ def music_tools(service: MusicService) -> tuple[ToolSpec[Any], ...]:
             risk=RiskLevel.SENSITIVE,
             handler=service.volume,
             permissions=APPLE_EVENTS,
+            # Always this one, so the level set for it governs every call.
+            application=lambda _args: "Music",
         ),
     )

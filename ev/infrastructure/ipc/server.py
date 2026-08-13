@@ -31,7 +31,7 @@ from typing import Any, Protocol
 
 from pydantic import ValidationError
 
-from ev.application.confirmation import ConfirmationRequest
+from ev.application.confirmation import ConfirmationRequest, satisfiable
 from ev.domain.journal import JournalEntry
 from ev.domain.permissions import Permission, PermissionState
 from ev.domain.results import Clarification, ToolResult
@@ -163,6 +163,8 @@ class SessionConfirmation:
 
     async def confirm(self, request: ConfirmationRequest) -> bool:
         if self._asker is None:
+            return False
+        if not satisfiable(request, self._asker):
             return False
         return await self._asker.confirm(request)
 

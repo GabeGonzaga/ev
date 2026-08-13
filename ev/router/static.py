@@ -374,6 +374,22 @@ RULES: tuple[Rule, ...] = (
         r"com\s+o\s+titulo)\s+(?P<title>.+)$",
         _note,
     ),
+    # Quitting, in both languages. "Open X" is deliberately absent: without a
+    # domain it is a coin toss between an application and a website, and that
+    # is a judgement, which is tier 2's job. Closing is not ambiguous.
+    _rule(
+        "applications.quit",
+        r"^(?:please\s+)?(?:quit|close)\s+(?:the\s+)?(?:app\s+|application\s+)?"
+        r"(?P<name>[\w .+-]{2,60})$",
+        lambda groups: {"name": groups["name"].strip()},
+    ),
+    _rule(
+        "applications.quit",
+        r"^(?:por\s+favor\s+)?(?:fecha|fechar|sai\s+d[oa]|encerra)\s+"
+        r"(?:o\s+|a\s+)?(?:app\s+|aplica[çc][ãa]o\s+)?"
+        r"(?P<name>[\w .+-]{2,60})$",
+        lambda groups: {"name": groups["name"].strip()},
+    ),
     # A reminder with no date. Anything with a time in it escalates: see
     # `_WHEN`.
     _rule(
