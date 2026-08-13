@@ -21,6 +21,20 @@ const appearance = useAppearance();
 const layout = useLayout();
 const composer = ref<InstanceType<typeof TheComposer> | null>(null);
 
+/// Nothing on screen but the ring: no bars, no widgets, no chrome.
+///
+/// A state rather than a different application. E.V. spends most of its life
+/// waiting, and what it should look like while waiting is not what it should
+/// look like while being read from.
+const ambient = ref(false);
+
+async function rest(on: boolean) {
+  ambient.value = on;
+  // The window goes with it: a display with nothing on it should not be
+  // sharing the screen with the thing it was covering.
+  await windowControl("fullscreen");
+}
+
 const quiet = computed(
   () =>
     !session.question &&
@@ -49,7 +63,11 @@ onMounted(() => {
   // Escape puts the window away. It does not answer anything: a turn waiting
   // on a confirmation is still waiting when it comes back.
   window.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !session.question) void dismiss();
+    if (event.key !== "Escape") return;
+    // Escape leaves the resting screen before it puts the window away: one
+    // key, the nearest thing first.
+    if (ambient.value) return void rest(false);
+    if (!session.question) void dismiss();
   });
 
   window.addEventListener("focus", () => composer.value?.take());
@@ -57,7 +75,14 @@ onMounted(() => {
 </script>
 
 <template>
-  <main :class="{ app: inApp }">
+  <!-- Resting: the ring, and nothing else at all. -->
+  <main v-if="ambient" class="resting" @click="rest(false)">
+    <TheCore :state="session.state" ambient>
+      <TheAnswer />
+    </TheCore>
+  </main>
+
+  <main v-else :class="{ app: inApp }">
     <!-- The chrome is the handle: there is no title bar to drag. -->
     <header class="chrome" data-drag>
       <div v-if="hasWindowControls" class="lights">
@@ -81,6 +106,9 @@ onMounted(() => {
       <span class="state">{{ session.state }}</span>
       <span class="grow" />
       <span v-if="canBindKeys && session.shortcut" class="key">{{ shortcut }}</span>
+      <button class="mode rest" type="button" title="rest" @click="rest(true)">
+        rest
+      </button>
       <span class="mode">{{ appearance.resolved }}</span>
     </header>
 
@@ -89,10 +117,9 @@ onMounted(() => {
         <!-- The middle of the display: a ring that turns while E.V. is doing
              something, with whatever it has to say inside it. -->
         <TheCore :state="session.state">
-          <!-- Inside the ring: the one thing worth reading from across the
-               room. At rest that is what E.V. is doing; otherwise it is what
-               it just said, or the question it is waiting on. -->
-          <p v-if="quiet" class="word">{{ session.state }}</p>
+          <!-- Inside the ring: the wordmark, and whatever E.V. has to say.
+               Not what it is doing -- the chrome says that, and two labels in
+               one circle is one label too many. -->
           <TheQuestion />
           <TheAnswer />
         </TheCore>
@@ -215,6 +242,27 @@ main:not(.app) {
   padding: 2px 6px;
 }
 
+.rest {
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: var(--faint);
+}
+
+.rest:hover {
+  color: var(--ink);
+  border-color: var(--panel-lit);
+}
+
+/* Nothing else is on screen. That is the whole specification. */
+.resting {
+  display: grid;
+  place-items: center;
+  height: 100vh;
+  padding: 0;
+  cursor: none;
+}
+
 .grid {
   display: grid;
   grid-template-columns: 1.45fr 1fr;
@@ -250,16 +298,6 @@ main:not(.app) {
    display it belongs to. */
 .stage {
   justify-content: space-between;
-}
-
-.word {
-  margin: 0;
-  font-size: 15px;
-  font-weight: var(--display);
-  letter-spacing: 0.42em;
-  text-transform: uppercase;
-  color: var(--ink);
-  text-shadow: 0 0 16px rgba(var(--accent), 0.6);
 }
 
 /* One column when there is not room for two: the browser page on a laptop
