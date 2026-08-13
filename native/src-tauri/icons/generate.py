@@ -249,9 +249,7 @@ def render() -> list[list[tuple[float, float, float, float]]]:
     return rows
 
 
-def downsample(
-    rows: list[list[tuple[float, float, float, float]]], size: int
-) -> bytes:
+def downsample(rows: list[list[tuple[float, float, float, float]]], size: int) -> bytes:
     """A box filter, in linear-ish space. Good enough, and it keeps the glow
     from crawling the way a nearest-neighbour scale does."""
     step = SIZE // size
