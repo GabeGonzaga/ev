@@ -139,7 +139,9 @@ fn the_daemons_own_payloads_deserialise() {
 
     let mut client = Client::connect(&path).expect("connect");
     let turn = client
-        .submit("open github.com", Some("pt-PT"), &mut |_| Answer::once(true))
+        .submit("open github.com", Some("pt-PT"), &mut |_| {
+            Answer::once(true)
+        })
         .expect("turn");
 
     assert_eq!(turn.speech.len(), 1);

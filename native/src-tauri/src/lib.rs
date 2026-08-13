@@ -105,8 +105,7 @@ fn run_turn(app: &AppHandle, input: Input, locale: Option<String>) -> Result<Tur
     // `true`: this is the signed app, and it can put macOS's own
     // authentication on screen. The daemon needs to know before it decides
     // whether a question can be asked here at all.
-    let mut client =
-        Client::connect_as(&socket(), true).map_err(|error| error.to_string())?;
+    let mut client = Client::connect_as(&socket(), true).map_err(|error| error.to_string())?;
 
     // The question goes to the panel and this thread waits for the answer.
     // The app decides nothing: no answer within the window is a decline, the
@@ -581,20 +580,12 @@ pub fn run() {
                 let _ = window.hide();
             }
 
-            // Clicking away puts it away, the way every panel summoned by a
-            // key does -- unless it is in the middle of asking something, in
-            // which case it stays where the question can be answered.
-            if let tauri::WindowEvent::Focused(false) = event {
-                let waiting = window
-                    .state::<Session>()
-                    .answering
-                    .lock()
-                    .map(|slot| slot.is_some())
-                    .unwrap_or(false);
-                if !waiting {
-                    let _ = window.hide();
-                }
-            }
+            // Deliberately not hidden on losing focus any more. It was right
+            // for a small panel summoned to type one line into; this is a
+            // display with the trail, the settings and the state on it, and a
+            // display that vanishes the moment you look at something else is
+            // one you cannot read from. Escape puts it away, and so does the
+            // menu bar.
         })
         .build(tauri::generate_context!())
         .expect("the app failed to start")

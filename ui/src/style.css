@@ -1,73 +1,151 @@
 /* The look, in one place, for both shells.
  *
  * One Vue application is served by the daemon and embedded in the app, so
- * everything here has to work over vibrancy in a floating panel and over a
- * plain background in a browser tab. The difference is a class on <html>,
- * set once by main.ts, and nothing below cares beyond the background.
+ * everything here works over vibrancy in a window and over a plain background
+ * in a browser tab. The difference is a class on <html>, set once by main.ts.
  *
- * Native, deliberately: the system font, the system accent colour, and the
- * light and dark of whatever the machine is set to. E.V. lives in the menu
- * bar, and a menu bar application that invents its own palette looks like a
- * visitor.
+ * A head-up display: squared panels, thin lit borders, corner brackets, glow
+ * where something is live. The same language as the icon, which is the point
+ * -- an application whose window and whose icon disagree looks like two
+ * programs.
+ *
+ * Three axes, all on <html> so nothing has to be passed down:
+ *   data-theme  dark | light        resolved from system when asked to
+ *   data-accent cyan | vaporeon ... the colour that means "E.V."
+ *   class       in-app | in-browser what is behind the page
  */
 
 :root {
-  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, monospace;
 
-  /* AccentColor is the one the person chose in System Settings. The fallback
-     is macOS blue, for a browser that does not know the keyword. */
-  --accent: #0a84ff;
-  --accent: AccentColor;
+  --radius: 4px;
+  --gap: 14px;
+  --bracket: 10px;
 
-  --text: #1c1c1e;
-  --muted: rgba(60, 60, 67, 0.6);
-  --faint: rgba(60, 60, 67, 0.3);
-  --line: rgba(60, 60, 67, 0.18);
-  --field: rgba(255, 255, 255, 0.7);
-  --raised: rgba(255, 255, 255, 0.5);
-  --page: #f2f2f7;
-  --ok: #248a3d;
-  --bad: #d70015;
-  --live: #ff3b30;
-
-  --radius: 10px;
-  --gap: 12px;
-
-  color-scheme: light dark;
-  font: 14px/1.45 var(--font);
-  color: var(--text);
+  color-scheme: dark;
+  font: 13.5px/1.5 var(--sans);
   -webkit-font-smoothing: antialiased;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --accent: #0a84ff;
-    --accent: AccentColor;
-    --text: #f2f2f7;
-    --muted: rgba(235, 235, 245, 0.6);
-    --faint: rgba(235, 235, 245, 0.3);
-    --line: rgba(235, 235, 245, 0.16);
-    --field: rgba(118, 118, 128, 0.24);
-    --raised: rgba(118, 118, 128, 0.16);
-    --page: #1c1c1e;
-    --ok: #30d158;
-    --bad: #ff453a;
-  }
+/* --- the accents -------------------------------------------------------
+ *
+ * Cyan is E.V.'s own. The rest are the evolutions, because the name was
+ * always going to end up there: one hue each, and nothing else about the
+ * interface changes.
+ */
+
+:root,
+[data-accent="cyan"] {
+  --accent: 56, 189, 248;
+  --accent-lit: 186, 236, 255;
+}
+[data-accent="vaporeon"] {
+  --accent: 79, 158, 214;
+  --accent-lit: 178, 226, 255;
+}
+[data-accent="jolteon"] {
+  --accent: 246, 205, 76;
+  --accent-lit: 255, 238, 170;
+}
+[data-accent="flareon"] {
+  --accent: 240, 110, 68;
+  --accent-lit: 255, 190, 160;
+}
+[data-accent="espeon"] {
+  --accent: 197, 137, 214;
+  --accent-lit: 238, 200, 250;
+}
+[data-accent="umbreon"] {
+  --accent: 240, 196, 68;
+  --accent-lit: 255, 226, 150;
+}
+[data-accent="leafeon"] {
+  --accent: 126, 199, 108;
+  --accent-lit: 198, 240, 186;
+}
+[data-accent="glaceon"] {
+  --accent: 140, 214, 226;
+  --accent-lit: 210, 245, 250;
+}
+[data-accent="sylveon"] {
+  --accent: 240, 160, 196;
+  --accent-lit: 255, 210, 230;
+}
+
+/* --- dark, which is the one it was drawn for --------------------------- */
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #05080f;
+  --panel: rgba(var(--accent), 0.045);
+  --panel-edge: rgba(var(--accent), 0.32);
+  --panel-lit: rgba(var(--accent), 0.75);
+  --field: rgba(4, 10, 18, 0.55);
+  --text: #e8f4ff;
+  --muted: rgba(200, 226, 245, 0.62);
+  --faint: rgba(200, 226, 245, 0.34);
+  --line: rgba(var(--accent), 0.18);
+  /* What accent-coloured *text* uses. In the dark that is the lit end of the
+     palette; in daylight the same colour would be invisible, so it is the
+     accent taken towards ink instead. */
+  --ink: rgb(var(--accent-lit));
+  --glow: 0 0 18px rgba(var(--accent), 0.35);
+  --grid: rgba(var(--accent), 0.05);
+  --ok: #46d39a;
+  --bad: #ff6b6b;
+  --live: #ff4d4d;
+}
+
+/* --- light, which is the same display in daylight ---------------------- */
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --page: #eef4fa;
+  --panel: rgba(255, 255, 255, 0.75);
+  --panel-edge: rgba(var(--accent), 0.45);
+  --panel-lit: rgba(var(--accent), 0.95);
+  --field: rgba(255, 255, 255, 0.9);
+  --text: #0b1a26;
+  --muted: rgba(11, 26, 38, 0.72);
+  /* Higher than the dark theme's: 10px uppercase mono on white needs it. */
+  --faint: rgba(11, 26, 38, 0.52);
+  --line: rgba(var(--accent), 0.32);
+  --ink: color-mix(in srgb, rgb(var(--accent)) 72%, #04121c);
+  /* A shadow rather than a glow: light does not read as light on white. */
+  --glow: 0 2px 14px rgba(var(--accent), 0.28);
+  --grid: rgba(var(--accent), 0.07);
+  --ok: #0f8a5f;
+  --bad: #c92a2a;
+  --live: #e03131;
 }
 
 body {
   margin: 0;
-  /* In the app the window is transparent and macOS draws the material behind
-     it. In a browser there is nothing behind, so the page provides it. */
-  background: var(--page);
+  color: var(--text);
+  background:
+    radial-gradient(
+      120% 90% at 50% -10%,
+      rgba(var(--accent), 0.1),
+      transparent 60%
+    ),
+    var(--page);
+  /* The grid behind everything, at the edge of visible. */
+  background-attachment: fixed;
 }
 
-.in-app body {
-  background: transparent;
+/* In the app the window is transparent and macOS draws the material behind
+   it -- but only in the dark, where a dark material belongs. In daylight the
+   page paints itself, because a light interface over a dark blur is mud. */
+.in-app:not([data-theme="light"]) body {
+  background: linear-gradient(
+    180deg,
+    rgba(var(--accent), 0.06),
+    transparent 40%
+  );
 }
 
-/* The panel is dragged by its own header: there is no title bar to grab. */
+/* The panel is dragged by its own chrome: there is no title bar to grab. */
 [data-drag] {
   -webkit-app-region: drag;
 }
@@ -93,9 +171,68 @@ button {
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 1px solid rgb(var(--accent));
   outline-offset: 2px;
-  border-radius: 4px;
+}
+
+/* --- the panels --------------------------------------------------------
+ *
+ * Squared, with the corners drawn as brackets rather than closed. It is the
+ * one shape that says "instrument" without saying anything else.
+ */
+
+.hud {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.hud::before,
+.hud::after {
+  content: "";
+  position: absolute;
+  width: var(--bracket);
+  height: var(--bracket);
+  border: 1px solid var(--panel-lit);
+  pointer-events: none;
+}
+
+.hud::before {
+  top: -1px;
+  left: -1px;
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.hud::after {
+  bottom: -1px;
+  right: -1px;
+  border-left: 0;
+  border-top: 0;
+}
+
+.hud > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.hud > header::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--line), transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {

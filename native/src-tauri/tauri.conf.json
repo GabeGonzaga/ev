@@ -14,16 +14,18 @@
       {
         "label": "panel",
         "title": "E.V.",
-        "width": 620,
-        "height": 460,
-        "resizable": false,
+        "width": 1020,
+        "height": 680,
+        "resizable": true,
         "decorations": false,
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "center": true,
         "visible": false,
         "transparent": true,
-        "shadow": true
+        "shadow": true,
+        "minWidth": 720,
+        "minHeight": 520
       }
     ],
     "security": {

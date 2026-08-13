@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { ref } from "vue";
 import { useSession } from "../stores/session";
 
 const session = useSession();
-const open = ref(false);
 
-/// How long ago, in words. The panel is glanced at, and a full timestamp is
+/// How long ago, in words. A panel is glanced at, and a full timestamp is
 /// something to read rather than something to see.
 function ago(iso: string): string {
   const seconds = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
@@ -15,117 +13,86 @@ function ago(iso: string): string {
   return `${Math.floor(seconds / 86_400)}d`;
 }
 
-function toggle() {
-  open.value = !open.value;
-  if (open.value) void session.refresh();
+function search(value: string) {
+  session.search = value;
+  void session.refresh();
 }
 </script>
 
 <template>
-  <section class="history">
-    <header>
-      <button type="button" class="toggle" @click="toggle()">
-        <span class="chevron" :class="{ open }">›</span>
-        history
-      </button>
-      <input
-        v-if="open"
-        class="find"
-        type="search"
-        :value="session.search"
-        :placeholder="
-          session.locale === 'pt-PT' ? 'procurar' : 'search what E.V. has done'
-        "
-        @input="
-          session.search = ($event.target as HTMLInputElement).value;
-          session.refresh();
-        "
-      />
-    </header>
+  <div class="trail">
+    <input
+      class="find"
+      type="search"
+      :value="session.search"
+      :placeholder="session.locale === 'pt-PT' ? 'procurar' : 'search'"
+      @input="search(($event.target as HTMLInputElement).value)"
+    />
 
-    <ul v-if="open">
+    <ul>
       <li v-if="!session.entries.length" class="empty">
         {{ session.search ? `nothing matches “${session.search}”` : "nothing yet" }}
       </li>
       <li v-for="entry in session.entries" :key="entry.id">
-        <span :class="entry.ok ? 'ok' : 'bad'">{{ entry.ok ? "✓" : "✕" }}</span>
+        <span :class="entry.ok ? 'ok' : 'bad'">{{ entry.ok ? "▸" : "✕" }}</span>
         <span class="tool">{{ entry.tool }}</span>
         <span class="detail">{{ entry.speech ?? entry.error_message ?? "" }}</span>
         <time :datetime="entry.recorded_at">{{ ago(entry.recorded_at) }}</time>
       </li>
     </ul>
-  </section>
+  </div>
 </template>
 
 <style scoped>
-.history {
+.trail {
   display: flex;
   flex-direction: column;
+  gap: 8px;
   min-height: 0;
-}
-
-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.toggle {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  color: var(--muted);
-  padding: 2px 0;
-}
-
-.chevron {
-  display: inline-block;
-  transition: transform 0.15s;
-}
-
-.chevron.open {
-  transform: rotate(90deg);
+  flex: 1;
 }
 
 .find {
-  flex: 1;
-  min-width: 0;
-  padding: 4px 8px;
-  font-size: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 5px 8px;
+  font-family: var(--mono);
+  font-size: 11px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 2px;
   background: var(--field);
 }
 
 .find:focus {
   outline: none;
-  border-color: var(--accent);
+  border-color: var(--panel-lit);
+  box-shadow: var(--glow);
 }
 
 ul {
   list-style: none;
-  margin: 6px 0 0;
+  margin: 0;
   padding: 0;
   overflow-y: auto;
   min-height: 0;
+  flex: 1;
 }
 
 li {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  padding: 4px 0;
-  font-size: 12px;
-  border-top: 1px solid var(--line);
+  padding: 5px 0;
+  font-size: 11.5px;
+  border-bottom: 1px solid var(--line);
 }
 
-.ok { color: var(--ok); }
+.ok { color: var(--ink); }
 .bad { color: var(--bad); }
 
 .tool {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 10px;
   color: var(--muted);
   flex: none;
 }
@@ -136,16 +103,18 @@ li {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--text);
 }
 
 time {
   color: var(--faint);
+  font-family: var(--mono);
+  font-size: 10px;
   flex: none;
-  font-variant-numeric: tabular-nums;
 }
 
 .empty {
   color: var(--faint);
-  border-top: 0;
+  border-bottom: 0;
 }
 </style>

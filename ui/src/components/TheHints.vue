@@ -58,7 +58,11 @@ const key = computed(() =>
 .hints {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+  /* Centred in whatever room is left: at rest this is the whole panel, and a
+     list clinging to the top of an empty box looks like something failed to
+     load. */
+  margin: auto 0;
   padding: 4px 2px;
 }
 
@@ -69,11 +73,11 @@ const key = computed(() =>
 }
 
 kbd {
-  font-family: var(--font);
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: var(--raised);
+  font-family: var(--mono);
+  padding: 1px 6px;
+  border-radius: 2px;
   border: 1px solid var(--line);
+  color: var(--ink);
 }
 
 ul {
@@ -86,17 +90,18 @@ ul {
 }
 
 button {
-  padding: 4px 10px;
-  border-radius: 999px;
+  padding: 5px 10px;
+  border-radius: 2px;
   border: 1px solid var(--line);
   background: var(--field);
   font-size: 12px;
   color: var(--muted);
-  transition: color 0.15s, border-color 0.15s;
+  transition: color 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
 
 button:hover {
   color: var(--text);
-  border-color: var(--accent);
+  border-color: var(--panel-lit);
+  box-shadow: var(--glow);
 }
 </style>

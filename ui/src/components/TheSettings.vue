@@ -1,10 +1,8 @@
 <script setup lang="ts">
-import { ref } from "vue";
 import { canBindKeys } from "../api";
 import { useSession } from "../stores/session";
 
 const session = useSession();
-const open = ref(false);
 
 // Recorded as it is typed, so "⌘⇧Space" is one gesture rather than something
 // to spell. The app answers whether it could take the key.
@@ -30,83 +28,48 @@ function pretty(binding: string): string {
     .split("+")
     .map(
       (part) =>
-        ({
-          CmdOrCtrl: "⌘",
-          Cmd: "⌘",
-          Ctrl: "⌃",
-          Alt: "⌥",
-          Shift: "⇧",
-          Space: "Space",
-        })[part] ?? part,
+        ({ CmdOrCtrl: "⌘", Cmd: "⌘", Ctrl: "⌃", Alt: "⌥", Shift: "⇧" })[part] ??
+        part,
     )
     .join("");
 }
 </script>
 
 <template>
-  <section class="settings">
-    <button type="button" class="toggle" @click="open = !open">
-      <span class="chevron" :class="{ open }">›</span>
-      settings
-    </button>
+  <div class="rows">
+    <label>
+      <span>Language</span>
+      <select
+        :value="session.locale"
+        @change="session.choose(($event.target as HTMLSelectElement).value)"
+      >
+        <option value="pt-PT">Português (PT)</option>
+        <option value="en">English</option>
+      </select>
+    </label>
 
-    <div v-if="open" class="rows">
-      <label>
-        <span>Language</span>
-        <select
-          :value="session.locale"
-          @change="session.choose(($event.target as HTMLSelectElement).value)"
-        >
-          <option value="pt-PT">Português (PT)</option>
-          <option value="en">English</option>
-        </select>
-      </label>
+    <label v-if="canBindKeys">
+      <span>Hold to talk</span>
+      <input
+        readonly
+        class="key"
+        :value="pretty(session.shortcut)"
+        placeholder="click, then press"
+        @keydown="record"
+      />
+    </label>
 
-      <label v-if="canBindKeys">
-        <span>Hold to talk</span>
-        <input
-          readonly
-          class="key"
-          :value="pretty(session.shortcut)"
-          placeholder="click, then press a combination"
-          @keydown="record"
-        />
-      </label>
-
-      <p v-if="session.shortcutTrouble" class="trouble">
-        {{ session.shortcutTrouble }}
-      </p>
-      <p v-else-if="canBindKeys" class="note">
-        Hold it anywhere to talk. Let go and E.V. answers.
-      </p>
-    </div>
-  </section>
+    <p v-if="session.shortcutTrouble" class="trouble">
+      {{ session.shortcutTrouble }}
+    </p>
+  </div>
 </template>
 
 <style scoped>
-.toggle {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  color: var(--muted);
-  padding: 2px 0;
-}
-
-.chevron {
-  display: inline-block;
-  transition: transform 0.15s;
-}
-
-.chevron.open {
-  transform: rotate(90deg);
-}
-
 .rows {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-top: 8px;
 }
 
 label {
@@ -114,17 +77,28 @@ label {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  font-size: 13px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+select {
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: right 10px center, right 6px center;
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
 }
 
 select,
 .key {
   padding: 3px 8px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 2px;
   background: var(--field);
-  font-size: 12px;
-  min-width: 160px;
+  color: var(--text);
+  font-size: 11px;
+  min-width: 150px;
   text-align: center;
 }
 
@@ -133,10 +107,11 @@ select,
   cursor: pointer;
 }
 
-.note {
-  margin: 0;
-  font-size: 11px;
-  color: var(--faint);
+select:focus,
+.key:focus {
+  outline: none;
+  border-color: var(--panel-lit);
+  box-shadow: var(--glow);
 }
 
 .trouble {
