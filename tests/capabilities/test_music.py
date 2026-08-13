@@ -48,12 +48,13 @@ class RefusingConfirmation:
         raise AssertionError("music.play must not require confirmation")
 
 
-def build(*, granted: bool) -> tuple[Registry, CollectingJournal]:
-    states = (
-        {Permission.APPLE_EVENTS: PermissionState.GRANTED}
-        if granted
-        else {Permission.APPLE_EVENTS: PermissionState.UNDETERMINED}
-    )
+def build(
+    *, granted: bool, state: PermissionState | None = None
+) -> tuple[Registry, CollectingJournal]:
+    states = {
+        Permission.APPLE_EVENTS: state
+        or (PermissionState.GRANTED if granted else PermissionState.UNDETERMINED)
+    }
     service = MusicService(MusicAdapter(AppleScriptClient(ProcessRunner())))
     journal = CollectingJournal()
     registry = Registry(
@@ -134,18 +135,39 @@ async def test_the_scripts_own_error_is_what_the_user_hears(
 
 
 @pytest.mark.asyncio
-async def test_the_permission_gate_stops_it_before_macos_is_asked(
+async def test_a_refused_permission_stops_it_before_macos_is_asked_again(
     fake_bin: FakeBin,
 ) -> None:
-    registry, journal = build(granted=False)
+    """Refused, not undecided.
+
+    macOS raises no second dialog for something it has already refused, so
+    trying again is a silent failure with extra steps. The useful answer is
+    where the decision is changed.
+    """
+    registry, journal = build(granted=False, state=PermissionState.DENIED)
 
     result = await registry.call("music.play", {"name": "Blonde", "kind": "album"})
 
     assert result.error is not None
     assert result.error.code is ToolErrorCode.PERMISSION_DENIED
     assert "apple_events" in result.error.message
+    assert "System Settings" in result.error.message
     assert not fake_bin.was_run()
     assert journal.records[0].result.ok is False
+
+
+@pytest.mark.asyncio
+async def test_an_undecided_permission_lets_macos_do_the_asking(
+    fake_bin: FakeBin,
+) -> None:
+    # The whole change: E.V. used to refuse here, and the person had to type
+    # --grant to get out of its way. Now the call reaches osascript, which is
+    # the only thing that can make macOS put a dialog on screen.
+    registry, _ = build(granted=False)
+
+    await registry.call("music.play", {"name": "Blonde", "kind": "album"})
+
+    assert fake_bin.was_run()
 
 
 @pytest.mark.asyncio

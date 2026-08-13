@@ -117,7 +117,8 @@ nothing.
 | Tauri shell: menu bar, panel, four commands | done |
 | History in the panel, searchable | done |
 | A global hotkey: hold to talk, anywhere | done, unproven on device |
-| The app spawns the daemon and owns its lifetime | done, unproven on device |
+| The app spawns the daemon and owns its lifetime | done |
+| Permissions: macOS asked rather than pre-refused, answers recorded | done |
 | Settings: the shortcut and the locale, remembered | done |
 | Confirmation in the browser page, sharing the core's turn lock | done |
 | Confirmation in the Tauri panel | done |

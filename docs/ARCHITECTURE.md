@@ -116,7 +116,6 @@ structure shaped by symmetry rather than by a decision.
 | `capabilities/<cap>/adapters.py` → `adapters/` | a second adapter in that capability |
 | A new capability directory | its first tool lands |
 | `ev/router/` gains a module | tier 2 arrives (phase 1) |
-| `PolicyDecision` gains `REQUEST_PERMISSION` | a native host exists that can service it |
 | Enforcing the `Content` marker | one step's result becomes another's argument (macro chaining, adr/0024) |
 | Streaming model responses | something can render a partial answer |
 | `sqlite-vec` | a corpus that a word match cannot answer (adr/0026) |
@@ -150,8 +149,12 @@ The suite reaches no model at all. An autouse fixture fails any test that would
 open a socket to Ollama, because that test would pass or fail according to
 whose machine ran it.
 
-A tool declaring a TCC permission is denied until the user asserts the grant
-(`--grant`, ADR 0007) or, from phase 1.5, a host reports it. `music.play`
+A tool declaring a TCC permission that macOS has *refused* is denied, and the
+refusal names the System Settings pane. One nobody has decided yet runs, so
+macOS can ask (ADR 0032): E.V. cannot raise a TCC dialog and standing in front
+of the attempt only means nobody is ever asked. What the system answers is
+recorded -- a delivered Apple Event, a camera that opened -- and grants are
+kept across runs. `music.play`
 declares `APPLE_EVENTS` and takes that path; `browser.open_url` declares
 nothing, because `open(1)` needs nothing.
 

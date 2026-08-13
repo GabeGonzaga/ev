@@ -46,14 +46,17 @@ def test_a_tool_needing_nothing_is_allowed() -> None:
     assert policy.decide(spec()).decision is PolicyDecision.ALLOW
 
 
-def test_an_undetermined_permission_denies() -> None:
-    # Phase 0 has no native host, so nothing is granted and anything declaring
-    # a permission cannot run. Denying is the honest answer.
+def test_an_undetermined_permission_asks_the_system_rather_than_refusing() -> None:
+    """It used to deny, and that was the honest answer when nothing could ask.
+
+    Something can now: macOS raises its own dialog on the first attempt, and
+    E.V. standing in front of it is what made `--grant` a chore (ADR 0032).
+    """
     policy = PermissionPolicy(PermissionLedger())
 
     verdict = policy.decide(spec(permissions=frozenset({Permission.MICROPHONE})))
 
-    assert verdict.decision is PolicyDecision.DENY
+    assert verdict.decision is PolicyDecision.REQUEST_PERMISSION
     assert verdict.reason is not None
     assert "microphone" in verdict.reason
 
@@ -75,7 +78,8 @@ def test_every_declared_permission_must_be_held() -> None:
         spec(permissions=frozenset({Permission.APPLE_EVENTS, Permission.CAMERA}))
     )
 
-    assert verdict.decision is PolicyDecision.DENY
+    # One held and one undecided is not "held".
+    assert verdict.decision is PolicyDecision.REQUEST_PERMISSION
     assert verdict.reason is not None
     assert "camera" in verdict.reason
     assert "apple_events" not in verdict.reason
@@ -95,7 +99,7 @@ def test_the_ledger_takes_updates_from_the_host() -> None:
     policy = PermissionPolicy(ledger)
     guarded = spec(permissions=frozenset({Permission.ACCESSIBILITY}))
 
-    assert policy.decide(guarded).decision is PolicyDecision.DENY
+    assert policy.decide(guarded).decision is PolicyDecision.REQUEST_PERMISSION
 
     ledger.update(Permission.ACCESSIBILITY, PermissionState.GRANTED)
 
@@ -135,11 +139,16 @@ def test_a_cautious_threshold_confirms_sensitive_too() -> None:
 
 
 def test_a_missing_permission_outranks_the_risk_threshold() -> None:
-    # Not "ask the user and then fail": there is nothing to ask about.
+    """The verdict says the most specific true thing about the call.
+
+    It is still confirmed: `Registry.call()` enforces invariant 5 itself,
+    whatever the policy answered, so that a policy bug cannot let a
+    destructive action run unasked.
+    """
     policy = PermissionPolicy(PermissionLedger())
 
     verdict = policy.decide(
         spec(risk=RiskLevel.DESTRUCTIVE, permissions=frozenset({Permission.CAMERA}))
     )
 
-    assert verdict.decision is PolicyDecision.DENY
+    assert verdict.decision is PolicyDecision.REQUEST_PERMISSION

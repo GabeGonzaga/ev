@@ -19,6 +19,7 @@ from typing import Any
 import pytest
 
 from ev.application.confirmation import ConfirmationRequest
+from ev.domain.permissions import Permission, PermissionState
 from ev.domain.results import Clarification, ToolErrorCode, ToolResult
 from ev.domain.risk import RiskLevel
 from ev.infrastructure.ipc.client import DaemonRefused, DaemonUnavailable, IpcClient
@@ -31,6 +32,7 @@ from protocol.messages import (
     PROTOCOL_VERSION,
     AudioSubmit,
     Hello,
+    PermissionReport,
     Request,
     UtteranceSubmit,
     VisionSubmit,
@@ -422,7 +424,7 @@ async def test_an_unbound_confirmation_declines() -> None:
 async def test_a_refused_handshake_reaches_the_client(state: Path) -> None:
     core = Core()
     async for _ in start(state, core):
-        with pytest.raises(DaemonRefused, match=r"speaks 1\.4"):
+        with pytest.raises(DaemonRefused, match=r"speaks 1\.5"):
             async with IpcClient(socket_path(state), protocol="0.9"):
                 pass
         break
@@ -740,3 +742,65 @@ async def test_a_daemon_with_no_journal_says_so(state: Path) -> None:
 
         assert answer["error"]["code"] == "no_history"
         break
+
+
+async def test_the_host_reports_what_macos_answered(state: Path) -> None:
+    """Invariant 7: the core never infers permission state.
+
+    Only the signed process macOS answered can know whether a camera opened,
+    so the report is a command it sends -- not something the core polls, and
+    not something it guesses from a failure.
+    """
+    said: list[tuple[Permission, PermissionState]] = []
+
+    server = IpcServer(
+        path=socket_path(state),
+        handle=Core(None).handle,
+        confirmation=SessionConfirmation(),
+        report=lambda permission, permission_state: said.append(
+            (permission, permission_state)
+        ),
+    )
+    await server.start()
+    task = asyncio.create_task(server.serve_forever())
+
+    try:
+        async with IpcClient(socket_path(state)) as client:
+            answer = await client._send(
+                PermissionReport(
+                    permission=Permission.CAMERA, state=PermissionState.GRANTED
+                )
+            )
+
+        assert answer["ok"] is True
+        assert said == [(Permission.CAMERA, PermissionState.GRANTED)]
+    finally:
+        task.cancel()
+        await server.aclose()
+
+
+async def test_a_report_is_not_a_turn(state: Path) -> None:
+    # It takes no lock, journals nothing and answers at once. A daemon that
+    # went quiet while a permission was reported would stall the app's startup.
+    server = IpcServer(
+        path=socket_path(state),
+        handle=Core(None).handle,
+        confirmation=SessionConfirmation(),
+    )
+    await server.start()
+    task = asyncio.create_task(server.serve_forever())
+
+    try:
+        async with IpcClient(socket_path(state)) as client:
+            answer = await client._send(
+                PermissionReport(
+                    permission=Permission.MICROPHONE, state=PermissionState.GRANTED
+                )
+            )
+
+        # No reporter wired: still answered, because a client waiting on a
+        # response it will never get is worse than a report going nowhere.
+        assert answer["ok"] is True
+    finally:
+        task.cancel()
+        await server.aclose()

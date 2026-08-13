@@ -175,6 +175,9 @@ class Registry:
         normalised: dict[str, object] = validated.model_dump(mode="json")
 
         verdict = self._policy.decide(spec)
+        # REQUEST_PERMISSION reaches the handler exactly as ALLOW does. The
+        # difference is who answers: macOS raises its own dialog on the first
+        # attempt, and E.V. records what it said rather than guessing first.
         if verdict.decision is PolicyDecision.DENY:
             return await self._finish(
                 spec,

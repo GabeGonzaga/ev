@@ -203,6 +203,29 @@ impl Client {
         )
     }
 
+    /// Tell the core what macOS said about a permission.
+    ///
+    /// Invariant 7: the core never infers this. Only the signed process macOS
+    /// answered can know whether a camera opened or a microphone was refused,
+    /// and this is how it says so.
+    pub fn report_permission(&mut self, permission: &str, state: &str) -> Result<(), Error> {
+        let response = self.request(json!({
+            "type": "permission.report",
+            "permission": permission,
+            "state": state,
+        }))?;
+
+        if response.ok {
+            return Ok(());
+        }
+        Err(Error::Refused(
+            response
+                .error
+                .map(|error| error.message)
+                .unwrap_or_else(|| "refused".to_string()),
+        ))
+    }
+
     /// `answer` decides confirmations; the host does not decide them itself,
     /// which is the same rule the CLI follows.
     fn turn(

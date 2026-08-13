@@ -188,14 +188,19 @@ def test_looking_declares_the_camera() -> None:
 
 
 @pytest.mark.asyncio
-async def test_without_the_camera_permission_the_model_is_never_asked() -> None:
-    # The policy denies before anything is shown to anything. A frame that a
-    # refused tool still sent to a model would be the whole point missed.
+async def test_with_the_camera_refused_the_model_is_never_asked() -> None:
+    # A frame that a refused tool still sent to a model would be the whole
+    # point missed. Refused, not merely undecided: an undecided permission is
+    # let through so macOS can ask (ADR 0032), and by the time a frame exists
+    # macOS has already been asked -- the surface could not have captured it
+    # otherwise.
     frames = Frames()
     frames.bind(FRAME)
     model = Model()
     registry = Registry(
-        policy=PermissionPolicy(PermissionLedger()),
+        policy=PermissionPolicy(
+            PermissionLedger({Permission.CAMERA: PermissionState.DENIED})
+        ),
         confirmation=Allowing(),
         journal=CollectingJournal(),
     )

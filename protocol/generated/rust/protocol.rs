@@ -194,6 +194,9 @@ impl AudioSubmit {
 #[doc = "      \"$ref\": \"#/$defs/HistoryQuery\""]
 #[doc = "    },"]
 #[doc = "    {"]
+#[doc = "      \"$ref\": \"#/$defs/PermissionReport\""]
+#[doc = "    },"]
+#[doc = "    {"]
 #[doc = "      \"$ref\": \"#/$defs/SessionCancel\""]
 #[doc = "    }"]
 #[doc = "  ],"]
@@ -203,6 +206,7 @@ impl AudioSubmit {
 #[doc = "      \"confirmation.respond\": \"#/$defs/ConfirmationRespond\","]
 #[doc = "      \"hello\": \"#/$defs/Hello\","]
 #[doc = "      \"history.query\": \"#/$defs/HistoryQuery\","]
+#[doc = "      \"permission.report\": \"#/$defs/PermissionReport\","]
 #[doc = "      \"session.cancel\": \"#/$defs/SessionCancel\","]
 #[doc = "      \"utterance.submit\": \"#/$defs/UtteranceSubmit\","]
 #[doc = "      \"vision.submit\": \"#/$defs/VisionSubmit\""]
@@ -221,6 +225,7 @@ pub enum Command {
     VisionSubmit(VisionSubmit),
     ConfirmationRespond(ConfirmationRespond),
     HistoryQuery(HistoryQuery),
+    PermissionReport(PermissionReport),
     SessionCancel(SessionCancel),
 }
 impl ::std::convert::From<Hello> for Command {
@@ -251,6 +256,11 @@ impl ::std::convert::From<ConfirmationRespond> for Command {
 impl ::std::convert::From<HistoryQuery> for Command {
     fn from(value: HistoryQuery) -> Self {
         Self::HistoryQuery(value)
+    }
+}
+impl ::std::convert::From<PermissionReport> for Command {
+    fn from(value: PermissionReport) -> Self {
+        Self::PermissionReport(value)
     }
 }
 impl ::std::convert::From<SessionCancel> for Command {
@@ -452,7 +462,7 @@ impl ConfirmationRespond {
 #[doc = "    }"]
 #[doc = "  },"]
 #[doc = "  \"additionalProperties\": false,"]
-#[doc = "  \"x-ev-protocol-version\": \"1.4\""]
+#[doc = "  \"x-ev-protocol-version\": \"1.5\""]
 #[doc = "}"]
 #[doc = r" ```"]
 #[doc = r" </details>"]
@@ -1109,6 +1119,50 @@ impl PermissionChanged {
         Default::default()
     }
 }
+#[doc = "What macOS said about a permission, from the process it said it to.\n\nInvariant 7: permission state is reported by the signed host, never\ninferred by the core. This is that report. Only the host can know whether\na camera opened or a microphone was refused, because it is the process\nmacOS answered.\n\nSent when there is evidence -- a device that opened, a prompt that was\nanswered -- and not on a schedule. A permission nobody has exercised is\n`undetermined`, which is a true statement rather than a missing one."]
+#[doc = r""]
+#[doc = r" <details><summary>JSON schema</summary>"]
+#[doc = r""]
+#[doc = r" ```json"]
+#[doc = "{"]
+#[doc = "  \"title\": \"PermissionReport\","]
+#[doc = "  \"description\": \"What macOS said about a permission, from the process it said it to.\\n\\nInvariant 7: permission state is reported by the signed host, never\\ninferred by the core. This is that report. Only the host can know whether\\na camera opened or a microphone was refused, because it is the process\\nmacOS answered.\\n\\nSent when there is evidence -- a device that opened, a prompt that was\\nanswered -- and not on a schedule. A permission nobody has exercised is\\n`undetermined`, which is a true statement rather than a missing one.\","]
+#[doc = "  \"type\": \"object\","]
+#[doc = "  \"required\": ["]
+#[doc = "    \"permission\","]
+#[doc = "    \"state\""]
+#[doc = "  ],"]
+#[doc = "  \"properties\": {"]
+#[doc = "    \"permission\": {"]
+#[doc = "      \"$ref\": \"#/$defs/Permission\""]
+#[doc = "    },"]
+#[doc = "    \"state\": {"]
+#[doc = "      \"$ref\": \"#/$defs/PermissionState\""]
+#[doc = "    },"]
+#[doc = "    \"type\": {"]
+#[doc = "      \"title\": \"Type\","]
+#[doc = "      \"default\": \"permission.report\","]
+#[doc = "      \"type\": \"string\","]
+#[doc = "      \"const\": \"permission.report\""]
+#[doc = "    }"]
+#[doc = "  },"]
+#[doc = "  \"additionalProperties\": false"]
+#[doc = "}"]
+#[doc = r" ```"]
+#[doc = r" </details>"]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct PermissionReport {
+    pub permission: Permission,
+    pub state: PermissionState,
+    #[serde(rename = "type", default = "defaults::permission_report_type")]
+    pub type_: ::std::string::String,
+}
+impl PermissionReport {
+    pub fn builder() -> builder::PermissionReport {
+        Default::default()
+    }
+}
 #[doc = "What the host last reported for a permission."]
 #[doc = r""]
 #[doc = r" <details><summary>JSON schema</summary>"]
@@ -1224,6 +1278,9 @@ impl ::std::convert::TryFrom<::std::string::String> for PermissionState {
 #[doc = "          \"$ref\": \"#/$defs/HistoryQuery\""]
 #[doc = "        },"]
 #[doc = "        {"]
+#[doc = "          \"$ref\": \"#/$defs/PermissionReport\""]
+#[doc = "        },"]
+#[doc = "        {"]
 #[doc = "          \"$ref\": \"#/$defs/SessionCancel\""]
 #[doc = "        }"]
 #[doc = "      ],"]
@@ -1233,6 +1290,7 @@ impl ::std::convert::TryFrom<::std::string::String> for PermissionState {
 #[doc = "          \"confirmation.respond\": \"#/$defs/ConfirmationRespond\","]
 #[doc = "          \"hello\": \"#/$defs/Hello\","]
 #[doc = "          \"history.query\": \"#/$defs/HistoryQuery\","]
+#[doc = "          \"permission.report\": \"#/$defs/PermissionReport\","]
 #[doc = "          \"session.cancel\": \"#/$defs/SessionCancel\","]
 #[doc = "          \"utterance.submit\": \"#/$defs/UtteranceSubmit\","]
 #[doc = "          \"vision.submit\": \"#/$defs/VisionSubmit\""]
@@ -2814,6 +2872,74 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
+    pub struct PermissionReport {
+        permission: ::std::result::Result<super::Permission, ::std::string::String>,
+        state: ::std::result::Result<super::PermissionState, ::std::string::String>,
+        type_: ::std::result::Result<::std::string::String, ::std::string::String>,
+    }
+    impl ::std::default::Default for PermissionReport {
+        fn default() -> Self {
+            Self {
+                permission: Err("no value supplied for permission".to_string()),
+                state: Err("no value supplied for state".to_string()),
+                type_: Ok(super::defaults::permission_report_type()),
+            }
+        }
+    }
+    impl PermissionReport {
+        pub fn permission<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<super::Permission>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.permission = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for permission: {e}"));
+            self
+        }
+        pub fn state<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<super::PermissionState>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.state = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for state: {e}"));
+            self
+        }
+        pub fn type_<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<::std::string::String>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.type_ = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for type_: {e}"));
+            self
+        }
+    }
+    impl ::std::convert::TryFrom<PermissionReport> for super::PermissionReport {
+        type Error = super::error::ConversionError;
+        fn try_from(
+            value: PermissionReport,
+        ) -> ::std::result::Result<Self, super::error::ConversionError> {
+            Ok(Self {
+                permission: value.permission?,
+                state: value.state?,
+                type_: value.type_?,
+            })
+        }
+    }
+    impl ::std::convert::From<super::PermissionReport> for PermissionReport {
+        fn from(value: super::PermissionReport) -> Self {
+            Self {
+                permission: Ok(value.permission),
+                state: Ok(value.state),
+                type_: Ok(value.type_),
+            }
+        }
+    }
+    #[derive(Clone, Debug)]
     pub struct Request {
         command: ::std::result::Result<super::Command, ::std::string::String>,
         id: ::std::result::Result<::std::string::String, ::std::string::String>,
@@ -3532,6 +3658,9 @@ pub mod defaults {
     }
     pub(super) fn permission_changed_type() -> ::std::string::String {
         "permission.changed".to_string()
+    }
+    pub(super) fn permission_report_type() -> ::std::string::String {
+        "permission.report".to_string()
     }
     pub(super) fn session_cancel_type() -> ::std::string::String {
         "session.cancel".to_string()

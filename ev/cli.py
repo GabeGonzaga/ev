@@ -171,7 +171,9 @@ def build_registry(
     )
 
     processes = ProcessRunner()
-    applescript = AppleScriptClient(processes)
+    # Every Apple Event is evidence: one delivered proves Automation is on, and
+    # one refused proves it is off. Better evidence than anyone typing --grant.
+    applescript = AppleScriptClient(processes, report=ledger.update)
 
     def saved() -> dict[str, Macro]:
         # Read per run rather than held: a macro edited in an editor should
@@ -225,7 +227,14 @@ def build(
         # E.V. keeps its state in one directory; the grants and the model
         # settings sit beside the journal rather than behind more path flags.
         grants = grants_path(database.parent)
-        ledger = PermissionLedger(load_grants(grants), refresh=reloader(grants))
+        ledger = PermissionLedger(
+            load_grants(grants),
+            refresh=reloader(grants),
+            # What macOS answers is written down, so the next run starts
+            # knowing it. Only grants: a refusal is undone in System Settings
+            # at any moment, and one on disk would outlive the decision.
+            persist=lambda granted: save_grants(grants, sorted(granted)),
+        )
         settings = load_settings(settings_path(database.parent))
 
     if model is not None:
@@ -697,6 +706,9 @@ async def serve(
         confirmation=confirmation,
         transcribe=transcribe,
         look=look,
+        # The host is the only process macOS answers about the microphone and
+        # the camera, so it is the only one that can say (invariant 7).
+        report=application.ledger.update,
         history=history,
         on_close=application.aclose,
         turn_lock=turns,

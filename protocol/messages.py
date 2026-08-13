@@ -41,12 +41,12 @@ MAX_IMAGE_BASE64 = 8_000_000
 leaves room for a camera that hands over something larger without leaving the
 field unbounded."""
 
-PROTOCOL_VERSION = "1.4"
+PROTOCOL_VERSION = "1.5"
 """Major.minor. The handshake compares it exactly: a mismatch refuses the
 connection rather than degrading into a conversation neither side understands.
 
 1.1 added `audio.submit`; 1.2 added `history.query`; 1.3 gave it `query`; 1.4
-added `vision.submit`. A client that knows an
+added `vision.submit`; 1.5 added `permission.report`. A client that knows an
 earlier version is refused rather than served a subset, because "some of the
 protocol" is not a protocol.
 """
@@ -162,6 +162,24 @@ class VisionSubmit(Message):
     locale: str | None = Field(default=None, description="The session locale.")
 
 
+class PermissionReport(Message):
+    """What macOS said about a permission, from the process it said it to.
+
+    Invariant 7: permission state is reported by the signed host, never
+    inferred by the core. This is that report. Only the host can know whether
+    a camera opened or a microphone was refused, because it is the process
+    macOS answered.
+
+    Sent when there is evidence -- a device that opened, a prompt that was
+    answered -- and not on a schedule. A permission nobody has exercised is
+    `undetermined`, which is a true statement rather than a missing one.
+    """
+
+    type: Literal["permission.report"] = "permission.report"
+    permission: Permission
+    state: PermissionState
+
+
 class SessionCancel(Message):
     type: Literal["session.cancel"] = "session.cancel"
 
@@ -173,6 +191,7 @@ Command = Annotated[
     | VisionSubmit
     | ConfirmationRespond
     | HistoryQuery
+    | PermissionReport
     | SessionCancel,
     Field(discriminator="type"),
 ]

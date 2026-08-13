@@ -48,7 +48,14 @@ export type Speech1 = string | null;
 export type Tool2 = string;
 export type Entries = JournalEntry[];
 export type Command =
-  Hello | UtteranceSubmit | AudioSubmit | VisionSubmit | ConfirmationRespond | HistoryQuery | SessionCancel;
+  | Hello
+  | UtteranceSubmit
+  | AudioSubmit
+  | VisionSubmit
+  | ConfirmationRespond
+  | HistoryQuery
+  | PermissionReport
+  | SessionCancel;
 /**
  * Who is connecting, for the log.
  */
@@ -103,7 +110,8 @@ export type Limit = number;
  */
 export type Query = string | null;
 export type Type11 = "history.query";
-export type Type12 = "session.cancel";
+export type Type12 = "permission.report";
+export type Type13 = "session.cancel";
 export type Id2 = string;
 export type Code = string;
 export type Message = string;
@@ -262,8 +270,25 @@ export interface HistoryQuery {
   query?: Query;
   type?: Type11;
 }
-export interface SessionCancel {
+/**
+ * What macOS said about a permission, from the process it said it to.
+ *
+ * Invariant 7: permission state is reported by the signed host, never
+ * inferred by the core. This is that report. Only the host can know whether
+ * a camera opened or a microphone was refused, because it is the process
+ * macOS answered.
+ *
+ * Sent when there is evidence -- a device that opened, a prompt that was
+ * answered -- and not on a schedule. A permission nobody has exercised is
+ * `undetermined`, which is a true statement rather than a missing one.
+ */
+export interface PermissionReport {
+  permission: Permission;
+  state: PermissionState;
   type?: Type12;
+}
+export interface SessionCancel {
+  type?: Type13;
 }
 export interface Response {
   error?: ResponseError | null;

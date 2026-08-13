@@ -306,6 +306,30 @@
       "title": "PermissionChanged",
       "type": "object"
     },
+    "PermissionReport": {
+      "additionalProperties": false,
+      "description": "What macOS said about a permission, from the process it said it to.\n\nInvariant 7: permission state is reported by the signed host, never\ninferred by the core. This is that report. Only the host can know whether\na camera opened or a microphone was refused, because it is the process\nmacOS answered.\n\nSent when there is evidence -- a device that opened, a prompt that was\nanswered -- and not on a schedule. A permission nobody has exercised is\n`undetermined`, which is a true statement rather than a missing one.",
+      "properties": {
+        "permission": {
+          "$ref": "#/$defs/Permission"
+        },
+        "state": {
+          "$ref": "#/$defs/PermissionState"
+        },
+        "type": {
+          "const": "permission.report",
+          "default": "permission.report",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "permission",
+        "state"
+      ],
+      "title": "PermissionReport",
+      "type": "object"
+    },
     "PermissionState": {
       "description": "What the host last reported for a permission.",
       "enum": [
@@ -327,6 +351,7 @@
               "confirmation.respond": "#/$defs/ConfirmationRespond",
               "hello": "#/$defs/Hello",
               "history.query": "#/$defs/HistoryQuery",
+              "permission.report": "#/$defs/PermissionReport",
               "session.cancel": "#/$defs/SessionCancel",
               "utterance.submit": "#/$defs/UtteranceSubmit",
               "vision.submit": "#/$defs/VisionSubmit"
@@ -351,6 +376,9 @@
             },
             {
               "$ref": "#/$defs/HistoryQuery"
+            },
+            {
+              "$ref": "#/$defs/PermissionReport"
             },
             {
               "$ref": "#/$defs/SessionCancel"
@@ -744,5 +772,5 @@
   },
   "title": "Envelope",
   "type": "object",
-  "x-ev-protocol-version": "1.4"
+  "x-ev-protocol-version": "1.5"
 }

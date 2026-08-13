@@ -33,6 +33,7 @@ from pydantic import ValidationError
 
 from ev.application.confirmation import ConfirmationRequest
 from ev.domain.journal import JournalEntry
+from ev.domain.permissions import Permission, PermissionState
 from ev.domain.results import Clarification, ToolResult
 from protocol.messages import (
     PROTOCOL_VERSION,
@@ -43,6 +44,7 @@ from protocol.messages import (
     Hello,
     HistoryPage,
     HistoryQuery,
+    PermissionReport,
     Request,
     Response,
     ResponseError,
@@ -180,6 +182,10 @@ one turn and cleared afterwards, and the daemon is the only thing that knows
 the turn is over.
 """
 
+Reporter = Callable[[Permission, PermissionState], None]
+"""Where the host's answer about a permission goes. The core does not ask for
+these and cannot: only the process macOS answered knows."""
+
 Transcriber = Callable[[Path, str], Awaitable[str]]
 """Audio in, words out. The daemon holds one; what implements it is
 `SpeechRecognizer`, and the daemon never learns which engine that is."""
@@ -194,6 +200,7 @@ class IpcServer:
         confirmation: SessionConfirmation,
         transcribe: Transcriber | None = None,
         look: Looker | None = None,
+        report: Reporter | None = None,
         history: History | None = None,
         on_close: Callable[[], Awaitable[None]] | None = None,
         confirmation_timeout: float = CONFIRMATION_TIMEOUT,
@@ -203,6 +210,7 @@ class IpcServer:
         self._handle = handle
         self._transcribe = transcribe
         self._look = look
+        self._report = report
         self._history = history
         self._confirmation = confirmation
         self._on_close = on_close
@@ -366,6 +374,15 @@ class IpcServer:
 
         if isinstance(command, VisionSubmit):
             await self._vision(session, request.id, command)
+            return
+
+        if isinstance(command, PermissionReport):
+            # Not a turn: nothing is locked, nothing is journalled, and the
+            # answer is immediate. A report is the host telling the core
+            # something it has no other way to learn.
+            if self._report is not None:
+                self._report(command.permission, command.state)
+            await session.send(Response(id=request.id, ok=True, payload={}))
             return
 
         if isinstance(command, UtteranceSubmit):

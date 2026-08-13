@@ -30,6 +30,16 @@ const TRAY: &str = "ev";
 /// Matches the corner radius macOS gives its own floating panels.
 const PANEL_RADIUS: f64 = 12.0;
 
+/// Say what macOS answered, on its own connection.
+///
+/// Errors are dropped on purpose: a report is a courtesy to the core, and a
+/// daemon that is not listening must not cost the person a turn or a prompt.
+fn report(permission: &str, state: &str) {
+    if let Ok(mut client) = Client::connect(&socket()) {
+        let _ = client.report_permission(permission, state);
+    }
+}
+
 /// The menu bar mark, drawn by `icons/generate.py` and carried in the binary.
 const TRAY_ICON: &[u8] = include_bytes!("../icons/tray@2x.png");
 
@@ -128,13 +138,19 @@ fn run_turn(app: &AppHandle, input: Input, locale: Option<String>) -> Result<Tur
             let samples = audio::record_until_silence(audio::Vad::default())
                 .map_err(|error| error.to_string())?;
             let wav = audio::to_wav(&samples).map_err(|error| error.to_string())?;
+            let _ = client.report_permission("microphone", "granted");
             client
                 .submit_audio(&wav, locale.as_deref(), &mut ask)
                 .map_err(|error| error.to_string())?
         }
-        Input::Recorded(wav) => client
-            .submit_audio(&wav, locale.as_deref(), &mut ask)
-            .map_err(|error| error.to_string())?,
+        Input::Recorded(wav) => {
+            // Bytes exist, so the microphone opened. That is the whole of what
+            // macOS ever tells anyone about it.
+            let _ = client.report_permission("microphone", "granted");
+            client
+                .submit_audio(&wav, locale.as_deref(), &mut ask)
+                .map_err(|error| error.to_string())?
+        }
         Input::Seen(frame, text) => client
             .submit_vision(&frame, text.as_deref(), locale.as_deref(), &mut ask)
             .map_err(|error| error.to_string())?,
@@ -210,6 +226,16 @@ async fn look(
     tauri::async_runtime::spawn_blocking(move || {
         let _ = app.emit("camera.started", ());
         let frame = camera::take_frame(camera::SESSION).map_err(|error| error.to_string());
+        report(
+            "camera",
+            match &frame {
+                Ok(_) => "granted",
+                // A frame that did not arrive is not a refusal: the camera may
+                // be in use, asleep, or absent. Only a refusal is a refusal.
+                Err(why) if why.contains("refused") => "denied",
+                Err(_) => "undetermined",
+            },
+        );
         // Emitted before the turn, not after it: the camera is already off,
         // and an indicator that stays on while a model thinks is a lie about
         // what the hardware is doing.
@@ -484,6 +510,9 @@ pub fn run() {
             let handle = app.handle().clone();
             camera::request(move |granted| {
                 let _ = handle.emit("camera.permission", granted);
+                // Answered by the person, in a dialog only this process can
+                // raise. The core has no other way to hear it.
+                report("camera", if granted { "granted" } else { "denied" });
             });
 
             Ok(())

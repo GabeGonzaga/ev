@@ -30,6 +30,19 @@ class PolicyDecision(StrEnum):
     """Ask the user first. A DESTRUCTIVE tool is confirmed whatever the policy
     answers -- see `Registry.call()`."""
 
+    REQUEST_PERMISSION = "request_permission"
+    """Never asked for, so let macOS ask.
+
+    E.V. cannot raise a TCC prompt. Only the attempt can, and refusing before
+    the attempt is why `--grant` existed: the user was made to assert a
+    permission by hand so that E.V. would stop standing between them and the
+    dialog. So a permission nobody has decided yet is not a refusal -- the call
+    goes through, macOS answers, and whatever it says is recorded.
+
+    A permission that was *refused* still denies here. Trying again produces no
+    prompt, only the same silent failure, and the useful answer is where to
+    change it."""
+
 
 class PolicyVerdict(BaseModel):
     """The decision plus why, so a refusal can say something useful."""
@@ -50,6 +63,10 @@ class PolicyVerdict(BaseModel):
     @classmethod
     def confirm(cls, reason: str) -> Self:
         return cls(decision=PolicyDecision.CONFIRM, reason=reason)
+
+    @classmethod
+    def request(cls, reason: str) -> Self:
+        return cls(decision=PolicyDecision.REQUEST_PERMISSION, reason=reason)
 
 
 class ConfidenceDecision(StrEnum):
@@ -114,7 +131,9 @@ class PermissionLedger:
         states: Mapping[Permission, PermissionState] | None = None,
         refresh: Callable[[], Mapping[Permission, PermissionState] | None]
         | None = None,
+        persist: Callable[[set[Permission]], None] | None = None,
     ) -> None:
+        self._persist = persist
         self._states: dict[Permission, PermissionState] = dict(states or {})
         # Asserting a permission and then having to restart the daemon for it
         # to count is a footgun: the user did the thing they were told to do
@@ -134,8 +153,25 @@ class PermissionLedger:
         return self._states.get(permission, PermissionState.UNDETERMINED)
 
     def update(self, permission: Permission, state: PermissionState) -> None:
-        """Called from a `permission.changed` event in phase 1.5."""
+        """What the system just said about a permission.
+
+        Reported by the host, or learned from an attempt that macOS answered.
+        A grant is written down so the next run starts knowing it; a refusal is
+        not, because TCC can be changed in System Settings at any moment and a
+        refusal on disk would outlive the decision that caused it.
+        """
+        if self._states.get(permission) is state:
+            return
+
         self._states[permission] = state
+        if state is PermissionState.GRANTED and self._persist is not None:
+            self._persist(
+                {
+                    name
+                    for name, held in self._states.items()
+                    if held is PermissionState.GRANTED
+                }
+            )
 
     def withheld(self, permissions: Iterable[Permission]) -> list[Permission]:
         return sorted(
@@ -144,8 +180,25 @@ class PermissionLedger:
             if self.state(permission) is not PermissionState.GRANTED
         )
 
+    def refused(self, permissions: Iterable[Permission]) -> list[Permission]:
+        """The ones macOS has actually said no to."""
+        return sorted(
+            permission
+            for permission in permissions
+            if self.state(permission) is PermissionState.DENIED
+        )
+
 
 _ORDER = {RiskLevel.SAFE: 0, RiskLevel.SENSITIVE: 1, RiskLevel.DESTRUCTIVE: 2}
+
+SETTINGS = {
+    Permission.MICROPHONE: "Microphone",
+    Permission.CAMERA: "Camera",
+    Permission.ACCESSIBILITY: "Accessibility",
+    Permission.APPLE_EVENTS: "Automation",
+}
+"""Where in System Settings each one is changed. A refusal that does not say
+where to undo it is a dead end, and the pane names are not guessable."""
 
 
 class PermissionPolicy:
@@ -161,12 +214,24 @@ class PermissionPolicy:
         self._confirm_at = confirm_at
 
     def decide(self, spec: Guarded) -> PolicyVerdict:
-        withheld = self._ledger.withheld(spec.permissions)
-        if withheld:
-            missing = ", ".join(permission.value for permission in withheld)
+        refused = self._ledger.refused(spec.permissions)
+        if refused:
+            missing = ", ".join(permission.value for permission in refused)
             return PolicyVerdict.deny(
-                f"{spec.name} needs permission not granted: {missing}. "
-                f"Grant it with: ev --grant {withheld[0].value}"
+                f"{spec.name} needs {missing}, and macOS has refused it. "
+                f"System Settings > Privacy & Security > {SETTINGS[refused[0]]}"
+            )
+
+        # Nobody has decided this one yet, so let the system be the one to ask.
+        # Reported before the risk, because what the verdict says should be the
+        # most specific true thing about the call. A destructive tool is
+        # confirmed either way: `Registry.call()` enforces that itself, so that
+        # a policy bug cannot let one run unasked.
+        undecided = self._ledger.withheld(spec.permissions)
+        if undecided:
+            missing = ", ".join(permission.value for permission in undecided)
+            return PolicyVerdict.request(
+                f"{spec.name} needs {missing}, which macOS has not been asked for yet"
             )
 
         if _ORDER[spec.risk] >= _ORDER[self._confirm_at]:
