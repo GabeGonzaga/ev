@@ -1,10 +1,15 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted, onUnmounted } from "vue";
 import { useLayout } from "../stores/layout";
 
 const props = defineProps<{ label: string; live?: boolean }>();
 
 const layout = useLayout();
+
+// Registered while it is on screen, so the store can tell a focus that can be
+// undone from one that cannot.
+onMounted(() => layout.register(props.label));
+onUnmounted(() => layout.forget(props.label));
 const folded = computed(() => layout.isFolded(props.label));
 const focused = computed(() => layout.focused === props.label);
 </script>

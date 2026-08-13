@@ -56,7 +56,12 @@ const shortcut = computed(() =>
     .join(""),
 );
 
+/// Every widget this layout has. The store checks what it remembered against
+/// this, so a name from an older arrangement cannot leave the display empty.
+const WIDGETS = ["Ask", "Trail", "Console", "Settings", "Appearance"];
+
 onMounted(() => {
+  layout.reconcile(WIDGETS);
   session.load();
   session.refresh();
 
@@ -64,9 +69,10 @@ onMounted(() => {
   // on a confirmation is still waiting when it comes back.
   window.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
-    // Escape leaves the resting screen before it puts the window away: one
-    // key, the nearest thing first.
+    // One key, the nearest thing first: leave the resting screen, then give
+    // the display back, then put the window away.
     if (ambient.value) return void rest(false);
+    if (layout.focused !== null) return layout.release();
     if (!session.question) void dismiss();
   });
 
@@ -113,10 +119,13 @@ onMounted(() => {
     </header>
 
     <div class="grid">
-      <div v-if="layout.focused === null" class="column stage">
+      <!-- The stage stays when the widget with the floor is the one that
+           lives in it. Hiding the column that holds the button to come back
+           is how it got stuck the first time. -->
+      <div v-if="layout.shown('Ask')" class="column stage">
         <!-- The middle of the display: a ring that turns while E.V. is doing
              something, with whatever it has to say inside it. -->
-        <TheCore :state="session.state">
+        <TheCore v-if="layout.focused === null" :state="session.state">
           <!-- Inside the ring: the wordmark, and whatever E.V. has to say.
                Not what it is doing -- the chrome says that, and two labels in
                one circle is one label too many. -->
@@ -124,9 +133,12 @@ onMounted(() => {
           <TheAnswer />
         </TheCore>
 
-        <TheHints v-if="quiet" @pick="composer?.suggest($event)" />
+        <TheHints
+          v-if="quiet && layout.focused === null"
+          @pick="composer?.suggest($event)"
+        />
 
-        <HudPanel label="Ask" :live="session.state !== 'idle'">
+        <HudPanel label="Ask" :live="session.state !== 'idle'" class="asking">
           <template #aside>
             <span class="locale">{{ session.locale }}</span>
           </template>
@@ -298,6 +310,11 @@ main:not(.app) {
    display it belongs to. */
 .stage {
   justify-content: space-between;
+}
+
+/* With the floor, the composer takes the room the ring was using. */
+.grid:has(.focused) .asking {
+  flex: 1;
 }
 
 /* One column when there is not room for two: the browser page on a laptop
