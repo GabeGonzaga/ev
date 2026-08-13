@@ -58,8 +58,18 @@ const focused = computed(() => layout.focused === props.label);
   flex: 1;
 }
 
+/* Folded, a widget is its own title bar and nothing else: no body, no
+   bottom padding, and no share of the column's height. `!important` because
+   the column marks the tall widgets `flex: 1` from the other stylesheet, and
+   whichever loaded last was winning. */
 .folded {
-  flex: none;
+  flex: 0 0 auto !important;
+  padding-bottom: 6px;
+  padding-top: 8px;
+}
+
+.folded > header {
+  margin-bottom: 0;
 }
 
 .live {

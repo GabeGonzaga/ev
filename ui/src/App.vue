@@ -296,7 +296,7 @@ main:not(.app) {
   grid-template-columns: 1fr;
 }
 
-.grows {
+.grows:not(.folded) {
   flex: 1;
   min-height: 0;
 }
