@@ -204,7 +204,7 @@ async def test_an_asserted_permission_lets_the_call_through(
 
 
 @pytest.mark.asyncio
-async def test_the_speech_reports_the_track_it_actually_started_on(
+async def test_the_speech_says_what_was_asked_for_not_what_music_answers(
     fake_bin: FakeBin, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # play takes one item, so an album starts somewhere. Saying only "Playing
@@ -214,7 +214,11 @@ async def test_the_speech_reports_the_track_it_actually_started_on(
 
     result = await registry.call("music.play", {"name": "Blonde", "kind": "album"})
 
-    assert result.speech == "Playing Blonde, from Nikes"
+    # `play` returns before the player has moved, so `name of current track`
+    # is often the song that was playing a moment ago. Announcing that as the
+    # new one is a lie that sounds like a broken library -- measured against a
+    # real one: asking for "mona lisa" said "A tocar wacced out murals".
+    assert result.speech == "Playing Blonde"
     assert result.data["started_at"] == "Nikes"
     assert journal.records[0].result.data["started_at"] == "Nikes"
 
@@ -391,10 +395,12 @@ class Library:
         playlists: list[str],
         albums: list[str] | None = None,
         artists: list[str] | None = None,
+        tracks: list[str] | None = None,
     ) -> None:
         self.names = playlists
         self.album_names = albums or []
         self.artist_names = artists or []
+        self.track_names = tracks or []
         self.played: list[str] = []
 
     async def playlists(self) -> list[str]:
@@ -405,6 +411,9 @@ class Library:
 
     async def artists(self) -> list[str]:
         return self.artist_names
+
+    async def tracks(self) -> list[str]:
+        return self.track_names
 
     async def play_artist(self, name: str) -> str:
         self.played.append(name)
@@ -419,7 +428,11 @@ class Library:
         return "Some Track"
 
     async def play_track(self, name: str) -> str:
-        raise AppleScriptError(f"nothing in the library matches {name}")
+        # As Music does: a song plays if the library has one spelled that way.
+        if name not in self.track_names:
+            raise AppleScriptError(f"nothing in the library matches {name}")
+        self.played.append(name)
+        return "Some Track"
 
     async def play_playlist(self, name: str) -> str:
         self.played.append(name)
@@ -685,3 +698,71 @@ def test_an_artist_is_matched_with_contains_not_is() -> None:
     from ev.capabilities.music.adapters import PLAY_ARTIST
 
     assert "artist contains theName" in PLAY_ARTIST
+
+
+# --- songs, and the versions a library keeps of them ----------------------
+
+
+@pytest.mark.asyncio
+async def test_a_song_the_library_spells_differently_still_plays() -> None:
+    # 746 of the 3975 track names in the library this was written against
+    # carry a suffix nobody says out loud.
+    library = Library([], tracks=["Stick Season (Live From Fenway Park)"])
+    service = MusicService(library, Speaker("en"))  # type: ignore[arg-type]
+
+    result = await service.play(PlayArgs(name="Stick Season", kind="track"))
+
+    assert result.ok
+    assert result.data["kind"] == "track"
+
+
+def test_editions_of_one_song_are_one_song() -> None:
+    """Three recordings of `Here Comes the Sun`, and any of them answers.
+
+    The prefix rule alone refused these: none of the three is the beginning of
+    the others, so they looked like different things.
+    """
+    editions = [
+        "Here Comes the Sun (2019 Mix)",
+        "Here Comes the Sun (feat. dodie)",
+        "Here Comes The Sun (Take 9)",
+    ]
+
+    assert closest("here comes the sun", editions) == "Here Comes the Sun (2019 Mix)"
+
+
+def test_an_outtake_is_not_what_anyone_meant() -> None:
+    # Sorting by length picked `(Take 9)` over `(2019 Mix)`, because it is
+    # shorter. A take is a different recording, not a different master.
+    assert (
+        closest("let it be", ["Let It Be (Take 28)", "Let It Be (2021 Mix)"])
+        == "Let It Be (2021 Mix)"
+    )
+
+
+def test_different_songs_that_start_alike_stay_ambiguous() -> None:
+    """`Something` is a Beatles song and the start of two others.
+
+    An edition qualifies what came before it -- a parenthesis, a dash. An
+    ordinary word after it means a different song, and picking one of those
+    would be picking by coin toss.
+    """
+    assert (
+        closest(
+            "something",
+            ["Something (2019 Mix)", "Something About Us", "something bout tomorrow"],
+        )
+        is None
+    )
+
+
+@pytest.mark.asyncio
+async def test_the_kind_asked_for_is_looked_at_first() -> None:
+    # One word, and the library has it as both. Asked for a song, the song is
+    # what plays.
+    library = Library([], albums=["Clancy"], tracks=["Clancy"])
+    service = MusicService(library, Speaker("en"))  # type: ignore[arg-type]
+
+    result = await service.play(PlayArgs(name="clancy", kind="track"))
+
+    assert result.data["kind"] == "track"

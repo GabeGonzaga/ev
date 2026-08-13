@@ -69,20 +69,15 @@ class MusicService:
                 if NOT_FOUND not in str(error):
                     raise
                 return await self._elsewhere(args.name, "album")
-            # An album plays through now: E.V. builds its own playlist, which
-            # is the only thing Music will play in order. Saying where it
-            # started is still honest -- the queue begins somewhere.
-            speech = (
-                self._speaker.say(
-                    "music.playing_from", name=args.name, track=started_at
-                )
-                if started_at and started_at != args.name
-                else self._speaker.say("music.playing", name=args.name)
-            )
+            # What is *asked for* is what is said back, never what Music
+            # answers with. `play` returns before the player has moved, so
+            # `name of current track` is often the track that was playing a
+            # moment ago -- and E.V. announcing the previous song as the new
+            # one is a lie that sounds like a bug in the library.
             return ToolResult.success(
                 PLAY,
                 data={"name": args.name, "kind": "album", "started_at": started_at},
-                speech=speech,
+                speech=self._speaker.say("music.playing", name=args.name),
             )
 
         try:
@@ -90,6 +85,8 @@ class MusicService:
         except AppleScriptError as error:
             if NOT_FOUND not in str(error):
                 raise
+            # Songs miss for the same reason albums do: the library calls it
+            # `Mona Lisa (Apple Music Live)` and nobody says the parenthesis.
             return await self._elsewhere(args.name, "track")
 
         return ToolResult.success(
@@ -111,7 +108,7 @@ class MusicService:
         them. Whatever is found is said out loud, so a wrong guess is audible
         rather than silent.
         """
-        found = await self._find(spoken)
+        found = await self._find(spoken, asked_for)
         if found is None:
             existing = ", ".join((await self._adapter.playlists())[:5]) or "none"
             return ToolResult.failure(
@@ -126,24 +123,37 @@ class MusicService:
         playing = {
             "album": self._adapter.play_album,
             "artist": self._adapter.play_artist,
+            "track": self._adapter.play_track,
             "playlist": self._adapter.play_playlist,
         }[kind]
         return await self._started(
             kind, name, playing(name), asked_for=spoken, instead_of=asked_for
         )
 
-    async def _find(self, spoken: str) -> tuple[str, str] | None:
-        album = closest(spoken, await self._adapter.albums())
-        if album is not None:
-            return "album", album
+    async def _find(self, spoken: str, prefer: str) -> tuple[str, str] | None:
+        """The kind that was asked for first, then the others.
 
-        artist = closest(spoken, await self._adapter.artists())
-        if artist is not None:
-            return "artist", artist
+        Tracks come late among the others because there are 3975 of them and
+        one word matches a great many: a name that is also an album or an
+        artist is more likely to have meant those. Asked for a song, though,
+        songs are looked at first.
+        """
+        order = ["album", "artist", "track", "playlist"]
+        if prefer in order:
+            order.remove(prefer)
+            order.insert(0, prefer)
 
-        playlist = closest(spoken, await self._adapter.playlists())
-        if playlist is not None:
-            return "playlist", playlist
+        listing = {
+            "album": self._adapter.albums,
+            "artist": self._adapter.artists,
+            "track": self._adapter.tracks,
+            "playlist": self._adapter.playlists,
+        }
+
+        for kind in order:
+            found = closest(spoken, await listing[kind]())
+            if found is not None:
+                return kind, found
 
         return None
 
@@ -157,6 +167,19 @@ class MusicService:
         instead_of: str | None = None,
     ) -> ToolResult:
         started_at = await playing
+        # An edition of the same thing is not "nothing called that": the
+        # library simply spells it with the year of the remaster on the end.
+        #
+        # Same kind, though. A playlist standing in for an album is a
+        # substitution however alike the names are, and saying so is how a
+        # wrong guess stays audible.
+        an_edition = (
+            asked_for is not None
+            and (instead_of is None or instead_of == kind)
+            and " ".join(name.casefold().split()).startswith(
+                " ".join(asked_for.casefold().split())
+            )
+        )
         speech = (
             self._speaker.say(
                 "music.playing_instead",
@@ -166,7 +189,7 @@ class MusicService:
                 kind=self._speaker.say(f"kind.{kind}"),
                 name=name,
             )
-            if asked_for and asked_for.casefold() != name.casefold()
+            if asked_for and not an_edition
             else self._speaker.say("music.playing", name=name)
         )
         return ToolResult.success(

@@ -46,6 +46,31 @@ name is resolved to the library's own spelling before it gets there, so
 reasonable thing to say and the wrong kind. A name that matches nothing of the
 kind asked for is looked for among the others before E.V. gives up.
 
+## Songs, and the versions a library keeps of them
+
+Individual songs missed for the same reason albums did, plus one of their own.
+3975 track names, 746 of them carrying a suffix nobody says: `(2019 Mix)`,
+`(feat. dodie)`, `(Live From Fenway Park)`. `Mona Lisa` exists four times over.
+
+The prefix rule alone refused those. `Here Comes the Sun` has three recordings
+and none of them is the beginning of the others, so they looked like three
+different things. They are one song, and any of them answers the request.
+
+So: **names that all begin with what was said and then open a parenthesis, a
+bracket or a dash are editions of one thing**, and the plainest wins. Names
+that continue with an ordinary word are different things and stay ambiguous --
+`Something (2019 Mix)`, `Something About Us` and `something bout tomorrow` are
+three songs, and choosing between them would be a coin toss.
+
+"Plainest" is not "shortest". Sorting by length picked `Let It Be (Take 28)`
+over `Let It Be (2021 Mix)`, and an outtake is not what anyone means, so a
+qualifier naming a different *recording* -- take, demo, rehearsal, live,
+instrumental, session, remix -- sorts last.
+
+**The kind asked for is looked at first**, then the others. Songs come late
+among the others because there are 3975 of them and one word matches a great
+many; asked for a song, songs are looked at first.
+
 ## Two bugs the real library found
 
 **`duplicate matches to theQueue` fails on a long list.** Music answers "Can't
@@ -59,6 +84,12 @@ told to start and has not got there yet, so it has no current track and
 AppleScript raises. This is ADR 0023 for the third time: the script compiled,
 and only running it said otherwise. Every script that reports what is playing
 now goes through one `my nowPlaying()` handler with a `try` in it.
+
+**What Music answers with is not what E.V. says back.** `play` returns before
+the player has moved, so `name of current track` is often the song that was
+playing a moment ago. Announcing that as the new one produced "A tocar wacced
+out murals" in answer to "mona lisa" -- a lie that sounds like a broken
+library. What was asked for is what is said back.
 
 Also found, by running `make applescript`: the runtime checker still called
 the reminders adapter with an argument removed two ADRs ago. It is not in CI —

@@ -70,5 +70,74 @@ def closest(spoken: str, existing: list[str]) -> str | None:
         if all(other.startswith(shortest) for other, _ in prefixed):
             return name
 
+    editions = _editions(spoken, existing)
+    if editions:
+        return editions
+
     contained = [name for key, name in simple if wanted in key]
     return contained[0] if len(contained) == 1 else None
+
+
+_QUALIFIER = ("(", "[", "-", "/", ",", ":")
+"""What a music library puts before an edition.
+
+`Here Comes the Sun (2019 Mix)`, `(Take 9)`, `(feat. dodie)` -- three
+recordings of one song. `Jazz Classics` and `Jazz Nights` are two playlists.
+The difference is the character after the words that were actually said.
+"""
+
+
+def _editions(spoken: str, existing: list[str]) -> str | None:
+    """The plainest of several recordings of the same thing.
+
+    Names that all begin with what was said and then open a parenthesis, a
+    bracket or a dash are editions: a remaster, a live take, a version with a
+    guest. Any of them answers the request, so the shortest does -- it is the
+    one without the qualifier.
+
+    Names that continue with an ordinary word are different things, and those
+    stay ambiguous.
+    """
+    wanted = " ".join(spoken.casefold().split())
+    if not wanted:
+        return None
+
+    matches: list[str] = []
+    for name in existing:
+        plain = " ".join(name.casefold().split())
+        if not plain.startswith(wanted):
+            continue
+        rest = plain[len(wanted) :].lstrip()
+        if rest and not rest.startswith(_QUALIFIER):
+            # An ordinary word follows, so these are different things and not
+            # editions of one. One of them being a different thing is enough:
+            # the whole set goes back to being ambiguous.
+            return None
+        matches.append(name)
+
+    return min(matches, key=_canonical) if matches else None
+
+
+_ALTERNATE = (
+    "take",
+    "demo",
+    "rehearsal",
+    "outtake",
+    "instrumental",
+    "live",
+    "session",
+    "remix",
+    "karaoke",
+)
+"""Qualifiers that name a different recording rather than a different master.
+
+Asking for `Here Comes the Sun` and getting `(Take 9)` is not the song anyone
+means; `(2019 Mix)` is. Sorting by length alone picked the outtake, because
+`Take 9` is shorter than `2019 Mix`."""
+
+
+def _canonical(name: str) -> tuple[int, int]:
+    """How much like the plain version a name is: alternates last, then the
+    shortest, which is the one carrying the least explanation."""
+    plain = name.casefold()
+    return (any(word in plain for word in _ALTERNATE), len(name))

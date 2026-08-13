@@ -62,6 +62,18 @@ a property on tracks. Deduplicated in Python, where a set is a set.
 4229 tracks answered in 0.24 s on the machine this was written for, which is
 why it is affordable to ask when a name does not match exactly."""
 
+LIST_TRACKS: Final = """on run argv
+	tell application "Music"
+		set theNames to name of every track of library playlist 1
+	end tell
+	set AppleScript's text item delimiters to linefeed
+	return theNames as text
+end run"""
+"""Every track name. 3975 of them here, 746 carrying a suffix nobody says --
+`(Remastered)`, `(feat. ...)`, `(Live From Fenway Park)`. `Mona Lisa` exists
+four times over, which is why the shortest prefix rule matters as much for
+songs as it does for artists."""
+
 LIST_ARTISTS: Final = """on run argv
 	tell application "Music"
 		set theNames to artist of every track of library playlist 1
@@ -270,6 +282,9 @@ class MusicAdapter:
 
     async def artists(self) -> list[str]:
         return await self._unique(LIST_ARTISTS)
+
+    async def tracks(self) -> list[str]:
+        return await self._unique(LIST_TRACKS)
 
     async def _unique(self, script: str) -> list[str]:
         answer = await self._applescript.run(script)
