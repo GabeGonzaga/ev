@@ -1,202 +1,73 @@
 /* The look, in one place, for both shells.
  *
- * One Vue application is served by the daemon and embedded in the app, so
- * everything here works over vibrancy in a window and over a plain background
- * in a browser tab. The difference is a class on <html>, set once by main.ts.
+ * Two type worlds, held apart on purpose: the orb is smooth geometric sans --
+ * "system" -- and the widgets are bitmap monospace -- "terminal". They never
+ * mix, and the contrast between them is most of what makes a floating panel
+ * read as a different kind of thing from the orb it sits on.
  *
- * A head-up display: squared panels, thin lit borders, corner brackets, glow
- * where something is live. The same language as the icon, which is the point
- * -- an application whose window and whose icon disagree looks like two
- * programs.
+ * The background is dark neutral grey, not navy. Blue appears almost only as
+ * glow. Getting that wrong is what turns this into a generic cyberpunk
+ * dashboard, and the restraint is the point.
  *
- * Three axes, all on <html> so nothing has to be passed down:
- *   data-theme  dark | light        resolved from system when asked to
- *   data-accent cyan | vaporeon ... the colour that means "E.V."
- *   class       in-app | in-browser what is behind the page
+ * Both faces are vendored rather than fetched: this runs under a content
+ * policy that allows nothing off the machine, and a font that silently fails
+ * to load would take the whole identity with it.
  */
+
+@import "@fontsource/michroma/400.css";
+@import "@fontsource/chakra-petch/300.css";
+@import "@fontsource/silkscreen/400.css";
 
 :root {
-  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
-  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --bg: #14171c;
+  --bg-deep: #0b0d11;
+  --grid: #8a93a0;
+  --ring: #ffffff;
+  --glow: 46, 139, 224;
+  --glow-hot: 111, 196, 255;
+  --tick: 200, 212, 224;
+  --text: #f2f5f8;
+  --accent: 63, 169, 245;
+  --warn: #ffb547;
+  --error: #ff5a6e;
 
-  /* Geometric and light, for the two letters in the middle of the ring and
-     the words that share its air. Both ship with macOS; the stack ends at
-     the system font for a browser that has neither. */
-  --display-font: "Avenir Next", "Futura", -apple-system, system-ui, sans-serif;
-
-  --radius: 4px;
-  --gap: 14px;
-  --bracket: 10px;
+  /* The orb's world: geometric, wide, flat-cut terminals. */
+  --system: "Michroma", "Chakra Petch", -apple-system, system-ui, sans-serif;
+  /* The widgets' world: a pixel grid, and nowhere else in the interface. */
+  --terminal: "Silkscreen", ui-monospace, "SF Mono", Menlo, monospace;
 
   color-scheme: dark;
-  font: 13.5px/1.5 var(--sans);
+  font: 12.5px/1.6 var(--terminal);
+  color: var(--text);
   -webkit-font-smoothing: antialiased;
-}
-
-/* --- the accents -------------------------------------------------------
- *
- * Cyan is E.V.'s own. The rest are the evolutions, because the name was
- * always going to end up there: one hue each, and nothing else about the
- * interface changes.
- */
-
-:root,
-[data-accent="cyan"] {
-  --accent: 30, 144, 255;
-  --accent-lit: 232, 244, 255;
-}
-[data-accent="vaporeon"] {
-  --accent: 79, 158, 214;
-  --accent-lit: 178, 226, 255;
-}
-[data-accent="jolteon"] {
-  --accent: 246, 205, 76;
-  --accent-lit: 255, 238, 170;
-}
-[data-accent="flareon"] {
-  --accent: 240, 110, 68;
-  --accent-lit: 255, 190, 160;
-}
-[data-accent="espeon"] {
-  --accent: 197, 137, 214;
-  --accent-lit: 238, 200, 250;
-}
-[data-accent="umbreon"] {
-  --accent: 240, 196, 68;
-  --accent-lit: 255, 226, 150;
-}
-[data-accent="leafeon"] {
-  --accent: 126, 199, 108;
-  --accent-lit: 198, 240, 186;
-}
-[data-accent="glaceon"] {
-  --accent: 140, 214, 226;
-  --accent-lit: 210, 245, 250;
-}
-[data-accent="sylveon"] {
-  --accent: 240, 160, 196;
-  --accent-lit: 255, 210, 230;
-}
-
-/* --- dark, which is the one it was drawn for --------------------------- */
-
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --page: #060b14;
-  /* Cyan at the top of the ring, electric blue at the bottom. */
-  --ring-top: 90, 220, 255;
-  --panel: rgba(var(--accent), 0.03);
-  --panel-edge: rgba(var(--accent), 0.22);
-  --panel-lit: rgba(var(--accent), 0.75);
-  --field: rgba(4, 10, 18, 0.55);
-  --text: #e8f4ff;
-  --display: 300;
-  --muted: rgba(200, 226, 245, 0.62);
-  --faint: rgba(200, 226, 245, 0.34);
-  --line: rgba(var(--accent), 0.18);
-  /* What accent-coloured *text* uses. In the dark that is the lit end of the
-     palette; in daylight the same colour would be invisible, so it is the
-     accent taken towards ink instead. */
-  --ink: rgb(var(--accent-lit));
-  --glow: 0 0 18px rgba(var(--accent), 0.35);
-  --grid: rgba(var(--accent), 0.16);
-  --ok: #46d39a;
-  --bad: #ff6b6b;
-  --live: #ff4d4d;
-}
-
-/* --- light, which is the same display in daylight ---------------------- */
-
-:root[data-theme="light"] {
-  color-scheme: light;
-  --page: #eef4fa;
-  --ring-top: 40, 170, 235;
-  --panel: rgba(255, 255, 255, 0.75);
-  --panel-edge: rgba(var(--accent), 0.45);
-  --panel-lit: rgba(var(--accent), 0.95);
-  --field: rgba(255, 255, 255, 0.9);
-  --text: #0b1a26;
-  --display: 400;
-  --muted: rgba(11, 26, 38, 0.72);
-  /* Higher than the dark theme's: 10px uppercase mono on white needs it. */
-  --faint: rgba(11, 26, 38, 0.52);
-  --line: rgba(var(--accent), 0.32);
-  --ink: color-mix(in srgb, rgb(var(--accent)) 72%, #04121c);
-  /* A shadow rather than a glow: light does not read as light on white. */
-  --glow: 0 2px 14px rgba(var(--accent), 0.28);
-  --grid: rgba(var(--accent), 0.08);
-  --ok: #0f8a5f;
-  --bad: #c92a2a;
-  --live: #e03131;
 }
 
 body {
   margin: 0;
-  color: var(--text);
-  /* Near-black blue, darkening toward the corners: the middle of the screen
-     is where everything worth reading is. */
-  background:
-    radial-gradient(
-      120% 100% at 50% 45%,
-      transparent 45%,
-      rgba(0, 0, 0, 0.55) 100%
-    ),
-    var(--page);
-  background-attachment: fixed;
+  /* Flat and even, edge to edge. No gradient, no vignette: the orb is what
+     draws the eye, and a background that also tries to is one competing light
+     source too many. */
+  background: var(--bg);
+  overflow: hidden;
 }
 
-/* The grid: thin blue lines, brightest under the middle of the display and
-   gone by the edges. A mask rather than a gradient over the top, so nothing
-   in front of it is dimmed by it. */
-body::before {
-  content: "";
+/* --- the grid ----------------------------------------------------------
+ *
+ * A persistent overlay: above any full-bleed surface, below the orb and the
+ * widgets. It never fades and it is never masked. Over a live camera feed it
+ * stays at full strength, which is what makes the room look ingested rather
+ * than merely displayed.
+ */
+
+.grid-overlay {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 0;
+  z-index: 2;
   background-image:
-    repeating-linear-gradient(0deg, var(--grid) 0 1px, transparent 1px 44px),
-    repeating-linear-gradient(90deg, var(--grid) 0 1px, transparent 1px 44px);
-  /* Sharpest in the middle and gone well before the edges, so the centre of
-     the screen reads as the focal point rather than as the middle of a
-     wallpaper. */
-  -webkit-mask-image: radial-gradient(
-    52% 48% at 50% 46%,
-    #000 0%,
-    rgba(0, 0, 0, 0.45) 42%,
-    transparent 72%
-  );
-  mask-image: radial-gradient(
-    52% 48% at 50% 46%,
-    #000 0%,
-    rgba(0, 0, 0, 0.45) 42%,
-    transparent 72%
-  );
-}
-
-body > * {
-  position: relative;
-  z-index: 1;
-}
-
-/* In the app the window is transparent and macOS draws the material behind
-   it -- but only in the dark, where a dark material belongs. In daylight the
-   page paints itself, because a light interface over a dark blur is mud. */
-.in-app:not([data-theme="light"]) body {
-  /* Nearly transparent: macOS draws the material, and this is only the tint
-     that makes it E.V.'s window rather than any window. */
-  background: rgba(6, 11, 20, 0.72);
-}
-
-/* The panel is dragged by its own chrome: there is no title bar to grab. */
-[data-drag] {
-  -webkit-app-region: drag;
-}
-
-[data-drag] input,
-[data-drag] select,
-[data-drag] button {
-  -webkit-app-region: no-drag;
+    repeating-linear-gradient(0deg, var(--grid) 0 1px, transparent 1px 96px),
+    repeating-linear-gradient(90deg, var(--grid) 0 1px, transparent 1px 96px);
+  opacity: 0.15;
 }
 
 input,
@@ -216,62 +87,6 @@ button {
 :focus-visible {
   outline: 1px solid rgb(var(--accent));
   outline-offset: 2px;
-}
-
-/* --- the panels --------------------------------------------------------
- *
- * Squared, with the corners drawn as brackets rather than closed. It is the
- * one shape that says "instrument" without saying anything else.
- */
-
-.hud {
-  position: relative;
-  background: var(--panel);
-  border: 1px solid var(--panel-edge);
-  border-radius: var(--radius);
-  padding: 12px 16px 14px;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-/* The brackets are the signature, so they are the one thing that stays
-   bright while everything around them quietens down. */
-.hud::before,
-.hud::after {
-  content: "";
-  position: absolute;
-  width: var(--bracket);
-  height: var(--bracket);
-  border: 1px solid var(--panel-lit);
-  opacity: 0.7;
-  pointer-events: none;
-}
-
-.hud::before {
-  top: -1px;
-  left: -1px;
-  border-right: 0;
-  border-bottom: 0;
-}
-
-.hud::after {
-  bottom: -1px;
-  right: -1px;
-  border-left: 0;
-  border-top: 0;
-}
-
-.hud > header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  font-family: var(--mono);
-  font-size: 9.5px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--faint);
 }
 
 @media (prefers-reduced-motion: reduce) {
