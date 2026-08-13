@@ -37,22 +37,25 @@ const shown = computed(
 .answer {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 12px 14px;
-  border-radius: var(--radius);
-  background: var(--raised);
+  align-items: center;
+  gap: 6px;
 }
 
 .heard {
   margin: 0;
-  font-size: 12px;
-  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--faint);
 }
 
 .said {
   margin: 0;
-  font-size: 16px;
-  line-height: 1.4;
+  font-size: 17px;
+  font-weight: var(--display);
+  letter-spacing: 0.03em;
+  line-height: 1.45;
 }
 
 .trouble {

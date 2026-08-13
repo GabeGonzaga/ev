@@ -6,6 +6,7 @@ import StateDot from "./components/StateDot.vue";
 import TheAnswer from "./components/TheAnswer.vue";
 import TheAppearance from "./components/TheAppearance.vue";
 import TheComposer from "./components/TheComposer.vue";
+import TheCore from "./components/TheCore.vue";
 import TheHints from "./components/TheHints.vue";
 import TheHistory from "./components/TheHistory.vue";
 import TheQuestion from "./components/TheQuestion.vue";
@@ -65,22 +66,25 @@ onMounted(() => {
     </header>
 
     <div class="grid">
-      <div class="column">
+      <div class="column stage">
+        <!-- The middle of the display: a ring that turns while E.V. is doing
+             something, with whatever it has to say inside it. -->
+        <TheCore :state="session.state">
+          <!-- Inside the ring: the one thing worth reading from across the
+               room. At rest that is what E.V. is doing; otherwise it is what
+               it just said, or the question it is waiting on. -->
+          <p v-if="quiet" class="word">{{ session.state }}</p>
+          <TheQuestion />
+          <TheAnswer />
+        </TheCore>
+
+        <TheHints v-if="quiet" @pick="composer?.suggest($event)" />
+
         <HudPanel label="Ask" :live="session.state !== 'idle'">
           <template #aside>
             <span class="locale">{{ session.locale }}</span>
           </template>
           <TheComposer ref="composer" />
-        </HudPanel>
-
-        <HudPanel
-          label="Answer"
-          :live="Boolean(session.question) || session.camera"
-          class="grows"
-        >
-          <TheQuestion />
-          <TheAnswer />
-          <TheHints v-if="quiet" @pick="composer?.suggest($event)" />
         </HudPanel>
       </div>
 
@@ -140,7 +144,8 @@ main:not(.app) {
 
 .mark {
   color: var(--ink);
-  letter-spacing: 0.3em;
+  font-weight: var(--display);
+  letter-spacing: 0.42em;
   text-shadow: 0 0 12px rgba(var(--accent), 0.45);
 }
 
@@ -157,7 +162,7 @@ main:not(.app) {
 
 .grid {
   display: grid;
-  grid-template-columns: 1.35fr 1fr;
+  grid-template-columns: 1.45fr 1fr;
   gap: var(--gap);
   flex: 1;
   min-height: 0;
@@ -178,6 +183,22 @@ main:not(.app) {
 .locale {
   font-family: var(--mono);
   color: var(--faint);
+}
+
+/* The ring, and under it the line you type into: a console sits below the
+   display it belongs to. */
+.stage {
+  justify-content: space-between;
+}
+
+.word {
+  margin: 0;
+  font-size: 15px;
+  font-weight: var(--display);
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: var(--ink);
+  text-shadow: 0 0 16px rgba(var(--accent), 0.6);
 }
 
 /* One column when there is not room for two: the browser page on a laptop

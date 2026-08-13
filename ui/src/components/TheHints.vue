@@ -58,12 +58,9 @@ const key = computed(() =>
 .hints {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  /* Centred in whatever room is left: at rest this is the whole panel, and a
-     list clinging to the top of an empty box looks like something failed to
-     load. */
-  margin: auto 0;
-  padding: 4px 2px;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 2px 10px;
 }
 
 .key {
@@ -86,6 +83,7 @@ ul {
   padding: 0;
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 6px;
 }
 

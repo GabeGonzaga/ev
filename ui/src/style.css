@@ -37,8 +37,8 @@
 
 :root,
 [data-accent="cyan"] {
-  --accent: 56, 189, 248;
-  --accent-lit: 186, 236, 255;
+  --accent: 30, 144, 255;
+  --accent-lit: 232, 244, 255;
 }
 [data-accent="vaporeon"] {
   --accent: 79, 158, 214;
@@ -77,12 +77,13 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --page: #05080f;
+  --page: #060b14;
   --panel: rgba(var(--accent), 0.045);
   --panel-edge: rgba(var(--accent), 0.32);
   --panel-lit: rgba(var(--accent), 0.75);
   --field: rgba(4, 10, 18, 0.55);
   --text: #e8f4ff;
+  --display: 300;
   --muted: rgba(200, 226, 245, 0.62);
   --faint: rgba(200, 226, 245, 0.34);
   --line: rgba(var(--accent), 0.18);
@@ -91,7 +92,7 @@
      accent taken towards ink instead. */
   --ink: rgb(var(--accent-lit));
   --glow: 0 0 18px rgba(var(--accent), 0.35);
-  --grid: rgba(var(--accent), 0.05);
+  --grid: rgba(var(--accent), 0.13);
   --ok: #46d39a;
   --bad: #ff6b6b;
   --live: #ff4d4d;
@@ -107,6 +108,7 @@
   --panel-lit: rgba(var(--accent), 0.95);
   --field: rgba(255, 255, 255, 0.9);
   --text: #0b1a26;
+  --display: 400;
   --muted: rgba(11, 26, 38, 0.72);
   /* Higher than the dark theme's: 10px uppercase mono on white needs it. */
   --faint: rgba(11, 26, 38, 0.52);
@@ -114,7 +116,7 @@
   --ink: color-mix(in srgb, rgb(var(--accent)) 72%, #04121c);
   /* A shadow rather than a glow: light does not read as light on white. */
   --glow: 0 2px 14px rgba(var(--accent), 0.28);
-  --grid: rgba(var(--accent), 0.07);
+  --grid: rgba(var(--accent), 0.1);
   --ok: #0f8a5f;
   --bad: #c92a2a;
   --live: #e03131;
@@ -123,26 +125,47 @@
 body {
   margin: 0;
   color: var(--text);
-  background:
-    radial-gradient(
-      120% 90% at 50% -10%,
-      rgba(var(--accent), 0.1),
-      transparent 60%
-    ),
-    var(--page);
-  /* The grid behind everything, at the edge of visible. */
-  background-attachment: fixed;
+  background: var(--page);
+}
+
+/* The grid: thin blue lines, brightest under the middle of the display and
+   gone by the edges. A mask rather than a gradient over the top, so nothing
+   in front of it is dimmed by it. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    repeating-linear-gradient(0deg, var(--grid) 0 1px, transparent 1px 44px),
+    repeating-linear-gradient(90deg, var(--grid) 0 1px, transparent 1px 44px);
+  -webkit-mask-image: radial-gradient(
+    58% 52% at 50% 46%,
+    #000 0%,
+    rgba(0, 0, 0, 0.55) 45%,
+    transparent 78%
+  );
+  mask-image: radial-gradient(
+    58% 52% at 50% 46%,
+    #000 0%,
+    rgba(0, 0, 0, 0.55) 45%,
+    transparent 78%
+  );
+}
+
+body > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* In the app the window is transparent and macOS draws the material behind
    it -- but only in the dark, where a dark material belongs. In daylight the
    page paints itself, because a light interface over a dark blur is mud. */
 .in-app:not([data-theme="light"]) body {
-  background: linear-gradient(
-    180deg,
-    rgba(var(--accent), 0.06),
-    transparent 40%
-  );
+  /* Nearly transparent: macOS draws the material, and this is only the tint
+     that makes it E.V.'s window rather than any window. */
+  background: rgba(6, 11, 20, 0.72);
 }
 
 /* The panel is dragged by its own chrome: there is no title bar to grab. */
