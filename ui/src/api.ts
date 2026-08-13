@@ -22,6 +22,9 @@ export interface TurnResult {
 
 const inTauri = "__TAURI_INTERNALS__" in window;
 
+/// Which shell this is. The transports differ; nothing else should.
+export const inApp = inTauri;
+
 // The token arrives once, in the fragment, which browsers never send to a
 // server. Read it, keep it for this tab only, and take it out of the address
 // bar so it does not survive a copied URL.
@@ -180,6 +183,10 @@ export const setShortcut = (shortcut: string) =>
   inTauri ? callTauri<void>("set_shortcut", { shortcut }) : Promise.resolve();
 
 export const canBindKeys = inTauri;
+
+/// Put the panel away. There is no window to hide in a browser tab.
+export const dismiss = () =>
+  inTauri ? callTauri<void>("dismiss") : Promise.resolve();
 
 export async function onQuestion(
   handle: (question: Record<string, unknown>) => void,

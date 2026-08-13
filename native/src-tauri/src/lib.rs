@@ -27,6 +27,9 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 /// The menu bar item, by name, so the core's state can be written to it later.
 const TRAY: &str = "ev";
 
+/// Matches the corner radius macOS gives its own floating panels.
+const PANEL_RADIUS: f64 = 12.0;
+
 /// How long a question waits for the person to answer it. Long, because they
 /// are being asked something; not forever, because a panel that was closed
 /// mid-question must not park a turn until the app quits.
@@ -358,6 +361,32 @@ fn reveal(window: &WebviewWindow) {
     let _ = window.set_focus();
 }
 
+/// Put the machine's own translucency behind the panel.
+///
+/// A floating window over whatever you were doing is what macOS uses this
+/// material for, and E.V. is not the application to invent its own. Failing is
+/// not fatal: a solid panel is a worse panel, not a broken one.
+fn frost(window: &WebviewWindow) {
+    if let Err(error) = window_vibrancy::apply_vibrancy(
+        window,
+        window_vibrancy::NSVisualEffectMaterial::HudWindow,
+        None,
+        Some(PANEL_RADIUS),
+    ) {
+        eprintln!("no vibrancy behind the panel: {error}");
+    }
+}
+
+/// Put the panel away.
+///
+/// Escape, and losing focus. Hiding is not answering: a turn waiting on a
+/// confirmation stays waiting, and the panel comes back with the question
+/// still on it.
+#[tauri::command]
+fn dismiss(window: WebviewWindow) {
+    let _ = window.hide();
+}
+
 pub fn run() {
     let saved = settings::load();
 
@@ -383,6 +412,7 @@ pub fn run() {
             submit,
             listen,
             confirm,
+            dismiss,
             look,
             history,
             set_locale,
@@ -390,6 +420,10 @@ pub fn run() {
             settings
         ])
         .setup(move |app| {
+            if let Some(panel) = app.get_webview_window("panel") {
+                frost(&panel);
+            }
+
             let show = MenuItem::with_id(app, "show", "Open E.V.", true, None::<&str>)?;
             // A core that could not start -- a permission not yet granted, a
             // daemon killed by hand -- should not need the app relaunched.
@@ -453,6 +487,21 @@ pub fn run() {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
                 let _ = window.hide();
+            }
+
+            // Clicking away puts it away, the way every panel summoned by a
+            // key does -- unless it is in the middle of asking something, in
+            // which case it stays where the question can be answered.
+            if let tauri::WindowEvent::Focused(false) = event {
+                let waiting = window
+                    .state::<Session>()
+                    .answering
+                    .lock()
+                    .map(|slot| slot.is_some())
+                    .unwrap_or(false);
+                if !waiting {
+                    let _ = window.hide();
+                }
             }
         })
         .build(tauri::generate_context!())

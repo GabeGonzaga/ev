@@ -29,6 +29,10 @@ tauri = { version = "2.11.3", features = ["tray-icon"] }
 # is a key combination and not an event tap -- so it needs no Accessibility
 # permission, and E.V. does not ask for one to listen for a keypress.
 tauri-plugin-global-shortcut = "2"
+# The panel is a floating window over whatever you were doing, so it is
+# translucent like every other one macOS puts there. Vibrancy needs the window
+# transparent, which is why tauri.conf says so.
+window-vibrancy = "0.6"
 
 [lints.rust]
 unsafe_code = "forbid"
