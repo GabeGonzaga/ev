@@ -30,6 +30,9 @@ const TRAY: &str = "ev";
 /// Matches the corner radius macOS gives its own floating panels.
 const PANEL_RADIUS: f64 = 12.0;
 
+/// The menu bar mark, drawn by `icons/generate.py` and carried in the binary.
+const TRAY_ICON: &[u8] = include_bytes!("../icons/tray@2x.png");
+
 /// How long a question waits for the person to answer it. Long, because they
 /// are being asked something; not forever, because a panel that was closed
 /// mid-question must not park a turn until the app quits.
@@ -436,7 +439,11 @@ pub fn run() {
             // other half of that.
             let restarting = core.clone();
             TrayIconBuilder::with_id(TRAY)
-                .icon(app.default_window_icon().cloned().ok_or("no icon")?)
+                .icon(tauri::image::Image::from_bytes(TRAY_ICON)?)
+                // A template is black with an alpha channel and macOS inverts
+                // it for a dark menu bar. The app icon glows, which is right
+                // in the Dock and wrong at 22 points next to the clock.
+                .icon_as_template(true)
                 .menu(&menu)
                 .tooltip(format!(
                     "E.V.\n{}",

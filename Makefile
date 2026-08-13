@@ -1,7 +1,7 @@
 PY ?= $(shell [ -x .venv/bin/python ] && echo .venv/bin/python || echo python3)
 
 .DEFAULT_GOAL := help
-.PHONY: help test lint format install eval applescript protocol protocol-check rust app-check sign models ui app
+.PHONY: help test lint format install eval applescript protocol protocol-check rust app-check sign models ui app icons
 
 help:
 	@echo "test     run the suite (must pass on Linux and macOS alike)"
@@ -16,6 +16,7 @@ help:
 	@echo "ui       typecheck and build the panel"
 	@echo "app      build EV.app, then sign it with entitlements"
 	@echo "models   download model weights and verify their checksums"
+	@echo "icons    redraw the app and menu bar icons from icons/generate.py"
 	@echo "applescript  run every AppleScript for real. Needs Music. NOT in CI"
 
 test:
@@ -75,6 +76,11 @@ APP := native/target/release/bundle/macos/EV.app
 ui: protocol-check-typescript
 	npm --prefix ui ci
 	npm --prefix ui run build
+
+# The icon is a program, not a picture: pure Python draws it and macOS's own
+# iconutil packs it, so it can be changed by editing the thing that made it.
+icons:
+	$(PY) native/src-tauri/icons/generate.py
 
 # The bundle is what gives E.V. its own TCC identity: launched from a shell the
 # host borrows the terminal's grants, and only a bundled app gets an identity

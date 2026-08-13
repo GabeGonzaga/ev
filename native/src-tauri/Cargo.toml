@@ -24,7 +24,9 @@ ev-host = { path = "../host" }
 nix = { version = "0.31.3", features = ["signal"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
-tauri = { version = "2.11.3", features = ["tray-icon"] }
+# image-png: the menu bar icon is a PNG drawn by icons/generate.py and
+# embedded, rather than the app icon shrunk to 22 points.
+tauri = { version = "2.11.3", features = ["tray-icon", "image-png"] }
 # Hold-to-talk from anywhere. Carbon's RegisterEventHotKey under this, which
 # is a key combination and not an event tap -- so it needs no Accessibility
 # permission, and E.V. does not ask for one to listen for a keypress.
