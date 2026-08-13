@@ -27,7 +27,7 @@ mod client;
 #[allow(dead_code, clippy::derivable_impls, clippy::to_string_trait_impl)]
 mod protocol;
 
-use client::{Client, Error};
+use client::{Client, Error, PROTOCOL_VERSION};
 use serde_json::{json, Value};
 
 /// A socket path short enough for `sockaddr_un`, which the Python side learned
@@ -79,7 +79,7 @@ fn fake_daemon(listener: UnixListener, script: Vec<Value>) -> thread::JoinHandle
 }
 
 fn accepted() -> Value {
-    json!({"id": "", "ok": true, "payload": {"protocol": "1.2"}})
+    json!({"id": "", "ok": true, "payload": {"protocol": PROTOCOL_VERSION}})
 }
 
 #[test]
@@ -93,7 +93,7 @@ fn a_handshake_is_sent_before_anything_else() {
 
     let received = daemon.join().expect("join");
     assert_eq!(received[0]["command"]["type"], json!("hello"));
-    assert_eq!(received[0]["command"]["protocol"], json!("1.2"));
+    assert_eq!(received[0]["command"]["protocol"], json!(PROTOCOL_VERSION));
     let _ = std::fs::remove_file(&path);
 }
 
