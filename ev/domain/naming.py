@@ -28,9 +28,17 @@ def simplify(name: str) -> str:
 def closest(spoken: str, existing: list[str]) -> str | None:
     """The one someone meant, or nothing.
 
-    Exact first, then punctuation-blind, then a unique prefix or containment.
-    Ambiguity returns nothing rather than a guess: acting on the wrong one is
-    worse than saying which ones matched.
+    Exact first, then punctuation-blind, then the shortest name that *starts*
+    with what was said, and only then a unique containment. Ambiguity returns
+    nothing rather than a guess: acting on the wrong one is worse than saying
+    which ones matched.
+
+    The prefix rule is what a music library taught us. "Kendrick" matches six
+    artists -- `Kendrick Lamar`, and five collaborations crediting him -- and
+    an earlier version called that ambiguous and refused. Nobody asking for
+    Kendrick means `Future, Metro Boomin & Kendrick Lamar`. The shortest name
+    that begins with what was said is the one they meant, and a credit that
+    merely contains it is not a candidate while a prefix exists.
     """
     for name in existing:
         if name == spoken:
@@ -46,5 +54,21 @@ def closest(spoken: str, existing: list[str]) -> str | None:
     if len(exact) == 1:
         return exact[0]
 
-    partial = [name for key, name in simple if key.startswith(wanted) or wanted in key]
-    return partial[0] if len(partial) == 1 else None
+    # `21st century breakdown` for `21st Century Breakdown (Deluxe Edition)`,
+    # and `kendrick` for `Kendrick Lamar`. Shortest, because the extra words
+    # in the longer ones are the ones nobody said.
+    prefixed = sorted(
+        ((key, name) for key, name in simple if key.startswith(wanted)),
+        key=lambda pair: len(pair[0]),
+    )
+    if prefixed:
+        shortest, name = prefixed[0]
+        # The shortest only wins when it begins every other match: `Kendrick
+        # Lamar` starts `Kendrick Lamar & SZA`, so they are one artist said at
+        # two lengths. `Jazz Classics` and `Jazz Nights` are two playlists, and
+        # taking the shorter would be choosing by coin toss.
+        if all(other.startswith(shortest) for other, _ in prefixed):
+            return name
+
+    contained = [name for key, name in simple if wanted in key]
+    return contained[0] if len(contained) == 1 else None

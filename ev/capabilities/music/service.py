@@ -9,6 +9,8 @@ the real list, never passed through freely" -- and a playlist called
 
 from __future__ import annotations
 
+from collections.abc import Awaitable
+
 from ev.application.speech import Speaker
 from ev.capabilities.music.adapters import MusicAdapter
 from ev.capabilities.music.args import STEP, ControlArgs, PlayArgs, VolumeArgs
@@ -50,11 +52,23 @@ class MusicService:
         if args.kind == "playlist":
             return await self._playlist(args.name)
 
+        if args.kind == "artist":
+            # Always resolved: half of what an artist recorded is credited to
+            # a collaboration, and `artist is "Kendrick Lamar"` finds none of
+            # it. Resolving first is also what turns "kendrick" into a name
+            # the library actually uses.
+            name = closest(args.name, await self._adapter.artists())
+            if name is None:
+                return await self._elsewhere(args.name, "artist")
+            return await self._started("artist", name, self._adapter.play_artist(name))
+
         if args.kind == "album":
             try:
                 started_at = await self._adapter.play_album(args.name)
             except AppleScriptError as error:
-                return await self._not_an_album(args.name, error)
+                if NOT_FOUND not in str(error):
+                    raise
+                return await self._elsewhere(args.name, "album")
             # An album plays through now: E.V. builds its own playlist, which
             # is the only thing Music will play in order. Saying where it
             # started is still honest -- the queue begins somewhere.
@@ -74,7 +88,9 @@ class MusicService:
         try:
             started_at = await self._adapter.play_track(args.name)
         except AppleScriptError as error:
-            return await self._not_an_album(args.name, error)
+            if NOT_FOUND not in str(error):
+                raise
+            return await self._elsewhere(args.name, "track")
 
         return ToolResult.success(
             PLAY,
@@ -82,33 +98,87 @@ class MusicService:
             speech=self._speaker.say("music.playing", name=args.name),
         )
 
-    async def _not_an_album(self, spoken: str, error: AppleScriptError) -> ToolResult:
-        """Nothing by that name -- but the name may be a playlist.
+    async def _elsewhere(self, spoken: str, asked_for: str) -> ToolResult:
+        """Nothing of that kind by that name. Look for it as the others.
 
-        This is the case that actually happened: a playlist called
-        `Indie kid??`, asked for as an album, answered with "nothing in the
-        library matches Indie Kid" while the thing sat in the sidebar. When
-        exactly one playlist matches and no album does, there is no second
-        reading to guess between, so it plays -- and says which, so a wrong
-        guess is visible rather than silent.
+        This is the case that actually happens. "Play the album 21st Century
+        Breakdown" misses because the library calls it `21st Century Breakdown
+        (Deluxe Edition)`; "play Indie kid" misses because it is a playlist;
+        "play Kendrick" misses because it is an artist and half his tracks are
+        credited to somebody else as well.
+
+        Albums first, then artists, then playlists -- the order people mean
+        them. Whatever is found is said out loud, so a wrong guess is audible
+        rather than silent.
         """
-        if NOT_FOUND not in str(error):
-            raise error
+        found = await self._find(spoken)
+        if found is None:
+            existing = ", ".join((await self._adapter.playlists())[:5]) or "none"
+            return ToolResult.failure(
+                PLAY,
+                ToolErrorCode.INVALID_ARGUMENTS,
+                self._speaker.say(
+                    "music.nothing_matches", name=spoken, existing=existing
+                ),
+            )
 
-        name = closest(spoken, await self._adapter.playlists())
-        if name is None:
-            return ToolResult.failure(PLAY, ToolErrorCode.ADAPTER_FAILED, str(error))
+        kind, name = found
+        playing = {
+            "album": self._adapter.play_album,
+            "artist": self._adapter.play_artist,
+            "playlist": self._adapter.play_playlist,
+        }[kind]
+        return await self._started(
+            kind, name, playing(name), asked_for=spoken, instead_of=asked_for
+        )
 
-        started_at = await self._adapter.play_playlist(name)
+    async def _find(self, spoken: str) -> tuple[str, str] | None:
+        album = closest(spoken, await self._adapter.albums())
+        if album is not None:
+            return "album", album
+
+        artist = closest(spoken, await self._adapter.artists())
+        if artist is not None:
+            return "artist", artist
+
+        playlist = closest(spoken, await self._adapter.playlists())
+        if playlist is not None:
+            return "playlist", playlist
+
+        return None
+
+    async def _started(
+        self,
+        kind: str,
+        name: str,
+        playing: Awaitable[str],
+        *,
+        asked_for: str | None = None,
+        instead_of: str | None = None,
+    ) -> ToolResult:
+        started_at = await playing
+        speech = (
+            self._speaker.say(
+                "music.playing_instead",
+                asked=asked_for,
+                # A word in the language being spoken, not the enum's spelling:
+                # "A tocar album X" is not a sentence anyone says.
+                kind=self._speaker.say(f"kind.{kind}"),
+                name=name,
+            )
+            if asked_for and asked_for.casefold() != name.casefold()
+            else self._speaker.say("music.playing", name=name)
+        )
         return ToolResult.success(
             PLAY,
             data={
                 "name": name,
-                "kind": "playlist",
+                "kind": kind,
                 "started_at": started_at,
-                "asked_for": spoken,
+                **({"asked_for": asked_for} if asked_for else {}),
+                **({"asked_kind": instead_of} if instead_of else {}),
             },
-            speech=self._speaker.say("music.playing_instead", asked=spoken, name=name),
+            speech=speech,
         )
 
     async def _playlist(self, spoken: str) -> ToolResult:

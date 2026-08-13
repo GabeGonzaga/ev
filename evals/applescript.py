@@ -64,6 +64,8 @@ async def main() -> int:
     print(f"running every music script against Music (queue: {QUEUE})")
 
     await expect_value("list playlists", adapter.playlists())
+    await expect_value("list albums", adapter.albums())
+    await expect_value("list artists", adapter.artists())
     await expect_error(
         "play album", adapter.play_album(MISSING), "nothing in the library matches"
     )
@@ -72,6 +74,9 @@ async def main() -> int:
     )
     await expect_error(
         "play playlist", adapter.play_playlist(MISSING), "there is no playlist"
+    )
+    await expect_error(
+        "play artist", adapter.play_artist(MISSING), "nothing in the library matches"
     )
     # No branch matches, so this reads the player and changes nothing. It also
     # exercises `my nowPlaying()`, which compiled perfectly while being sent
@@ -97,7 +102,7 @@ async def main() -> int:
     # exercising: the arithmetic is in the script.
     await expect_error(
         "create reminder",
-        reminders.create(MISSING, "checking", datetime(2027, 1, 31, 9, 30), MISSING),
+        reminders.create(MISSING, datetime(2027, 1, 31, 9, 30), MISSING),
         "there is no list called",
     )
 

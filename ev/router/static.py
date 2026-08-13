@@ -108,6 +108,11 @@ _KINDS = {
     "tema": "track",
     "playlist": "playlist",
     "lista": "playlist",
+    "artist": "artist",
+    "artista": "artist",
+    "banda": "artist",
+    "grupo": "artist",
+    "band": "artist",
 }
 _KIND = "|".join(sorted(_KINDS, key=len, reverse=True))
 

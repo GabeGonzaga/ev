@@ -38,3 +38,5 @@
 {"id": "volume-mute", "locale": "pt-PT", "utterance": "silencia", "tool": "music.volume", "arguments": {"change": "mute"}}
 {"id": "run-a-macro", "locale": "en", "utterance": "run the macro morning", "tool": "macro.run", "arguments": {"name": "morning"}}
 {"id": "run-a-macro", "locale": "pt-PT", "utterance": "corre a macro manhã", "tool": "macro.run", "arguments": {"name": "manhã"}}
+{"id": "play-an-artist", "locale": "en", "utterance": "play the artist Kendrick Lamar", "tool": "music.play", "arguments": {"name": "Kendrick Lamar", "kind": "artist"}}
+{"id": "play-an-artist", "locale": "pt-PT", "utterance": "toca o artista Kendrick Lamar", "tool": "music.play", "arguments": {"name": "Kendrick Lamar", "kind": "artist"}}

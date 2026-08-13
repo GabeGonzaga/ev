@@ -23,7 +23,14 @@ PHRASES: dict[str, dict[str, str]] = {
         "browser.opening": "Opening {host}",
         "music.playing": "Playing {name}",
         "music.playing_from": "Playing {name}, from {track}",
-        "music.playing_instead": "No album called {asked}. Playing the playlist {name}",
+        "music.playing_instead": "Nothing called {asked}. Playing {kind} {name}",
+        "kind.album": "the album",
+        "kind.artist": "the artist",
+        "kind.track": "the track",
+        "kind.playlist": "the playlist",
+        "music.nothing_matches": (
+            "Nothing in the library matches {name}. Your playlists: {existing}"
+        ),
         "music.paused": "Paused",
         "music.resumed": "Playing",
         "music.resumed_track": "Playing {track}",
@@ -59,8 +66,14 @@ PHRASES: dict[str, dict[str, str]] = {
         "browser.opening": "A abrir {host}",
         "music.playing": "A tocar {name}",
         "music.playing_from": "A tocar {name}, a partir de {track}",
-        "music.playing_instead": (
-            "Não há nenhum álbum chamado {asked}. A tocar a playlist {name}"
+        "music.playing_instead": "Não há nada chamado {asked}. A tocar {kind} {name}",
+        "kind.album": "o álbum",
+        "kind.artist": "o artista",
+        "kind.track": "a faixa",
+        "kind.playlist": "a playlist",
+        "music.nothing_matches": (
+            "Não há nada na biblioteca que corresponda a {name}. "
+            "As tuas playlists: {existing}"
         ),
         "music.paused": "Em pausa",
         "music.resumed": "A tocar",

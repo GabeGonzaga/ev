@@ -6,7 +6,7 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-Kind = Literal["album", "track", "playlist"]
+Kind = Literal["album", "artist", "track", "playlist"]
 
 Action = Literal["pause", "resume", "next", "previous", "stop"]
 """What the buttons on a music app do. A closed set, because "control the
@@ -19,14 +19,22 @@ class PlayArgs(BaseModel):
     name: str = Field(
         min_length=1,
         max_length=200,
-        description="The name of the album, track or playlist.",
+        description=(
+            "The name of the album, artist, track or playlist, as the user "
+            "said it. It is matched against the library, so a partial name "
+            "is fine: 'kendrick' finds Kendrick Lamar."
+        ),
     )
 
     kind: Kind = Field(
         # Deliberately required. "Play Blonde" is ambiguous between an album
         # and a track, and the caller resolving it explicitly is better than a
         # default quietly picking one and playing the wrong thing.
-        description="What the name refers to.",
+        #
+        # Being wrong is survivable, though: a name that matches nothing of
+        # the kind that was asked for is looked for among the others before
+        # E.V. gives up.
+        description="What the name refers to: album, artist, track or playlist.",
     )
 
 

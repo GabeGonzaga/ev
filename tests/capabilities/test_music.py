@@ -32,9 +32,20 @@ EXPECTED_TRACK_SOURCE = """on run argv
 \t\t\terror "nothing in the library matches " & theName
 \t\tend if
 \t\tplay item 1 of matches
-\t\treturn name of current track
+\t\treturn my nowPlaying()
 \tend tell
-end run"""
+end run
+
+on nowPlaying()
+\ttell application "Music"
+\t\ttry
+\t\t\tif player state is stopped then return ""
+\t\t\treturn name of current track
+\t\ton error
+\t\t\treturn ""
+\t\tend try
+\tend tell
+end nowPlaying"""
 
 
 class CollectingJournal:
@@ -310,10 +321,13 @@ async def test_an_album_is_played_as_a_playlist(fake_bin: FakeBin) -> None:
 
     source = fake_bin.argv()[1]
     assert "make new user playlist" in source
-    assert "duplicate matches to theQueue" in source
+    # One at a time, not `duplicate matches to theQueue`: Music answers
+    # "Can't set user playlist ... to {shared track id ...}" when the list is
+    # long, which is what an artist's 112 tracks look like.
+    assert "duplicate aTrack to theQueue" in source
     assert "play theQueue" in source
     # Its own playlist, replaced each time, and never anything else.
-    assert fake_bin.argv()[-1] == "E.V. queue"
+    assert fake_bin.argv()[3:] == ["Blonde", "E.V. queue", "500"]
 
 
 @pytest.mark.asyncio
@@ -372,15 +386,37 @@ class Library:
     """A library where `Indie kid??` is a playlist and no album by that name
     exists, which is the library that produced the bug."""
 
-    def __init__(self, playlists: list[str]) -> None:
+    def __init__(
+        self,
+        playlists: list[str],
+        albums: list[str] | None = None,
+        artists: list[str] | None = None,
+    ) -> None:
         self.names = playlists
+        self.album_names = albums or []
+        self.artist_names = artists or []
         self.played: list[str] = []
 
     async def playlists(self) -> list[str]:
         return self.names
 
+    async def albums(self) -> list[str]:
+        return self.album_names
+
+    async def artists(self) -> list[str]:
+        return self.artist_names
+
+    async def play_artist(self, name: str) -> str:
+        self.played.append(name)
+        return "Some Track"
+
     async def play_album(self, name: str) -> str:
-        raise AppleScriptError(f"nothing in the library matches {name}")
+        # Exactly what Music does: an album plays if the library has one
+        # spelled that way, and nothing else counts.
+        if name not in self.album_names:
+            raise AppleScriptError(f"nothing in the library matches {name}")
+        self.played.append(name)
+        return "Some Track"
 
     async def play_track(self, name: str) -> str:
         raise AppleScriptError(f"nothing in the library matches {name}")
@@ -406,9 +442,7 @@ async def test_a_playlist_asked_for_as_an_album_still_plays() -> None:
 
     assert result.ok
     assert library.played == ["Indie kid??"]
-    assert (
-        result.speech == "No album called Indie Kid. Playing the playlist Indie kid??"
-    )
+    assert result.speech == "Nothing called Indie Kid. Playing the playlist Indie kid??"
     assert result.data["kind"] == "playlist"
     assert result.data["asked_for"] == "Indie Kid"
 
@@ -424,7 +458,11 @@ async def test_a_name_that_is_nothing_at_all_still_fails() -> None:
 
     assert not result.ok
     assert result.error is not None
-    assert "nothing in the library matches" in result.error.message
+    # The library's own wording is no longer repeated back: it named a
+    # spelling nobody used. What is said instead is what E.V. does know --
+    # that nothing matched, and what the playlists are called.
+    assert "Nothing in the library matches" in result.error.message
+    assert "Music That Does Not Exist" in result.error.message
     assert library.played == []
 
 
@@ -581,3 +619,69 @@ def test_the_control_script_survives_a_player_with_no_track() -> None:
     # sent to the application, which answers "Can't continue nowPlaying".
     # It compiled, it shipped, and `make applescript` is what found it.
     assert "my nowPlaying()" in CONTROL
+
+
+# --- what a library actually contains --------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_an_artist_plays_everything_they_are_on() -> None:
+    """Resolved before it is played, and matched with `contains` after.
+
+    Half of what an artist recorded is credited to a collaboration, and
+    `artist is "Kendrick Lamar"` finds none of it.
+    """
+    library = Library([], artists=["Kendrick Lamar", "Kendrick Lamar & SZA"])
+    service = MusicService(library, Speaker("en"))  # type: ignore[arg-type]
+
+    result = await service.play(PlayArgs(name="kendrick", kind="artist"))
+
+    assert result.ok
+    assert library.played == ["Kendrick Lamar"]
+
+
+@pytest.mark.asyncio
+async def test_an_album_the_library_spells_differently_still_plays() -> None:
+    # The real case: asking for `21st Century Breakdown` misses, because the
+    # library calls it `21st Century Breakdown (Deluxe Edition)`.
+    library = Library([], albums=["21st Century Breakdown (Deluxe Edition)"])
+    service = MusicService(library, Speaker("en"))  # type: ignore[arg-type]
+
+    result = await service.play(PlayArgs(name="21st Century Breakdown", kind="album"))
+
+    assert result.ok
+    assert library.played == ["21st Century Breakdown (Deluxe Edition)"]
+    assert result.speech is not None
+    assert "Deluxe" in result.speech
+
+
+@pytest.mark.asyncio
+async def test_a_name_asked_for_as_an_album_is_looked_for_as_an_artist() -> None:
+    # "Play the album Kendrick" is a reasonable thing to say and a wrong kind.
+    # Being wrong about the kind should not be fatal.
+    library = Library([], artists=["Kendrick Lamar"])
+    service = MusicService(library, Speaker("en"))  # type: ignore[arg-type]
+
+    result = await service.play(PlayArgs(name="kendrick", kind="album"))
+
+    assert result.ok
+    assert result.data["kind"] == "artist"
+    assert library.played == ["Kendrick Lamar"]
+
+
+@pytest.mark.asyncio
+async def test_albums_come_before_artists_and_playlists() -> None:
+    # One name, three possible meanings. Albums first: it is the most specific
+    # thing the word can name.
+    library = Library(["Nikes"], albums=["Nikes"], artists=["Nikes"])
+    service = MusicService(library, Speaker("en"))  # type: ignore[arg-type]
+
+    result = await service.play(PlayArgs(name="nikes", kind="album"))
+
+    assert result.data["kind"] == "album"
+
+
+def test_an_artist_is_matched_with_contains_not_is() -> None:
+    from ev.capabilities.music.adapters import PLAY_ARTIST
+
+    assert "artist contains theName" in PLAY_ARTIST
