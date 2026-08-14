@@ -94,6 +94,10 @@ export type Locale1 = string | null;
 export type SampleRate = number;
 export type Type8 = "audio.submit";
 /**
+ * This is room audio, not a request. Transcribe it, and act only if it began with E.V.'s name; if it did not, answer that nothing was meant and record nothing. The host sends these continuously while the wake loop runs.
+ */
+export type Wake = boolean;
+/**
  * base64 of a JPEG or PNG frame.
  */
 export type Image = string;
@@ -260,6 +264,7 @@ export interface AudioSubmit {
   locale?: Locale1;
   sample_rate?: SampleRate;
   type?: Type8;
+  wake?: Wake;
 }
 /**
  * One frame, and optionally what to ask about it.

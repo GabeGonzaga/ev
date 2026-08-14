@@ -248,6 +248,18 @@ Rememberer = Callable[[str, AccessLevel], None]
 """Where "always" and "never" go. The application is the one the question named,
 so a client cannot set a level for something it was not asked about."""
 
+Waker = Callable[[Path, str], Awaitable[str | None]]
+"""Room audio: was that E.V.'s name, and what followed it.
+
+Given the recording rather than a transcript of it, because deciding whether
+two syllables were a name is a job for a small model and the request that
+follows is a job for a better one. Which is which belongs to the core, not to
+this socket.
+
+`None` means it was not the name, and then nothing happens -- no turn, no
+event, no journal entry. An empty string means the name and nothing after it,
+which is somebody about to speak."""
+
 Transcriber = Callable[[Path, str], Awaitable[str]]
 """Audio in, words out. The daemon holds one; what implements it is
 `SpeechRecognizer`, and the daemon never learns which engine that is."""
@@ -262,6 +274,7 @@ class IpcServer:
         confirmation: SessionConfirmation,
         transcribe: Transcriber | None = None,
         look: Looker | None = None,
+        wake: Waker | None = None,
         report: Reporter | None = None,
         remember: Rememberer | None = None,
         history: History | None = None,
@@ -273,6 +286,7 @@ class IpcServer:
         self._handle = handle
         self._transcribe = transcribe
         self._look = look
+        self._wake = wake
         self._report = report
         self._remember_level = remember
         self._history = history
@@ -487,14 +501,57 @@ class IpcServer:
                 file.write(audio)
 
             try:
-                said = await self._transcribe(path, command.locale or "en")
+                if command.wake:
+                    # Room audio. Almost all of it is somebody else's
+                    # conversation, the radio, or nothing at all, so it is
+                    # heard by the small model whose only job is the name.
+                    if self._wake is None:
+                        await session.send(
+                            Response(
+                                id=request_id, ok=True, payload={"outcome": "ignored"}
+                            )
+                        )
+                        return
+                    asked = await self._wake(path, command.locale or "en")
+                else:
+                    asked = await self._transcribe(path, command.locale or "en")
             except Exception as error:
+                if command.wake:
+                    # A room that could not be transcribed is a room. It is
+                    # not worth an error to a client that is going to send
+                    # another second of it immediately.
+                    await session.send(
+                        Response(id=request_id, ok=True, payload={"outcome": "ignored"})
+                    )
+                    return
                 await self._refuse(
                     session, request_id, "transcription_failed", str(error)
                 )
                 return
         finally:
             path.unlink(missing_ok=True)
+
+        if command.wake:
+            if asked is None:
+                # Not the name: nothing runs, nothing is recorded, and nothing
+                # says it was heard.
+                await session.send(
+                    Response(id=request_id, ok=True, payload={"outcome": "ignored"})
+                )
+                return
+
+            if not asked:
+                # The name and nothing after it: somebody is about to speak.
+                # Saying so is what makes the pause feel answered.
+                await session.emit(StateChanged(state="listening"))
+                await session.send(
+                    Response(id=request_id, ok=True, payload={"outcome": "woken"})
+                )
+                return
+
+        # Both paths have produced words by here: the wake branch returned
+        # early on everything else.
+        said = asked or ""
 
         # What E.V. heard, before it acts on it. A user who is misheard should
         # see it in the words, not infer it from the wrong action.

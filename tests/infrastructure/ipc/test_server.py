@@ -427,7 +427,7 @@ async def test_an_unbound_confirmation_declines() -> None:
 async def test_a_refused_handshake_reaches_the_client(state: Path) -> None:
     core = Core()
     async for _ in start(state, core):
-        with pytest.raises(DaemonRefused, match=r"speaks 1\.6"):
+        with pytest.raises(DaemonRefused, match=r"speaks 1\.7"):
             async with IpcClient(socket_path(state), protocol="0.9"):
                 pass
         break
@@ -918,3 +918,133 @@ class _Discarding:
 
     def identifier(self) -> str:
         return str(json.loads(self.lines[-1])["id"])
+
+
+async def never_asked(audio: Path, locale: str) -> str:
+    """The wake pass has its own, smaller model. If room audio ever reached
+    the good one, that is 723 ms spent on somebody else's conversation."""
+    raise AssertionError("room audio must not reach the request recogniser")
+
+
+async def test_room_audio_that_was_not_the_name_leaves_no_trace(state: Path) -> None:
+    """The privacy of the wake loop, as a test.
+
+    While it runs, everything said near the machine is transcribed on it.
+    Almost all of that is somebody else's conversation, and the only honest
+    thing to do with it is decide whether the name was said and forget the
+    rest: no turn, no event, no journal entry.
+    """
+    core = Core(ToolResult.success("browser.open_url"))
+
+    async def woken(audio: Path, locale: str) -> str | None:
+        return None
+
+    server = IpcServer(
+        path=socket_path(state),
+        handle=core.handle,
+        confirmation=SessionConfirmation(),
+        transcribe=never_asked,
+        wake=woken,
+    )
+    await server.start()
+    task = asyncio.create_task(server.serve_forever())
+
+    try:
+        async with IpcClient(socket_path(state)) as client:
+            answer = await client._send(
+                AudioSubmit(audio=base64.b64encode(b"RIFF..room").decode(), wake=True)
+            )
+
+        assert answer["ok"] is True
+        assert answer["payload"]["outcome"] == "ignored"
+        # Nothing was routed, so nothing could have been journalled.
+        assert core.utterances == []
+    finally:
+        task.cancel()
+        await server.aclose()
+
+
+async def test_the_name_with_a_request_after_it_runs_the_request(state: Path) -> None:
+    core = Core(ToolResult.success("music.control", speech="Paused"))
+
+    async def woken(audio: Path, locale: str) -> str | None:
+        # The wake pass hears the recording itself: what it returns is the
+        # request, with the name already taken off the front.
+        return "pause the music"
+
+    server = IpcServer(
+        path=socket_path(state),
+        handle=core.handle,
+        confirmation=SessionConfirmation(),
+        transcribe=never_asked,
+        wake=woken,
+    )
+    await server.start()
+    task = asyncio.create_task(server.serve_forever())
+
+    try:
+        reader, writer = await raw(socket_path(state))
+        await write(
+            writer,
+            Request(id="h", command=Hello(protocol=PROTOCOL_VERSION, client="t")),
+        )
+        await line(reader)
+        await write(
+            writer,
+            Request(
+                id="1",
+                command=AudioSubmit(
+                    audio=base64.b64encode(b"RIFF..said").decode(), wake=True
+                ),
+            ),
+        )
+
+        first = await line(reader)
+        # The name is not repeated back: what E.V. heard is the request.
+        assert first["type"] == "transcription.partial"
+        assert first["text"] == "pause the music"
+        assert core.utterances == ["pause the music"]
+    finally:
+        task.cancel()
+        await server.aclose()
+
+
+async def test_the_name_alone_asks_for_the_next_thing(state: Path) -> None:
+    # Somebody is about to speak. Saying so is what makes the pause between
+    # "E.V." and the request feel answered rather than ignored.
+    async def woken(audio: Path, locale: str) -> str | None:
+        return ""
+
+    server = IpcServer(
+        path=socket_path(state),
+        handle=Core(None).handle,
+        confirmation=SessionConfirmation(),
+        transcribe=never_asked,
+        wake=woken,
+    )
+    await server.start()
+    task = asyncio.create_task(server.serve_forever())
+
+    try:
+        reader, writer = await raw(socket_path(state))
+        await write(
+            writer,
+            Request(id="h", command=Hello(protocol=PROTOCOL_VERSION, client="t")),
+        )
+        await line(reader)
+        await write(
+            writer,
+            Request(
+                id="1",
+                command=AudioSubmit(
+                    audio=base64.b64encode(b"RIFF..ev").decode(), wake=True
+                ),
+            ),
+        )
+
+        event = await line(reader)
+        assert event["type"] == "state.changed"
+        assert event["state"] == "listening"
+    finally:
+        task.cancel()
+        await server.aclose()

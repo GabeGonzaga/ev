@@ -43,6 +43,7 @@ from ev.application.confirmation import ConfirmationRequest
 from ev.application.frames import Frames
 from ev.application.policy import ConfidencePolicy, PermissionLedger, PermissionPolicy
 from ev.application.speech import Speaker
+from ev.application.wake import WakeWord, hear
 from ev.capabilities.applications.adapters import ApplicationAdapter
 from ev.capabilities.applications.service import ApplicationService
 from ev.capabilities.applications.tools import application_tools
@@ -91,8 +92,10 @@ from ev.infrastructure.permissions import (
     reloader,
     save_grants,
 )
-from ev.infrastructure.speech.recognizer import WhisperCppRecognizer
+from ev.infrastructure.speech.recognizer import WAKE_MODEL, WhisperCppRecognizer
 from ev.infrastructure.speech.synthesizer import SaySynthesizer, SpeechSynthesizer
+from ev.infrastructure.wake import load_wake, save_wake, wake_path
+from ev.infrastructure.wake import reloader as reloader_for_wake
 from ev.infrastructure.web.server import DEFAULT_PORT, WebSurface
 from ev.registry import CallRecord, ConfirmationPort, JournalPort, Registry
 from ev.router.model import Completion, ModelRouter
@@ -495,6 +498,22 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         help="undo a --grant. Repeatable.",
     )
     parser.add_argument(
+        "--wake",
+        nargs="?",
+        const="",
+        default=None,
+        metavar="WORD",
+        help="the name E.V. answers to. `--wake` shows it, `--wake jarvis` "
+        "sets it, `--wake off` and `--wake on` stop and start listening",
+    )
+    parser.add_argument(
+        "--also",
+        action="append",
+        default=None,
+        metavar="SPELLING",
+        help="another way the microphone writes the name, e.g. --also evie",
+    )
+    parser.add_argument(
         "--apps",
         action="store_true",
         help="what E.V. may do with each application on this Mac",
@@ -596,6 +615,9 @@ async def run(args: argparse.Namespace, completion: Completion | None = None) ->
     if args.history is not None:
         return await show_history(database, args.history)
 
+    if args.wake is not None or args.also is not None:
+        return set_wake(database.parent, args.wake, args.also or [])
+
     if args.app is not None:
         return set_level(database.parent, args.app[0], args.app[1])
 
@@ -680,6 +702,42 @@ def show_macros(database: Path, registry: Registry) -> int:
                 print(f"  {number}. {step.tool} {step.arguments}")
 
     return EXIT_FAILED if broken else EXIT_OK
+
+
+def set_wake(state_dir: Path, word: str | None, also: list[str]) -> int:
+    """Show the name, change it, or start and stop listening for it."""
+    path = wake_path(state_dir)
+    try:
+        wake = load_wake(path)
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return EXIT_FAILED
+
+    if word in {"on", "off"}:
+        wake = WakeWord(word=wake.word, also=wake.also, enabled=word == "on")
+    elif word:
+        # A new name is a new name: the old spellings belonged to the old one.
+        wake = WakeWord(word=word, also=tuple(also), enabled=wake.enabled)
+    elif also:
+        wake = WakeWord(
+            word=wake.word, also=tuple([*wake.also, *also]), enabled=wake.enabled
+        )
+
+    if word is not None or also:
+        save_wake(path, wake)
+
+    spelled = ", ".join(sorted(wake.variants()))
+    print(f"name: {wake.word}")
+    print(f"heard as: {spelled}")
+    print("listening" if wake.enabled else "not listening (ev --wake on)")
+    if wake.enabled:
+        # Said plainly, because it is the whole of what the feature costs.
+        print(
+            "while it listens, speech near this Mac is transcribed on it to "
+            "check for the name. Nothing leaves, and nothing that was not "
+            "addressed to E.V. is recorded."
+        )
+    return EXIT_OK
 
 
 def set_level(state_dir: Path, name: str, level: str) -> int:
@@ -803,6 +861,33 @@ async def serve(
     async def transcribe(audio: Path, locale: str) -> str:
         return await recognizer.transcribe(audio, language=locale)
 
+    # Two recognisers, two jobs. `tiny` decides whether two syllables were the
+    # name, on every burst of speech in the room; `small` hears the request
+    # that follows, once.
+    listener = WhisperCppRecognizer(ProcessRunner(), model=WAKE_MODEL)
+    heard_name = reloader_for_wake(wake_path(database.parent))
+    known = load_wake(wake_path(database.parent))
+
+    async def woken(audio: Path, locale: str) -> str | None:
+        """Was that E.V.'s name, and what followed it.
+
+        `None` is the answer almost every time, and it is the important one:
+        nothing runs, nothing is journalled, nothing is emitted. Room audio
+        that was not addressed to E.V. leaves no trace of having been heard.
+
+        Heard by `tiny`, not by `small`: this runs on every burst of speech in
+        the room rather than once per request, and what it gets wrong is
+        caught by a string comparison rather than by the model.
+        """
+        nonlocal known
+        known = heard_name() or known
+        if not known.enabled:
+            return None
+
+        said = await listener.transcribe(audio, language=locale)
+        heard = hear(said, known)
+        return heard.rest if heard.woke else None
+
     async def handle(text: str, locale: str | None = None) -> object:
         # Bound per turn, under the same lock that serialises turns, for the
         # same reason the confirmation port is: one core, many surfaces, and
@@ -846,6 +931,7 @@ async def serve(
         handle=handle,  # type: ignore[arg-type]
         confirmation=confirmation,
         transcribe=transcribe,
+        wake=woken,
         look=look,
         # The host is the only process macOS answers about the microphone and
         # the camera, so it is the only one that can say (invariant 7).

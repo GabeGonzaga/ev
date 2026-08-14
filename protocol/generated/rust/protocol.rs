@@ -311,6 +311,12 @@ impl<'de> ::serde::Deserialize<'de> for Audio {
 #[doc = "      \"default\": \"audio.submit\","]
 #[doc = "      \"type\": \"string\","]
 #[doc = "      \"const\": \"audio.submit\""]
+#[doc = "    },"]
+#[doc = "    \"wake\": {"]
+#[doc = "      \"title\": \"Wake\","]
+#[doc = "      \"description\": \"This is room audio, not a request. Transcribe it, and act only if it began with E.V.'s name; if it did not, answer that nothing was meant and record nothing. The host sends these continuously while the wake loop runs.\","]
+#[doc = "      \"default\": false,"]
+#[doc = "      \"type\": \"boolean\""]
 #[doc = "    }"]
 #[doc = "  },"]
 #[doc = "  \"additionalProperties\": false"]
@@ -329,6 +335,9 @@ pub struct AudioSubmit {
     pub sample_rate: i64,
     #[serde(rename = "type", default = "defaults::audio_submit_type")]
     pub type_: ::std::string::String,
+    #[doc = "This is room audio, not a request. Transcribe it, and act only if it began with E.V.'s name; if it did not, answer that nothing was meant and record nothing. The host sends these continuously while the wake loop runs."]
+    #[serde(default)]
+    pub wake: bool,
 }
 impl AudioSubmit {
     pub fn builder() -> builder::AudioSubmit {
@@ -670,7 +679,7 @@ impl ConfirmationRespond {
 #[doc = "    }"]
 #[doc = "  },"]
 #[doc = "  \"additionalProperties\": false,"]
-#[doc = "  \"x-ev-protocol-version\": \"1.6\""]
+#[doc = "  \"x-ev-protocol-version\": \"1.7\""]
 #[doc = "}"]
 #[doc = r" ```"]
 #[doc = r" </details>"]
@@ -2332,6 +2341,7 @@ pub mod builder {
         >,
         sample_rate: ::std::result::Result<i64, ::std::string::String>,
         type_: ::std::result::Result<::std::string::String, ::std::string::String>,
+        wake: ::std::result::Result<bool, ::std::string::String>,
     }
     impl ::std::default::Default for AudioSubmit {
         fn default() -> Self {
@@ -2340,6 +2350,7 @@ pub mod builder {
                 locale: Ok(Default::default()),
                 sample_rate: Ok(super::defaults::default_u64::<i64, 16000>()),
                 type_: Ok(super::defaults::audio_submit_type()),
+                wake: Ok(Default::default()),
             }
         }
     }
@@ -2384,6 +2395,16 @@ pub mod builder {
                 .map_err(|e| format!("error converting supplied value for type_: {e}"));
             self
         }
+        pub fn wake<T>(mut self, value: T) -> Self
+        where
+            T: ::std::convert::TryInto<bool>,
+            T::Error: ::std::fmt::Display,
+        {
+            self.wake = value
+                .try_into()
+                .map_err(|e| format!("error converting supplied value for wake: {e}"));
+            self
+        }
     }
     impl ::std::convert::TryFrom<AudioSubmit> for super::AudioSubmit {
         type Error = super::error::ConversionError;
@@ -2395,6 +2416,7 @@ pub mod builder {
                 locale: value.locale?,
                 sample_rate: value.sample_rate?,
                 type_: value.type_?,
+                wake: value.wake?,
             })
         }
     }
@@ -2405,6 +2427,7 @@ pub mod builder {
                 locale: Ok(value.locale),
                 sample_rate: Ok(value.sample_rate),
                 type_: Ok(value.type_),
+                wake: Ok(value.wake),
             }
         }
     }

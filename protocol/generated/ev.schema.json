@@ -57,6 +57,12 @@
           "default": "audio.submit",
           "title": "Type",
           "type": "string"
+        },
+        "wake": {
+          "default": false,
+          "description": "This is room audio, not a request. Transcribe it, and act only if it began with E.V.'s name; if it did not, answer that nothing was meant and record nothing. The host sends these continuously while the wake loop runs.",
+          "title": "Wake",
+          "type": "boolean"
         }
       },
       "required": [
@@ -831,5 +837,5 @@
   },
   "title": "Envelope",
   "type": "object",
-  "x-ev-protocol-version": "1.6"
+  "x-ev-protocol-version": "1.7"
 }

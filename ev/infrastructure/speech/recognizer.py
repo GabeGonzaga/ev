@@ -25,6 +25,14 @@ from ev.infrastructure.macos.processes import ProcessFailed, ProcessRunner
 WHISPER_TIMEOUT = 60.0
 DEFAULT_MODEL = Path(__file__).resolve().parents[3] / "models" / "ggml-small.bin"
 
+WAKE_MODEL = DEFAULT_MODEL.with_name("ggml-tiny.bin")
+"""What listens for the name.
+
+`tiny` rather than `small`: this runs on every burst of speech in the room
+rather than once per request, and it has one job -- deciding whether two
+syllables were E.V.'s name. What it gets wrong is caught by the name check,
+which is a string comparison, not by the model."""
+
 # whisper.cpp takes a two-letter code; the session carries a full tag.
 LANGUAGES = {
     "pt-PT": "pt",

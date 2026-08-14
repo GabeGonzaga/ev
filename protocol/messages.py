@@ -42,14 +42,14 @@ MAX_IMAGE_BASE64 = 8_000_000
 leaves room for a camera that hands over something larger without leaving the
 field unbounded."""
 
-PROTOCOL_VERSION = "1.6"
+PROTOCOL_VERSION = "1.7"
 """Major.minor. The handshake compares it exactly: a mismatch refuses the
 connection rather than degrading into a conversation neither side understands.
 
 1.1 added `audio.submit`; 1.2 added `history.query`; 1.3 gave it `query`; 1.4
 added `vision.submit`; 1.5 added `permission.report`; 1.6 carried the
-application and the assurance into a confirmation, and an answer back. A client
-that knows an
+application and the assurance into a confirmation, and an answer back; 1.7
+added `wake` to `audio.submit`. A client that knows an
 earlier version is refused rather than served a subset, because "some of the
 protocol" is not a protocol.
 """
@@ -109,6 +109,15 @@ class AudioSubmit(Message):
         description="base64 of a mono 16-bit PCM WAV.",
     )
     sample_rate: int = Field(default=16000, ge=8000, le=48000)
+    wake: bool = Field(
+        default=False,
+        description=(
+            "This is room audio, not a request. Transcribe it, and act only "
+            "if it began with E.V.'s name; if it did not, answer that nothing "
+            "was meant and record nothing. The host sends these continuously "
+            "while the wake loop runs."
+        ),
+    )
     locale: str | None = Field(
         default=None,
         description="The language to transcribe as. Never 'auto': auto-detect "

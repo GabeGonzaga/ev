@@ -515,6 +515,10 @@ SpeechRecognizer · SpeechSynthesizer · AudioSession
 - **Order:** push-to-talk first, VAD second, wake word last. Always-on
   listening introduces power draw, false positives, echo cancellation and
   privacy problems simultaneously.
+- **The wake word is transcribed, not trained** (ADR 0037), so it is the
+  user's to change: `ev --wake jarvis`. It is off until asked for, it must
+  start the utterance, and room audio that was not addressed to E.V. leaves no
+  turn, no event and no journal entry.
 
 **TransformerTTS is not part of the architecture.** It may be evaluated later
 as an experimental `SpeechSynthesizer` adapter. It must not become a required
@@ -569,7 +573,7 @@ Do not introduce, and push back if asked:
 | 3 | Tauri, menu bar, NSPanel, settings, history, local web surface | done, unproven on device |
 | 4 | JSON macros, more adapters, retrieval | done |
 | 5 | Camera and vision | done, unproven on device |
-| 6 | Wake word, continuous interaction | |
+| 6 | Wake word, continuous interaction | the core hears the name (ADR 0037); always-on capture pending |
 
 Camera comes after the UI exists because it needs the indicator and permission
 surfaces. Wake word is last because it is the hardest part of the audio stack

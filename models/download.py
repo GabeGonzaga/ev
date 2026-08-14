@@ -9,7 +9,7 @@ The hashes below are the ones Hugging Face publishes for its own blobs, read
 from its API rather than computed from whatever arrived first. A mismatch
 deletes the file and fails.
 
-    python models/download.py            the model E.V. uses
+    python models/download.py            the two models E.V. uses
     python models/download.py --check    verify what is already here
     python models/download.py --all
 """
@@ -39,6 +39,10 @@ class Model:
 # Visual Studio Code" -- and base handles that badly.
 DEFAULT = "ggml-small.bin"
 
+WAKE = "ggml-tiny.bin"
+"""What listens for the name. It only has to recognise one word, and it runs
+on everything said in the room, so it is the small one."""
+
 MODELS = {
     "ggml-small.bin": Model(
         name="ggml-small.bin",
@@ -51,6 +55,12 @@ MODELS = {
         sha256="ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb",
         megabytes=190,
         why="quantised small, for measuring the accuracy cost",
+    ),
+    "ggml-tiny.bin": Model(
+        name="ggml-tiny.bin",
+        sha256="be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21",
+        megabytes=78,
+        why="the wake pass: every burst of room speech, so it has to be cheap",
     ),
     "ggml-base.bin": Model(
         name="ggml-base.bin",
@@ -122,7 +132,7 @@ def main(argv: list[str]) -> int:
     )
     arguments = parser.parse_args(argv)
 
-    wanted = list(MODELS.values()) if arguments.all else [MODELS[DEFAULT]]
+    wanted = list(MODELS.values()) if arguments.all else [MODELS[DEFAULT], MODELS[WAKE]]
     print(f"models in {HERE}")
 
     ok = True
