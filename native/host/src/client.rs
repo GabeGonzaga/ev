@@ -199,10 +199,39 @@ impl Client {
         locale: Option<&str>,
         answer: &mut dyn FnMut(&Value) -> Answer,
     ) -> Result<Turn, Error> {
+        self.submit_recording(wav, locale, false, answer)
+    }
+
+    /// A burst of room speech, which is probably not for E.V. at all.
+    ///
+    /// The core decides: it hears the name with a small model and answers
+    /// `ignored` for everything else, which is almost everything. Nothing is
+    /// journalled and no turn is taken unless the name was said.
+    pub fn submit_room(
+        &mut self,
+        wav: &[u8],
+        locale: Option<&str>,
+        answer: &mut dyn FnMut(&Value) -> Answer,
+    ) -> Result<Turn, Error> {
+        self.submit_recording(wav, locale, true, answer)
+    }
+
+    fn submit_recording(
+        &mut self,
+        wav: &[u8],
+        locale: Option<&str>,
+        wake: bool,
+        answer: &mut dyn FnMut(&Value) -> Answer,
+    ) -> Result<Turn, Error> {
         use base64::Engine as _;
         let encoded = base64::engine::general_purpose::STANDARD.encode(wav);
         self.turn(
-            json!({ "type": "audio.submit", "audio": encoded, "locale": locale }),
+            json!({
+                "type": "audio.submit",
+                "audio": encoded,
+                "locale": locale,
+                "wake": wake,
+            }),
             answer,
         )
     }

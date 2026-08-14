@@ -302,13 +302,18 @@ def png(raw: bytes, size: int) -> bytes:
 # --- the menu bar ---------------------------------------------------------
 
 
-def tray(size: int) -> bytes:
+def tray(size: int, listening: bool = False) -> bytes:
     """The menu bar mark: black with alpha, which macOS calls a template.
 
     Not the app icon shrunk. A menu bar is 22 points tall and monochrome by
     convention; a glowing badge up there looks like something went wrong.
     macOS inverts a template for dark menu bars, so this is drawn once and is
     correct in both.
+
+    Two of them: the ring, and the ring with its middle filled. The filled one
+    is on screen for exactly as long as the microphone is open, which is what
+    `CLAUDE.md` invariant 8 asks for -- macOS shows its own indicator, and its
+    own indicator does not say which application is listening.
     """
     scale = 4
     big = size * scale
@@ -327,7 +332,7 @@ def tray(size: int) -> bytes:
             angle = math.degrees(math.atan2(py, px)) % 360.0
             if 300.0 < angle < 345.0:
                 ring = 1.0
-            dot = radius - 0.11
+            dot = radius - (0.19 if listening else 0.11)
             alpha[y][x] = max(coverage(ring, feather), coverage(dot, feather))
 
     out = bytearray()
@@ -383,8 +388,13 @@ def main() -> int:
         stale.unlink()
     iconset.rmdir()
 
-    for path, size in ((HERE / "tray.png", 22), (HERE / "tray@2x.png", 44)):
-        path.write_bytes(tray(size))
+    for path, size, live in (
+        (HERE / "tray.png", 22, False),
+        (HERE / "tray@2x.png", 44, False),
+        (HERE / "tray-live.png", 22, True),
+        (HERE / "tray-live@2x.png", 44, True),
+    ):
+        path.write_bytes(tray(size, live))
         print(f"  wrote {path.name} ({size}px, template)")
 
     return 0

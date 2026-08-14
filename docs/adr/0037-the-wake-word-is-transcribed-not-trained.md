@@ -98,3 +98,53 @@ language, and `CLAUDE.md` already puts it at "a fallback backend at most".
 
 **Running `small` on room audio.** 0.72 s per burst of somebody else's
 conversation, for a decision a 78 MB model makes in 0.3 s.
+
+## The loop, and what it costs
+
+Added after the matcher, and it is what turns a function into a microphone
+that stays open.
+
+The room is heard in the signed host, not in the core. The microphone is a TCC
+surface and TCC belongs to the signed process -- the same reason push-to-talk
+captures there. The host opens the device **once** and keeps it, polling 50 ms
+frames through the same VAD the hold path uses; opening and closing it per
+utterance would show macOS's own indicator flickering all day and would cost a
+device open every few seconds.
+
+Each burst of speech goes to the core as `audio.submit` with `wake: true`. The
+core transcribes it with `tiny`, matches, and answers one of three things:
+
+- `ignored` -- not the name. **No event, no journal entry, nothing kept.**
+  This is almost everything the loop ever produces.
+- `woken` -- the name and nothing after it. The panel is revealed, the host
+  records the next utterance and submits it as an ordinary turn.
+- a turn -- the name with a request behind it, run as though it had been typed.
+
+The audio file is deleted either way. What is not journalled cannot be
+searched later, which is the point: a wake loop that wrote a transcript of the
+room would be a recording device with a filter in front of it.
+
+### The indicator
+
+Invariant 8 asks for a visible active-state indicator, and macOS's own is not
+enough on its own -- it says *something* is listening, not *what*. So while the
+microphone is open:
+
+- the menu bar mark is drawn filled (`tray-live`), and returns to the outline
+  the moment the loop stops;
+- the panel shows a breathing `◉ listening` badge, for the case where the
+  window is on screen and the menu bar is not being looked at.
+
+Both are driven by the loop itself rather than by the setting, so a loop that
+died leaves an honest indicator rather than a lying one.
+
+### Switching it on
+
+`wake.json` is the whole switch. The loop stats it once per utterance, so
+`ev --wake on` and the panel's toggle are the same act and neither restarts
+anything. The app writes the file back through `serde_json::Value` rather than
+its own struct: it models `word` and `enabled`, the core also writes `also`,
+and a window saving a settings file must not drop the keys it never read.
+
+Off by default, and the sentence next to the switch says plainly that while it
+is on, everything said near the machine is transcribed on it.

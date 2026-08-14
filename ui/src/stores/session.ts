@@ -19,6 +19,14 @@ export const useSession = defineStore("session", () => {
   // On while the camera is. In the app the host says so; in a browser the
   // page knows, because it is the one holding the stream.
   const camera = ref(false);
+  /// Whether the microphone is open for the name. Invariant 8: it is not
+  /// enough for macOS to show its own indicator, because its own indicator
+  /// does not say which application is listening.
+  const listening = ref(false);
+  /// What it answers to, and whether it is listening for it. Null in a
+  /// browser, where the name can be seen in the CLI but not changed here.
+  const wake = ref<api.Wake | null>(null);
+  const wakeTrouble = ref("");
   const shortcutTrouble = ref<string | null>(null);
   // A question the core is waiting on. While this is set, a turn is parked on
   // the other side and nothing has run.
@@ -99,6 +107,29 @@ export const useSession = defineStore("session", () => {
   });
 
   void api.onCamera((on) => (camera.value = on));
+  void api.wakeState().then((found) => (wake.value = found));
+
+  /// Switch the name on or off, or change it. The loop is watching the file,
+  /// so this is the whole of it.
+  async function name(word: string, enabled: boolean) {
+    wakeTrouble.value = "";
+    try {
+      wake.value = await api.setWake(word, enabled);
+    } catch (error) {
+      wakeTrouble.value = String(error);
+    }
+  }
+
+  void api.onListening(
+    (on) => (listening.value = on),
+    () => {
+      // The name was heard and nothing followed it. What comes next is a
+      // request, and saying so is what makes the pause feel answered.
+      state.value = "listening";
+      heard.value = null;
+      said.value = [];
+    },
+  );
 
   // A turn started by the hotkey, which the panel did not ask for and cannot
   // await. Same shape as any other turn once it arrives.
@@ -227,7 +258,7 @@ export const useSession = defineStore("session", () => {
 
   return {
     state, heard, said, trouble, entries, locale, question, search,
-    shortcut, shortcutTrouble, camera,
+    shortcut, shortcutTrouble, camera, listening, wake, wakeTrouble, name,
     ask, speak, look, answer, refresh, choose, load, bind,
   };
 });

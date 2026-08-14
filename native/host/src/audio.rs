@@ -231,6 +231,63 @@ pub fn record(stop: impl FnOnce()) -> Result<Vec<i16>, Error> {
     capture.finish()
 }
 
+/// Listen until told to stop, handing over each utterance as it ends.
+///
+/// The device is opened once and stays open, which is what makes this a wake
+/// loop rather than a series of recordings: opening the microphone for every
+/// burst of speech would flicker the system's own indicator all day and pay
+/// the device's start-up cost each time.
+///
+/// `heard` is given the samples of one utterance and answers whether to keep
+/// listening. Silence produces nothing at all -- the room is not an utterance,
+/// and a wake loop that reported every quiet second would be a busy loop with
+/// a microphone attached.
+pub fn listen(
+    make: impl Fn() -> Vad,
+    mut heard: impl FnMut(Vec<i16>) -> bool,
+) -> Result<(), Error> {
+    let capture = open()?;
+    let frame = std::time::Duration::from_millis(50);
+    let seconds = frame.as_secs_f32();
+    let mut vad = make();
+    let mut consumed = 0usize;
+    let mut utterance: Vec<f32> = Vec::new();
+
+    loop {
+        std::thread::sleep(frame);
+
+        let (level, fresh) = {
+            let buffer = capture
+                .collected
+                .lock()
+                .map_err(|_| Error::Device("the capture thread panicked".into()))?;
+            let fresh = buffer[consumed.min(buffer.len())..].to_vec();
+            consumed = buffer.len();
+            (rms(&fresh), fresh)
+        };
+
+        utterance.extend_from_slice(&fresh);
+
+        match vad.observe(level, seconds) {
+            Decision::Continue => {}
+            Decision::Done => {
+                let samples = to_i16(&resample(&utterance, capture.rate, TARGET_RATE));
+                utterance.clear();
+                vad = make();
+                if !heard(samples) {
+                    return Ok(());
+                }
+            }
+            Decision::NothingSaid => {
+                // A quiet stretch. Not an error here, unlike a single
+                // recording: quiet is what a room is most of the time.
+                utterance.clear();
+                vad = make();
+            }
+        }
+    }
+}
+
 /// Record until the room goes quiet again.
 ///
 /// Polls the buffer rather than deciding inside the audio callback: the

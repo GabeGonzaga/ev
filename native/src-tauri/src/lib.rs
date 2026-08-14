@@ -10,8 +10,10 @@
 
 mod daemon;
 mod settings;
+mod wake;
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -30,6 +32,169 @@ const TRAY: &str = "ev";
 /// Matches the corner radius macOS gives its own floating panels.
 const PANEL_RADIUS: f64 = 12.0;
 
+/// Listen for E.V.'s name until told to stop.
+///
+/// Every burst of speech in the room goes to the core, which hears the name
+/// with a small model and answers `ignored` for almost all of it. Nothing is
+/// journalled and no turn is taken unless the name was said, so what this
+/// loop mostly does is throw away other people's conversations (ADR 0037).
+///
+/// The room is heard here rather than in the core because the microphone is a
+/// TCC surface and TCC belongs to the signed process -- the same reason the
+/// push-to-talk path captures here.
+fn wake_loop(app: AppHandle, stop: Arc<AtomicBool>) {
+    let mut watching = wake::changed_at();
+
+    while !stop.load(Ordering::Relaxed) {
+        if !wake::load().enabled {
+            // Switched off while running: put the microphone down and wait
+            // for the file to say otherwise.
+            let _ = app.emit("wake.listening", false);
+            show_listening(&app, false);
+            std::thread::sleep(RETRY_AFTER);
+            continue;
+        }
+
+        let _ = app.emit("wake.listening", true);
+        show_listening(&app, true);
+
+        let heard = audio::listen(audio::Vad::default, |samples| {
+            if stop.load(Ordering::Relaxed) {
+                return false;
+            }
+            // The name may have been switched off, or changed, while the
+            // microphone was open. Noticing costs one `stat` per utterance.
+            let now = wake::changed_at();
+            if now != watching {
+                watching = now;
+                if !wake::load().enabled {
+                    return false;
+                }
+            }
+
+            room(&app, samples);
+            true
+        });
+
+        if let Err(error) = heard {
+            eprintln!("the wake loop stopped listening: {error}");
+            std::thread::sleep(RETRY_AFTER);
+        }
+    }
+
+    let _ = app.emit("wake.listening", false);
+    show_listening(&app, false);
+}
+
+/// One burst of room speech, offered to the core.
+fn room(app: &AppHandle, samples: Vec<i16>) {
+    let Ok(wav) = audio::to_wav(&samples) else {
+        return;
+    };
+
+    let locale = app
+        .state::<Session>()
+        .locale
+        .lock()
+        .ok()
+        .and_then(|slot| slot.clone());
+
+    let Ok(mut client) = Client::connect_as(&socket(), true) else {
+        return;
+    };
+
+    let mut ask = |question: &serde_json::Value| -> Answer {
+        // A question raised by something nobody asked for is answered by
+        // nobody: the panel is not open, and silence is not consent.
+        let assurance = question["assurance"].as_str().unwrap_or("ack");
+        match requirement(assurance) {
+            Some(needed) => Answer::once(verified(question, needed)),
+            None => Answer::once(false),
+        }
+    };
+
+    let Ok(turn) = client.submit_room(&wav, locale.as_deref(), &mut ask) else {
+        return;
+    };
+
+    let outcome = turn
+        .response
+        .payload
+        .get("outcome")
+        .and_then(|it| it.as_str());
+    match outcome {
+        // Not the name. Nothing happened, and nothing is said about it.
+        Some("ignored") | None => {}
+        Some("woken") => {
+            // The name, and nothing after it. Somebody is about to speak, so
+            // the next utterance is a request rather than a room.
+            let _ = app.emit("wake.woken", ());
+            if let Some(window) = app.get_webview_window("panel") {
+                reveal(&window);
+            }
+            follow(app);
+        }
+        Some(_) => {
+            let _ = app.emit(
+                "turn.completed",
+                TurnResult {
+                    heard: turn.heard,
+                    spoken: turn.speech.iter().map(|s| s.text.clone()).collect(),
+                    ok: turn.response.ok,
+                    outcome: "ran".into(),
+                    error: turn.response.error.as_ref().map(|e| e.message.clone()),
+                },
+            );
+        }
+    }
+}
+
+/// The utterance after the name, taken as an ordinary turn.
+fn follow(app: &AppHandle) {
+    let _ = app.emit("turn.started", ());
+    let outcome = audio::record_until_silence(audio::Vad::default())
+        .map_err(|error| error.to_string())
+        .and_then(|samples| audio::to_wav(&samples).map_err(|error| error.to_string()))
+        .and_then(|wav| run_turn(app, Input::Recorded(wav), None));
+
+    let _ = match outcome {
+        Ok(result) => app.emit("turn.completed", result),
+        Err(error) => app.emit(
+            "turn.completed",
+            TurnResult {
+                heard: None,
+                spoken: Vec::new(),
+                ok: false,
+                outcome: "failed".into(),
+                error: Some(error),
+            },
+        ),
+    };
+}
+
+/// The menu bar mark, filled while the microphone is open.
+fn show_listening(app: &AppHandle, live: bool) {
+    let bytes = if live { TRAY_LIVE } else { TRAY_ICON };
+    if let (Some(tray), Ok(icon)) = (app.tray_by_id(TRAY), tauri::image::Image::from_bytes(bytes)) {
+        let _ = tray.set_icon(Some(icon));
+        let _ = tray.set_icon_as_template(true);
+    }
+}
+
+/// What E.V. answers to, and whether it is listening for it.
+#[tauri::command]
+fn wake_state() -> wake::Wake {
+    wake::load()
+}
+
+/// Change it. The loop is watching the file, so this is the whole switch:
+/// nothing is signalled, nothing is restarted, and `ev --wake on` in a
+/// terminal does exactly the same thing.
+#[tauri::command]
+fn set_wake(word: String, enabled: bool) -> Result<wake::Wake, String> {
+    wake::save(&word, enabled)
+}
+
 /// Say what macOS answered, on its own connection.
 ///
 /// Errors are dropped on purpose: a report is a courtesy to the core, and a
@@ -42,6 +207,16 @@ fn report(permission: &str, state: &str) {
 
 /// The menu bar mark, drawn by `icons/generate.py` and carried in the binary.
 const TRAY_ICON: &[u8] = include_bytes!("../icons/tray@2x.png");
+
+/// The same mark with its middle filled, on screen for exactly as long as the
+/// microphone is open. macOS shows its own indicator; its own indicator does
+/// not say which application is listening (invariant 8).
+const TRAY_LIVE: &[u8] = include_bytes!("../icons/tray-live@2x.png");
+
+/// How long the loop waits before trying a microphone that would not open.
+/// Long enough not to spin, short enough that plugging one in works without
+/// restarting anything.
+const RETRY_AFTER: Duration = Duration::from_secs(5);
 
 /// How long a question waits for the person to answer it. Long, because they
 /// are being asked something; not forever, because a panel that was closed
@@ -78,6 +253,9 @@ struct Session {
     /// Where the key-up goes. Present only while a hold is recording, which
     /// is also how a key repeat is told from a second press.
     holding: Mutex<Option<Sender<()>>>,
+    /// Raised when the app is quitting, so the wake loop puts the microphone
+    /// down rather than being killed holding it.
+    stop_listening: Arc<AtomicBool>,
 }
 
 #[derive(Clone, Serialize)]
@@ -509,12 +687,14 @@ pub fn run() {
     );
 
     let ending = core.clone();
+    let session = Session::default();
+    let quiet = session.stop_listening.clone();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(Session {
             locale: Mutex::new(saved.locale.clone()),
-            ..Session::default()
+            ..session
         })
         .invoke_handler(tauri::generate_handler![
             submit,
@@ -526,7 +706,9 @@ pub fn run() {
             history,
             set_locale,
             set_shortcut,
-            settings
+            settings,
+            wake_state,
+            set_wake
         ])
         .setup(move |app| {
             if let Some(panel) = app.get_webview_window("panel") {
@@ -595,6 +777,13 @@ pub fn run() {
                 report("camera", if granted { "granted" } else { "denied" });
             });
 
+            // The wake loop, if the name has been switched on. It watches the
+            // file either way, so `ev --wake on` starts it without restarting
+            // the app.
+            let listening = app.handle().clone();
+            let stop = app.state::<Session>().stop_listening.clone();
+            std::thread::spawn(move || wake_loop(listening, stop));
+
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -618,6 +807,7 @@ pub fn run() {
             // What the app started, the app stops. An adopted daemon --
             // someone's terminal, watching it -- is left running.
             if matches!(event, tauri::RunEvent::Exit) {
+                quiet.store(true, Ordering::Relaxed);
                 if let Ok(mut state) = ending.lock() {
                     daemon::stop(&mut state);
                 }

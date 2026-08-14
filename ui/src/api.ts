@@ -148,6 +148,37 @@ export const confirm = async (
 /// In the app a question arrives as an event while the turn waits. In a
 /// browser it arrives as the turn's own answer, so there is nothing to
 /// subscribe to.
+export interface Wake {
+  word: string;
+  enabled: boolean;
+}
+
+/// What E.V. answers to. Only the app can change it: the file lives beside
+/// the journal, and a browser tab has no business writing there.
+export async function wakeState(): Promise<Wake | null> {
+  if (!inTauri) return null;
+  return callTauri<Wake>("wake_state");
+}
+
+export async function setWake(word: string, enabled: boolean): Promise<Wake> {
+  return callTauri<Wake>("set_wake", { word, enabled });
+}
+
+/// The wake loop, while it runs.
+///
+/// A microphone that is open all day needs saying so where it can be seen.
+/// The menu bar mark fills for as long as it is open; this is the same fact,
+/// for a window that may or may not be on screen.
+export async function onListening(
+  live: (on: boolean) => void,
+  woken: () => void,
+): Promise<void> {
+  if (!inTauri) return;
+  const { listen } = await import("@tauri-apps/api/event");
+  await listen<boolean>("wake.listening", (event) => live(event.payload));
+  await listen("wake.woken", () => woken());
+}
+
 /// The camera, while it is on.
 ///
 /// macOS shows its own indicator, and E.V. shows one too: a light that belongs

@@ -13,7 +13,7 @@ is right.
 | 4 | JSON macros, more adapters, retrieval | done |
 | 4.5 | Per-application access levels, launching and quitting | done, `verify` unproven on device |
 | 5 | Camera and vision | done, unproven on device |
-| 6 | Wake word, continuous interaction | the name is heard; the loop that listens is next |
+| 6 | Wake word, continuous interaction | the name is heard and the loop listens for it; barge-in is next |
 
 ## Phase 0
 

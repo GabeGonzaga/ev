@@ -111,6 +111,10 @@ onMounted(() => {
       <StateDot :state="session.state" />
       <span class="state">{{ session.state }}</span>
       <span class="grow" />
+      <!-- Said where it can be seen, for as long as it is true. -->
+      <span v-if="session.listening" class="ear" title="listening for the name">
+        ◉ listening
+      </span>
       <span v-if="canBindKeys && session.shortcut" class="key">{{ shortcut }}</span>
       <button class="mode rest" type="button" title="rest" @click="rest(true)">
         rest
@@ -245,6 +249,19 @@ main:not(.app) {
 
 .grow {
   flex: 1;
+}
+
+.ear {
+  color: var(--live);
+  border: 1px solid var(--live);
+  border-radius: 2px;
+  padding: 2px 6px;
+  animation: breathe 2s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
 }
 
 .key,
