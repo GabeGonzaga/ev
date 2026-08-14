@@ -1,0 +1,9 @@
+Bundled webfonts, used under the SIL Open Font License 1.1:
+
+  Orbitron  — © The League of Moveable Type / Matt McInerney
+  Exo 2     — © Natanael Gama
+
+Full license: https://openfontlicense.org  (OFL-1.1)
+Both faces are redistributable under the OFL; these copies are the
+Latin subset served by Google Fonts, embedded so the HUD renders the
+same on every machine and with no network fetch.
