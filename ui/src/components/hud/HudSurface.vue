@@ -21,9 +21,11 @@ import { useFrame } from "../../composables/useFrame";
 import { useTelemetry } from "../../composables/useTelemetry";
 import { SLEEP_MS, WAKE_MS, useAssistantState } from "../../stores/assistant";
 import HudBeam from "./HudBeam.vue";
+import ConversationPanel from "./ConversationPanel.vue";
 import HudChrome from "./HudChrome.vue";
 import HudGrid from "./HudGrid.vue";
 import VoiceOrb from "./VoiceOrb.vue";
+import { useConversation } from "../../composables/useConversation";
 
 const ev = useAssistantState();
 
@@ -36,6 +38,11 @@ const { data: telemetry, pending: telemetryPending, error: telemetryError } =
 // anything else that wants it later reads the same number rather than opening
 // a second AnalyserNode. Nothing is attached yet, so this is the stub that
 // keeps the orb alive in development.
+// One level up, as every panel's data is: the panel itself takes turns,
+// pending and error as props and could be mounted on its own with three
+// lines typed in by hand.
+const conversation = useConversation();
+
 const audio = useAudioLevel();
 watch(audio.level, (loud) => {
   // Quantised on the way into the store. The level changes every frame and
@@ -48,10 +55,10 @@ watch(audio.level, (loud) => {
 /// Where each panel goes. The grid names are short because they have to line
 /// up in a template-areas block and `conversation` is nine characters wider
 /// than the column it sits in.
-const SLOTS: { name: string; area: string }[] = [
+const SLOTS: { name: string; area: string; built?: boolean }[] = [
   { name: "ticker", area: "ticker" },
   { name: "camera", area: "camera" },
-  { name: "conversation", area: "conv" },
+  { name: "conversation", area: "conv", built: true },
   { name: "media", area: "media" },
   { name: "web", area: "web" },
   { name: "headlines", area: "heads" },
@@ -212,10 +219,18 @@ onBeforeUnmount(() => {
         <div
           v-for="(slot, index) in SLOTS"
           :key="slot.name"
-          class="slot"
+          class="cell"
+          :class="{ slot: !slot.built }"
           :style="{ gridArea: slot.area, ...arriving(index) }"
         >
-          <span class="slot-name">{{ slot.name }}</span>
+          <ConversationPanel
+            v-if="slot.name === 'conversation'"
+            :turns="conversation.turns.value"
+            :pending="conversation.pending.value"
+            :error="conversation.error.value"
+            @revealed="conversation.settle"
+          />
+          <span v-else class="slot-name">{{ slot.name }}</span>
         </div>
         <div class="slot dock" :style="{ gridArea: 'dock', ...arriving(SLOTS.length) }">
           <span class="slot-name">dock</span>
@@ -336,14 +351,17 @@ onBeforeUnmount(() => {
     ".      .      .      dock   dock   dock   dock   dock   dock   chart  chart  .";
 }
 
-/* Empty, for now: a dashed outline with the name of what belongs in it, so
-   the geometry can be judged before anything has been built into it. */
-.slot {
+.cell {
   display: grid;
-  place-items: center;
-  border: 1px dashed rgba(120, 180, 255, 0.16);
   min-height: 0;
   min-width: 0;
+}
+
+/* Not built yet: a dashed outline with the name of what belongs in it, so
+   the geometry can be judged before anything has been built into it. */
+.slot {
+  place-items: center;
+  border: 1px dashed rgba(120, 180, 255, 0.16);
 }
 
 .slot-name {

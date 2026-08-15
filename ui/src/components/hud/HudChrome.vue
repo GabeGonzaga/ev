@@ -222,31 +222,4 @@ const strip = computed(() => {
   color: var(--error);
 }
 
-/* The block cursor every waiting thing in this UI uses. */
-.caret {
-  display: inline-block;
-  width: 5px;
-  height: 9px;
-  margin-left: 4px;
-  vertical-align: -1px;
-  background: currentColor;
-  animation: blink 1.1s steps(1) infinite;
-}
-
-@keyframes blink {
-  0%,
-  50% {
-    opacity: 1;
-  }
-  50.01%,
-  100% {
-    opacity: 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .caret {
-    animation: none;
-  }
-}
 </style>

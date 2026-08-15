@@ -357,3 +357,37 @@ button {
     transition: none !important;
   }
 }
+
+/* --- the cursor --------------------------------------------------------
+ *
+ * One block, everywhere something is waiting or still arriving. Global
+ * rather than per-component because it is a single idiom repeated, and three
+ * copies of it would drift into three different widths.
+ */
+
+.caret {
+  display: inline-block;
+  width: 0.5em;
+  height: 1em;
+  margin-left: 0.35em;
+  vertical-align: -0.12em;
+  background: currentColor;
+  animation: caret-blink 1.1s steps(1) infinite;
+}
+
+@keyframes caret-blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caret {
+    animation: none;
+  }
+}
