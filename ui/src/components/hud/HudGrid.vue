@@ -16,8 +16,12 @@ withDefaults(
     /// no-op. It is a mask rather than an opacity so the beam can appear to
     /// uncover the mesh rather than turn it up.
     reveal?: number;
+    /// True only while the beam is crossing. The band that flashes under it
+    /// would otherwise sit at the bottom edge of a finished screen, lit, for
+    /// no reason.
+    sweeping?: boolean;
   }>(),
-  { reveal: 1 },
+  { reveal: 1, sweeping: false },
 );
 </script>
 
@@ -25,6 +29,10 @@ withDefaults(
   <div class="mesh" :style="{ '--reveal': reveal }" aria-hidden="true">
     <div class="flat" />
     <div class="floor" />
+
+    <!-- The squares the beam is passing over right now, brighter, in a band
+         that follows it down and leaves them settled behind it. -->
+    <div v-if="sweeping" class="flash" />
   </div>
 </template>
 
@@ -36,20 +44,23 @@ withDefaults(
   pointer-events: none;
   /* Everything above the beam is drawn; everything below it is not yet. The
      soft edge is the beam's own trail catching the mesh as it passes. */
+  /* The soft edge runs off the bottom as the reveal completes: measured
+     against 100% + its own width, a finished screen has no ramp on it. */
   -webkit-mask-image: linear-gradient(
     to bottom,
-    #000 calc(var(--reveal) * 100% - 90px),
-    transparent calc(var(--reveal) * 100%)
+    #000 calc(var(--reveal) * (100% + 90px) - 90px),
+    transparent calc(var(--reveal) * (100% + 90px))
   );
   mask-image: linear-gradient(
     to bottom,
-    #000 calc(var(--reveal) * 100% - 90px),
-    transparent calc(var(--reveal) * 100%)
+    #000 calc(var(--reveal) * (100% + 90px) - 90px),
+    transparent calc(var(--reveal) * (100% + 90px))
   );
 }
 
 .flat,
-.floor {
+.floor,
+.flash {
   position: absolute;
   background-image:
     repeating-linear-gradient(0deg, var(--hud-line) 0 1px, transparent 1px 48px),
@@ -62,6 +73,26 @@ withDefaults(
   opacity: 0.55;
   -webkit-mask-image: radial-gradient(120% 90% at 50% 40%, #000 30%, transparent 85%);
   mask-image: radial-gradient(120% 90% at 50% 40%, #000 30%, transparent 85%);
+}
+
+.flash {
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(0deg, var(--neon-bright) 0 1px, transparent 1px 48px),
+    repeating-linear-gradient(90deg, var(--neon-bright) 0 1px, transparent 1px 48px);
+  opacity: 0.34;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent calc(var(--reveal) * (100% + 90px) - 164px),
+    #000 calc(var(--reveal) * (100% + 90px) - 106px),
+    transparent calc(var(--reveal) * (100% + 90px) - 90px)
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent calc(var(--reveal) * (100% + 90px) - 164px),
+    #000 calc(var(--reveal) * (100% + 90px) - 106px),
+    transparent calc(var(--reveal) * (100% + 90px) - 90px)
+  );
 }
 
 /* And the floor, running off toward a horizon that is off-screen. Anchored

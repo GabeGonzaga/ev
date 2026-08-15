@@ -387,6 +387,13 @@ canvas {
   animation: turn 14s linear infinite;
 }
 
+/* The rings arrive with the badge rather than appearing on it: the orb is
+   still travelling when they mount, and a hard cut at that moment reads as
+   two things happening instead of one. */
+.rings {
+  animation: arrive 0.45s ease-out both;
+}
+
 .ring.in {
   opacity: 0.35;
   stroke-dasharray: 26 10 12 52;
@@ -428,9 +435,19 @@ canvas {
   }
 }
 
+@keyframes arrive {
+  from {
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ring {
     animation: none;
+  }
+
+  .rings {
+    animation-duration: 0.01ms;
   }
 }
 </style>

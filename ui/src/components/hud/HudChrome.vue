@@ -12,11 +12,17 @@
 import { computed } from "vue";
 import { asUptime, type Telemetry } from "../../composables/useTelemetry";
 
-const props = defineProps<{
-  telemetry: Telemetry | null;
-  pending: boolean;
-  error: string | null;
-}>();
+const props = withDefaults(
+  defineProps<{
+    telemetry: Telemetry | null;
+    pending: boolean;
+    error: string | null;
+    /// How much of the frame the beam has uncovered, 0..1. The same number
+    /// the grid takes, so the two cannot come up at different rates.
+    reveal?: number;
+  }>(),
+  { reveal: 1 },
+);
 
 /// Dense, uppercase, and dull. Nobody reads this; they check that it is
 /// moving, and they read it only on the day something is wrong.
@@ -36,7 +42,7 @@ const strip = computed(() => {
 </script>
 
 <template>
-  <div class="chrome" aria-hidden="true">
+  <div class="chrome" :style="{ '--reveal': reveal }" aria-hidden="true">
     <!-- Rangefinder scales down the left edge and across the top. Gradients
          rather than several hundred elements: the browser draws these as one
          paint each, and nothing here ever changes. -->
@@ -77,6 +83,18 @@ const strip = computed(() => {
   pointer-events: none;
   z-index: 2;
   font-family: var(--mono);
+  /* The ramp leaves the screen as the reveal completes, or the telemetry
+     strip spends the rest of the session behind the tail of it. */
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 calc(var(--reveal) * (100% + 60px) - 60px),
+    transparent calc(var(--reveal) * (100% + 60px))
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    #000 calc(var(--reveal) * (100% + 60px) - 60px),
+    transparent calc(var(--reveal) * (100% + 60px))
+  );
 }
 
 /* Every tick 12px, every fifth one longer and brighter -- two gradients
