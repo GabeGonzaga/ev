@@ -15,6 +15,25 @@
  *   class       in-app | in-browser what is behind the page
  */
 
+/* The two techy faces the core is drawn in. Bundled as woff2 (Latin subset,
+   SIL OFL -- see public/fonts/OFL.txt) rather than linked, so the HUD renders
+   the same on every machine and fetches nothing. Both are variable fonts, one
+   file across the weight range. */
+@font-face {
+  font-family: "Orbitron";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/Orbitron.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Exo 2";
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: swap;
+  src: url("/fonts/Exo2.woff2") format("woff2");
+}
+
 :root {
   --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, monospace;
@@ -23,6 +42,11 @@
      the words that share its air. Both ship with macOS; the stack ends at
      the system font for a browser that has neither. */
   --display-font: "Avenir Next", "Futura", -apple-system, system-ui, sans-serif;
+
+  /* The wordmark seated in the core, and the clock beneath it in the resting
+     screen. Techy geometric faces, falling back to the display stack. */
+  --wordmark-font: "Orbitron", var(--display-font);
+  --clock-font: "Exo 2", var(--display-font);
 
   --radius: 4px;
   --gap: 14px;

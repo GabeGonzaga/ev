@@ -5,6 +5,7 @@ import HudPanel from "./components/HudPanel.vue";
 import StateDot from "./components/StateDot.vue";
 import TheAnswer from "./components/TheAnswer.vue";
 import TheAppearance from "./components/TheAppearance.vue";
+import TheClock from "./components/TheClock.vue";
 import TheComposer from "./components/TheComposer.vue";
 import TheConsole from "./components/TheConsole.vue";
 import TheCore from "./components/TheCore.vue";
@@ -81,11 +82,12 @@ onMounted(() => {
 </script>
 
 <template>
-  <!-- Resting: the ring, and nothing else at all. -->
+  <!-- Resting: the orb and the clock beneath it, and nothing else at all. -->
   <main v-if="ambient" class="resting" @click="rest(false)">
     <TheCore :state="session.state" ambient>
       <TheAnswer />
     </TheCore>
+    <TheClock />
   </main>
 
   <main v-else :class="{ app: inApp }">
@@ -283,13 +285,23 @@ main:not(.app) {
   border-color: var(--panel-lit);
 }
 
-/* Nothing else is on screen. That is the whole specification. */
+/* Nothing else is on screen: the orb, and the clock under it, as one centred
+   group. */
 .resting {
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(16px, 4vh, 40px);
   height: 100vh;
   padding: 0;
   cursor: none;
+}
+
+/* The orb sizes to itself here rather than filling the column, so the clock
+   sits with it instead of being pushed to the floor. */
+.resting :deep(.core) {
+  flex: 0 0 auto;
 }
 
 .grid {
