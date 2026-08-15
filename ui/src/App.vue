@@ -3,8 +3,10 @@ import { computed, onMounted, ref } from "vue";
 import { canBindKeys, dismiss, hasWindowControls, inApp, windowControl } from "./api";
 import HudPanel from "./components/HudPanel.vue";
 import StateDot from "./components/StateDot.vue";
+import TheActions from "./components/TheActions.vue";
 import TheAnswer from "./components/TheAnswer.vue";
 import TheAppearance from "./components/TheAppearance.vue";
+import TheBeam from "./components/TheBeam.vue";
 import TheClock from "./components/TheClock.vue";
 import TheComposer from "./components/TheComposer.vue";
 import TheConsole from "./components/TheConsole.vue";
@@ -82,6 +84,10 @@ onMounted(() => {
 </script>
 
 <template>
+  <!-- The sweep that answers the name, over everything. It renders only while
+       it falls, so at rest it is not there at all. -->
+  <TheBeam />
+
   <!-- Resting: the orb and the clock beneath it, and nothing else at all. -->
   <main v-if="ambient" class="resting" @click="rest(false)">
     <TheCore :state="session.state" ambient>
@@ -143,6 +149,10 @@ onMounted(() => {
           v-if="quiet && layout.focused === null"
           @pick="composer?.suggest($event)"
         />
+
+        <!-- The quick row: music, camera, and a site to open. Under the orb,
+             above the line you type into -- the reach-for-it things first. -->
+        <TheActions v-if="layout.focused === null" />
 
         <HudPanel label="Ask" :live="session.state !== 'idle'" class="asking">
           <template #aside>
