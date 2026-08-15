@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
+import * as api from "./api";
 import { canBindKeys, dismiss, hasWindowControls, inApp, windowControl } from "./api";
 import HudPanel from "./components/HudPanel.vue";
 import StateDot from "./components/StateDot.vue";
@@ -11,6 +12,7 @@ import TheConsole from "./components/TheConsole.vue";
 import TheCore from "./components/TheCore.vue";
 import TheHints from "./components/TheHints.vue";
 import TheHistory from "./components/TheHistory.vue";
+import TheOrb from "./components/TheOrb.vue";
 import TheQuestion from "./components/TheQuestion.vue";
 import TheSettings from "./components/TheSettings.vue";
 import { useAppearance } from "./stores/appearance";
@@ -22,18 +24,36 @@ const appearance = useAppearance();
 const layout = useLayout();
 const composer = ref<InstanceType<typeof TheComposer> | null>(null);
 
-/// Nothing on screen but the ring: no bars, no widgets, no chrome.
+/// Nothing on screen but the sphere: no bars, no widgets, no chrome.
 ///
 /// A state rather than a different application. E.V. spends most of its life
-/// waiting, and what it should look like while waiting is not what it should
-/// look like while being read from.
+/// waiting to be called, and what it should look like while waiting is not
+/// what it should look like while being read from.
 const ambient = ref(false);
 
-async function rest(on: boolean) {
+// Called by name, so the waiting screen has stopped being the right one.
+// What was asked for is about to arrive, and it arrives in the working view.
+watch(
+  () => session.woke,
+  () => {
+    if (ambient.value) void rest(false);
+    composer.value?.take();
+  },
+);
+
+/// Whether the waiting screen took the whole display when it was entered.
+/// It does when it was asked for, and does not when E.V. started on it --
+/// and leaving must give back only what was taken, or dismissing the sphere
+/// puts the working view full screen instead.
+const tookScreen = ref(false);
+
+async function rest(on: boolean, whole = true) {
   ambient.value = on;
+  const move = on ? whole : tookScreen.value;
+  tookScreen.value = on && whole;
   // The window goes with it: a display with nothing on it should not be
   // sharing the screen with the thing it was covering.
-  await windowControl("fullscreen");
+  if (move) await windowControl("fullscreen");
 }
 
 const quiet = computed(
@@ -66,6 +86,13 @@ onMounted(() => {
   session.load();
   session.refresh();
 
+  // Listening for its name is what E.V. is doing, so it is what the window
+  // should show when it opens. The window is left the size it was: this is
+  // the screen it was already on, not a screen it asked for.
+  void api.wakeState().then((wake) => {
+    if (wake?.enabled) void rest(true, false);
+  });
+
   // Escape puts the window away. It does not answer anything: a turn waiting
   // on a confirmation is still waiting when it comes back.
   window.addEventListener("keydown", (event) => {
@@ -82,11 +109,15 @@ onMounted(() => {
 </script>
 
 <template>
-  <!-- Resting: the orb and the clock beneath it, and nothing else at all. -->
+  <!-- Waiting to be called: the sphere, the clock beneath it, nothing else. -->
   <main v-if="ambient" class="resting" @click="rest(false)">
-    <TheCore :state="session.state" ambient>
+    <TheOrb :live="session.listening">
       <TheAnswer />
-    </TheCore>
+      <!-- The one line worth having here: what to say to leave it. -->
+      <p v-if="session.listening && !session.said.length" class="call">
+        say “{{ session.wake?.word ?? "ev" }}”
+      </p>
+    </TheOrb>
     <TheClock />
   </main>
 
@@ -196,6 +227,16 @@ main:not(.app) {
   margin: 0 auto;
 }
 
+/* The working view sits in the middle of the window rather than being
+   stretched across it: a display the width of a monitor is a display nobody
+   can read the two ends of at once. */
+.chrome,
+.grid {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
 .chrome {
   display: flex;
   align-items: center;
@@ -298,10 +339,22 @@ main:not(.app) {
   cursor: none;
 }
 
-/* The orb sizes to itself here rather than filling the column, so the clock
-   sits with it instead of being pushed to the floor. */
-.resting :deep(.core) {
+/* The sphere sizes to itself here rather than filling the column, so the
+   clock sits with it instead of being pushed to the floor. Square, because a
+   sphere drawn into a rectangle is drawn smaller than the room it was given. */
+.resting :deep(.orb) {
   flex: 0 0 auto;
+  width: min(68vh, 68vw);
+  height: min(68vh, 68vw);
+}
+
+.call {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--faint);
 }
 
 .grid {
