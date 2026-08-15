@@ -8,14 +8,29 @@
 //
 // Fixed to the viewport and never scrolls. A HUD that scrolls is a document.
 
-import { onBeforeUnmount, onMounted } from "vue";
+import { onBeforeUnmount, onMounted, watch } from "vue";
 import TheClock from "../TheClock.vue";
+import { useAudioLevel } from "../../composables/useAudioLevel";
 import { useTelemetry } from "../../composables/useTelemetry";
 import { useAssistantState } from "../../stores/assistant";
 import HudChrome from "./HudChrome.vue";
 import HudGrid from "./HudGrid.vue";
+import VoiceOrb from "./VoiceOrb.vue";
 
 const ev = useAssistantState();
+
+// Measured once, here, and put in the store: the orb reads it as a prop, and
+// anything else that wants it later reads the same number rather than opening
+// a second AnalyserNode. Nothing is attached yet, so this is the stub that
+// keeps the orb alive in development.
+const audio = useAudioLevel();
+watch(audio.level, (loud) => {
+  // Quantised on the way into the store. The level changes every frame and
+  // the store is reactive, so writing all of it would re-run the render of
+  // everything reading it sixty times a second to say something the orb's own
+  // smoothing cannot show.
+  if (Math.abs(loud - ev.audioLevel) > 0.02) ev.audioLevel = loud;
+});
 
 // Wired here rather than in the chrome: the chrome takes what it draws as
 // props, so it can be mounted on its own with numbers made up on the spot.
@@ -76,11 +91,7 @@ onBeforeUnmount(() => {
   <main class="surface" :class="ev.state.toLowerCase()">
     <!-- IDLE: the clock, the orb, and nothing else at all. -->
     <section v-if="!ev.awake" class="idle">
-      <!-- The orb lands here in step 2; until then this is the room it will
-           need, at the size it will be. -->
-      <div class="orb-slot">
-        <p class="wordmark">EV</p>
-      </div>
+      <VoiceOrb :level="ev.audioLevel" :state="ev.state" :size="180" />
       <TheClock />
     </section>
 
@@ -135,25 +146,6 @@ onBeforeUnmount(() => {
   background:
     radial-gradient(120% 120% at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.5) 100%),
     radial-gradient(90% 90% at 50% 48%, var(--bg-void) 30%, #070d1a 100%);
-}
-
-.orb-slot {
-  display: grid;
-  place-items: center;
-  width: 180px;
-  height: 180px;
-}
-
-/* One of the two things on this display allowed to be pure white. */
-.wordmark {
-  margin: 0;
-  font-family: var(--wordmark-font);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.42em;
-  text-indent: 0.42em;
-  color: #fff;
-  text-shadow: var(--neon-glow-text);
 }
 
 /* --- active ----------------------------------------------------------- */
