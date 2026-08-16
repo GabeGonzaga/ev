@@ -23,6 +23,7 @@ import DockBar, { type DockAction } from "./DockBar.vue";
 import HudBeam from "./HudBeam.vue";
 import HudChrome from "./HudChrome.vue";
 import HudGrid from "./HudGrid.vue";
+import MusicWidget from "./MusicWidget.vue";
 import ShortcutsStrip from "./ShortcutsStrip.vue";
 import TheAmbient from "./TheAmbient.vue";
 import WindowLights from "./WindowLights.vue";
@@ -263,6 +264,11 @@ onBeforeUnmount(() => {
       v-if="ev.isOpen('console')"
       :locale="ev.locale"
       @close="ev.hide('console')"
+    />
+    <MusicWidget
+      v-if="ev.isOpen('music')"
+      :locale="ev.locale"
+      @close="ev.hide('music')"
     />
     <ShortcutsStrip
       v-if="ev.isOpen('shortcuts')"

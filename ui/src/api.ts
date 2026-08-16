@@ -16,6 +16,11 @@ export interface TurnResult {
   outcome: "ran" | "unsure" | "not_understood" | "confirm" | string;
   speech?: string | null;
   error?: string | null;
+  /// Whatever the tool returned. A reading tool puts its answer here --
+  /// `music.now_playing` its track and its cover -- and the payload already
+  /// carried it, so nothing in the protocol had to change to let a widget
+  /// draw one.
+  data?: Record<string, unknown>;
   // Present only when outcome is "confirm": the turn is parked, waiting.
   tool?: string;
   risk?: string;
