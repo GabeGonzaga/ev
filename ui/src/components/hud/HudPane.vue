@@ -151,10 +151,13 @@ const geometry = computed(() => {
     :style="geometry"
     @pointerdown="movable && workspace.raise(name)"
   >
-    <!-- The tab: small, lit, and the handle. -->
-    <header>
-      <span class="tab" @pointerdown="grab($event, 'move')">{{ name }}</span>
-      <span class="rule" @pointerdown="grab($event, 'move')" />
+    <!-- The whole bar is the handle, not just the tab. The rule between them
+         is one pixel tall and the tab is a few characters wide: between them
+         they were the only places a press did anything, which is a window
+         most people conclude cannot be moved. -->
+    <header @pointerdown="grab($event, 'move')">
+      <span class="tab">{{ name }}</span>
+      <span class="rule" />
       <button
         v-if="closable"
         class="shut"
@@ -223,8 +226,15 @@ header {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 6px 0 8px;
+  /* Deep enough to aim at. The bar is the handle, so it is worth the pixels
+     -- eight above and eight below the tab rather than six and nothing. */
+  padding: 8px 6px 8px 8px;
   touch-action: none;
+  cursor: grab;
+}
+
+header:active {
+  cursor: grabbing;
 }
 
 /* Lit, and the only lit thing on a panel that is not doing anything. */
@@ -239,18 +249,12 @@ header {
   text-transform: uppercase;
   color: var(--neon-soft);
   white-space: nowrap;
-  cursor: grab;
-}
-
-.tab:active {
-  cursor: grabbing;
 }
 
 .rule {
   flex: 1;
   height: 1px;
   background: var(--panel-border);
-  cursor: grab;
 }
 
 .shut {

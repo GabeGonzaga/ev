@@ -207,20 +207,6 @@ const words = computed(() => playing.value?.lyrics?.trim() ?? "");
   height: 100%;
   object-fit: cover;
   display: block;
-  filter: contrast(1.05) brightness(0.9);
-}
-
-/* The duotone. `color` takes hue and saturation from this and leaves the
-   cover's own luminance alone, which is what keeps it a photograph rather
-   than a blue rectangle -- and it is the only image on a screen that is
-   otherwise one hue. */
-.art::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: rgba(63, 165, 246, 0.55);
-  mix-blend-mode: color;
-  pointer-events: none;
 }
 
 .nothing {
