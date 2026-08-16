@@ -98,6 +98,18 @@ function scheme(): Scheme {
       ? { deep: mix(live, [40, 0, 0], 0.2), near: mix(live, [255, 255, 255], 0.5), glow: live, comp: "lighter" }
       : { deep: mix(live, [255, 255, 255], 0.55), near: live, glow: live, comp: "source-over" };
   }
+  // Idle on the working display is dim steel, not azure: in the reference the
+  // resting ring reads almost charcoal with a pale highlight, and the colour
+  // arriving is what says "awake". The ambient screen keeps its full blue --
+  // there the orb is the only thing on, and dim would read as broken.
+  if (props.state === "idle" && !props.ambient && isDark) {
+    return {
+      deep: mix(accent, [72, 88, 108], 0.55),
+      near: mix(ringTop, [170, 186, 202], 0.55),
+      glow: mix(accent, [40, 56, 76], 0.5),
+      comp: "lighter",
+    };
+  }
   return isDark
     ? { deep: accent, near: mix(ringTop, [255, 255, 255], 0.35), glow: accent, comp: "lighter" }
     : { deep: mix(accent, [255, 255, 255], 0.55), near: mix(accent, [8, 40, 96], 0.15), glow: accent, comp: "source-over" };
@@ -210,8 +222,10 @@ function draw(now: number) {
   ctx.globalCompositeOperation = comp;
 
   // A soft halo the sphere sits inside. Quieter in daylight, where it is a
-  // tint on white rather than light in the dark.
-  const haloA = isDark ? 0.16 : 0.08;
+  // tint on white rather than light in the dark -- and quieter still while
+  // idle on the working display, where the reference ring barely glows.
+  const idleDim = props.state === "idle" && !props.ambient;
+  const haloA = isDark ? (idleDim ? 0.09 : 0.16) : 0.08;
   const halo = ctx.createRadialGradient(cx, cy, r * 0.15, cx, cy, r * 1.55);
   halo.addColorStop(0, rgba(glow, haloA * breathe));
   halo.addColorStop(0.55, rgba(glow, haloA * 0.4 * breathe));
