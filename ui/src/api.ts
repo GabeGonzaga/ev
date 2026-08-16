@@ -120,6 +120,31 @@ export const setLocale = (locale: string | null) =>
 
 export const canRecordHere = !inTauri;
 
+/// What Music is playing right now, for the player widget.
+///
+/// A read, not a tool: it drives a view, so it goes the same way `history` and
+/// `settings` do -- a direct command in the app, a GET on the web surface --
+/// rather than through the router. Still one door: on macOS it is an Apple
+/// Event to Music, gated exactly as the transport tools are. Null when nothing
+/// is playing, or when the read is not wired yet on this surface, so the widget
+/// shows a resting player rather than an error.
+export interface NowPlaying {
+  state: "playing" | "paused" | "stopped";
+  title: string;
+  artist: string;
+  album: string;
+  position: number;
+  duration: number;
+  // A data URL when the library has cover art to give; the widget draws its
+  // own tile when it does not, so this staying null is not a broken image.
+  artwork?: string | null;
+}
+
+export const nowPlaying = (): Promise<NowPlaying | null> =>
+  inTauri
+    ? callTauri<NowPlaying | null>("now_playing")
+    : http<NowPlaying | null>("/api/now-playing");
+
 /// Answering a question the core asked mid-turn. The page decides nothing on
 /// the user's behalf: this only carries what they clicked.
 ///

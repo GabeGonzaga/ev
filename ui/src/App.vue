@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { canBindKeys, dismiss, hasWindowControls, inApp, windowControl } from "./api";
 import HudPanel from "./components/HudPanel.vue";
+import HudWindow from "./components/HudWindow.vue";
 import StateDot from "./components/StateDot.vue";
 import TheActions from "./components/TheActions.vue";
 import TheAnswer from "./components/TheAnswer.vue";
@@ -11,17 +12,32 @@ import TheClock from "./components/TheClock.vue";
 import TheComposer from "./components/TheComposer.vue";
 import TheConsole from "./components/TheConsole.vue";
 import TheCore from "./components/TheCore.vue";
+import TheDock from "./components/TheDock.vue";
 import TheHints from "./components/TheHints.vue";
 import TheHistory from "./components/TheHistory.vue";
+import TheMusic from "./components/TheMusic.vue";
 import TheQuestion from "./components/TheQuestion.vue";
 import TheSettings from "./components/TheSettings.vue";
 import { useAppearance } from "./stores/appearance";
 import { useLayout } from "./stores/layout";
 import { useSession } from "./stores/session";
+import { useWindows } from "./stores/windows";
 
 const session = useSession();
 const appearance = useAppearance();
 const layout = useLayout();
+const windows = useWindows();
+
+/// Where each floating window opens the first time, and how big. Kept here
+/// with the windows themselves so the store stays about geometry, not about
+/// which widgets exist. Off by default: the display starts as the orb, and a
+/// window is there because the dock was asked for it.
+const SPAWN = {
+  console: { x: 40, y: 96, w: 340, h: 300 },
+  music: { x: 300, y: 380, w: 384, h: 224 },
+  settings: { x: 80, y: 150, w: 340, h: 260 },
+} as const;
+const FLOATING = Object.keys(SPAWN);
 const composer = ref<InstanceType<typeof TheComposer> | null>(null);
 
 /// Nothing on screen but the ring: no bars, no widgets, no chrome.
@@ -65,6 +81,7 @@ const WIDGETS = ["Ask", "Trail", "Console", "Settings", "Appearance"];
 
 onMounted(() => {
   layout.reconcile(WIDGETS);
+  windows.reconcile(FLOATING);
   session.load();
   session.refresh();
 
@@ -87,6 +104,26 @@ onMounted(() => {
   <!-- The sweep that answers the name, over everything. It renders only while
        it falls, so at rest it is not there at all. -->
   <TheBeam />
+
+  <!-- The floating widgets, over the grid and the orb. The layer itself lets
+       clicks through; only the windows on it catch them, so the app beneath
+       stays reachable where no window covers it. Each renders only while open;
+       the dock opens them. -->
+  <div class="floating">
+    <HudWindow id="console" label="console" :spawn="SPAWN.console" :live="session.state !== 'idle'">
+      <TheConsole />
+    </HudWindow>
+
+    <HudWindow id="music" label="apple_music" :spawn="SPAWN.music">
+      <TheMusic />
+    </HudWindow>
+
+    <HudWindow id="settings" label="settings" :spawn="SPAWN.settings">
+      <TheSettings />
+    </HudWindow>
+  </div>
+
+  <TheDock />
 
   <!-- Resting: the orb and the clock beneath it, and nothing else at all. -->
   <main v-if="ambient" class="resting" @click="rest(false)">
@@ -191,6 +228,20 @@ main {
   padding: 14px 16px 16px;
   min-height: 100vh;
   box-sizing: border-box;
+}
+
+/* The canvas the floating windows live on: the whole viewport, transparent
+   to clicks so the app underneath keeps working, with each window turning
+   pointer events back on for itself. */
+.floating {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+}
+
+.floating > * {
+  pointer-events: auto;
 }
 
 /* In the app the window is the display: it fills it. In a browser it is a
