@@ -27,6 +27,7 @@ import HudPane from "./HudPane.vue";
 import HudChrome from "./HudChrome.vue";
 import HudGrid from "./HudGrid.vue";
 import VoiceOrb from "./VoiceOrb.vue";
+import WindowLights from "./WindowLights.vue";
 import { useConversation } from "../../composables/useConversation";
 
 const ev = useAssistantState();
@@ -231,6 +232,14 @@ onBeforeUnmount(() => {
         :reveal="sweep"
       />
 
+      <!-- A frameless window with nothing to grab cannot be moved, and the
+           HUD has had no title bar since it replaced the old chrome. The top
+           strip is the handle; the buttons on it opt out by the rule in the
+           stylesheet. -->
+      <div class="grab" data-drag :style="arriving(0)">
+        <WindowLights />
+      </div>
+
       <div class="stage">
         <div
           v-for="(slot, index) in SLOTS"
@@ -341,6 +350,17 @@ onBeforeUnmount(() => {
   inset: 0;
   overflow: hidden;
   background: var(--bg-hud);
+}
+
+/* Tall enough to grab, short enough to stop above the first row of panels --
+   the stage begins at 34. */
+.grab {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 30px;
+  z-index: 4;
 }
 
 /* Twelve columns, twelve rows, and the panels placed by name. The
