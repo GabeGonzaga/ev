@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from ev.capabilities.music.args import ControlArgs, PlayArgs, VolumeArgs
-from ev.capabilities.music.service import CONTROL, PLAY, VOLUME, MusicService
+from ev.capabilities.music.args import ControlArgs, ModeArgs, PlayArgs, VolumeArgs
+from ev.capabilities.music.service import CONTROL, MODE, PLAY, VOLUME, MusicService
 from ev.domain.permissions import Permission
 from ev.domain.risk import RiskLevel
 from ev.registry import ToolSpec
@@ -39,6 +39,20 @@ def music_tools(service: MusicService) -> tuple[ToolSpec[Any], ...]:
             args=ControlArgs,
             risk=RiskLevel.SENSITIVE,
             handler=service.control,
+            permissions=APPLE_EVENTS,
+            # Always this one, so the level set for it governs every call.
+            application=lambda _args: "Music",
+        ),
+        ToolSpec(
+            name=MODE,
+            description=(
+                "Turn shuffle or repeat on or off. Left alone, the state flips "
+                "-- saying 'shuffle' is pressing the button. Repeat also takes "
+                "'one' for repeating the current track."
+            ),
+            args=ModeArgs,
+            risk=RiskLevel.SENSITIVE,
+            handler=service.mode,
             permissions=APPLE_EVENTS,
             # Always this one, so the level set for it governs every call.
             application=lambda _args: "Music",

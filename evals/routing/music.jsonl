@@ -40,3 +40,19 @@
 {"id": "run-a-macro", "locale": "pt-PT", "utterance": "corre a macro manhã", "tool": "macro.run", "arguments": {"name": "manhã"}}
 {"id": "play-an-artist", "locale": "en", "utterance": "play the artist Kendrick Lamar", "tool": "music.play", "arguments": {"name": "Kendrick Lamar", "kind": "artist"}}
 {"id": "play-an-artist", "locale": "pt-PT", "utterance": "toca o artista Kendrick Lamar", "tool": "music.play", "arguments": {"name": "Kendrick Lamar", "kind": "artist"}}
+{"id": "shuffle-toggle", "locale": "en", "utterance": "shuffle", "tool": "music.mode", "arguments": {"setting": "shuffle", "state": "toggle"}}
+{"id": "shuffle-toggle", "locale": "pt-PT", "utterance": "aleatório", "tool": "music.mode", "arguments": {"setting": "shuffle", "state": "toggle"}}
+{"id": "shuffle-on", "locale": "en", "utterance": "turn on shuffle", "tool": "music.mode", "arguments": {"setting": "shuffle", "state": "on"}}
+{"id": "shuffle-on", "locale": "pt-PT", "utterance": "liga o aleatório", "tool": "music.mode", "arguments": {"setting": "shuffle", "state": "on"}}
+{"id": "shuffle-off", "locale": "en", "utterance": "shuffle off", "tool": "music.mode", "arguments": {"setting": "shuffle", "state": "off"}}
+{"id": "shuffle-off", "locale": "pt-PT", "utterance": "desliga o aleatório", "tool": "music.mode", "arguments": {"setting": "shuffle", "state": "off"}}
+{"id": "repeat-toggle", "locale": "en", "utterance": "repeat", "tool": "music.mode", "arguments": {"setting": "repeat", "state": "toggle"}}
+{"id": "repeat-toggle", "locale": "pt-PT", "utterance": "repetir", "tool": "music.mode", "arguments": {"setting": "repeat", "state": "toggle"}}
+{"id": "repeat-on", "locale": "en", "utterance": "turn repeat on", "tool": "music.mode", "arguments": {"setting": "repeat", "state": "on"}}
+{"id": "repeat-on", "locale": "pt-PT", "utterance": "liga a repetição", "tool": "music.mode", "arguments": {"setting": "repeat", "state": "on"}}
+{"id": "repeat-off", "locale": "en", "utterance": "repeat off", "tool": "music.mode", "arguments": {"setting": "repeat", "state": "off"}}
+{"id": "repeat-off", "locale": "pt-PT", "utterance": "desliga a repetição", "tool": "music.mode", "arguments": {"setting": "repeat", "state": "off"}}
+{"id": "repeat-one", "locale": "en", "utterance": "repeat this song", "tool": "music.mode", "arguments": {"setting": "repeat", "state": "one"}}
+{"id": "repeat-one", "locale": "pt-PT", "utterance": "repete esta música", "tool": "music.mode", "arguments": {"setting": "repeat", "state": "one"}}
+{"id": "skip", "locale": "en", "utterance": "skip", "tool": "music.control", "arguments": {"action": "next"}}
+{"id": "skip", "locale": "pt-PT", "utterance": "salta", "tool": "music.control", "arguments": {"action": "next"}}

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 from pydantic import ValidationError
 
@@ -7,7 +9,7 @@ from ev.application.applications import ApplicationLedger
 from ev.application.policy import PermissionLedger, PermissionPolicy
 from ev.application.speech import Speaker
 from ev.capabilities.music.adapters import MusicAdapter
-from ev.capabilities.music.args import ControlArgs, PlayArgs, VolumeArgs
+from ev.capabilities.music.args import ControlArgs, ModeArgs, PlayArgs, VolumeArgs
 from ev.capabilities.music.service import MusicService
 from ev.capabilities.music.tools import music_tools
 from ev.domain.access import AccessLevel
@@ -115,6 +117,52 @@ async def test_the_exact_source_and_argv_reach_osascript(fake_bin: FakeBin) -> N
 
     assert fake_bin.command() == "osascript"
     assert fake_bin.argv() == ["-e", EXPECTED_TRACK_SOURCE, "--", "Nikes"]
+
+
+EXPECTED_MODE_SOURCE = """on run argv
+\tset theSetting to item 1 of argv
+\tset theState to item 2 of argv
+\ttell application "Music"
+\t\tif theSetting is "shuffle" then
+\t\t\tset wanted to (theState is "on")
+\t\t\tif theState is "toggle" then set wanted to not (shuffle enabled)
+\t\t\tset shuffle enabled to wanted
+\t\t\tif wanted then return "on"
+\t\t\treturn "off"
+\t\telse if theSetting is "repeat" then
+\t\t\tset wanted to theState
+\t\t\tif wanted is "toggle" then
+\t\t\t\tif song repeat is off then
+\t\t\t\t\tset wanted to "all"
+\t\t\t\telse
+\t\t\t\t\tset wanted to "off"
+\t\t\t\tend if
+\t\t\telse if wanted is "on" then
+\t\t\t\tset wanted to "all"
+\t\t\tend if
+\t\t\tif wanted is "one" then
+\t\t\t\tset song repeat to one
+\t\t\telse if wanted is "all" then
+\t\t\t\tset song repeat to all
+\t\t\telse
+\t\t\t\tset song repeat to off
+\t\t\tend if
+\t\t\treturn wanted
+\t\tend if
+\t\treturn ""
+\tend tell
+end run"""
+"""The switch script, as it reaches osascript.
+
+It answers with what it *set*, never with a read-back. `set shuffle enabled to
+true` followed by `shuffle enabled` answers false; put a `delay 0.4` between
+them and it answers true -- the write lands, the read races it. Measured on
+Music 1.6.5, macOS 26.5.2. Reading *before* writing is fine, which is what
+makes `toggle` honest: the state being flipped is Music's, not one E.V.
+remembered.
+
+An unrecognised setting falls through to `return ""` without writing
+anything, which is the path `make applescript` runs."""
 
 
 @pytest.mark.asyncio
@@ -354,6 +402,87 @@ async def test_each_control_reaches_music_as_itself(fake_bin: FakeBin) -> None:
         assert fake_bin.argv()[-1] == action
 
 
+# --- shuffle and repeat ---------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_each_switch_reaches_music_as_a_setting_and_a_state(
+    fake_bin: FakeBin,
+) -> None:
+    adapter = MusicAdapter(AppleScriptClient(ProcessRunner()))
+
+    for setting, state in (
+        ("shuffle", "on"),
+        ("shuffle", "off"),
+        ("shuffle", "toggle"),
+        ("repeat", "all"),
+        ("repeat", "one"),
+        ("repeat", "toggle"),
+    ):
+        await adapter.mode(setting, state)
+        assert fake_bin.argv()[-2:] == [setting, state]
+
+
+@pytest.mark.asyncio
+async def test_the_switch_script_is_exactly_this(fake_bin: FakeBin) -> None:
+    adapter = MusicAdapter(AppleScriptClient(ProcessRunner()))
+
+    await adapter.mode("repeat", "toggle")
+
+    assert fake_bin.argv()[1] == EXPECTED_MODE_SOURCE
+
+
+def test_shuffling_one_track_is_not_a_thing() -> None:
+    with pytest.raises(ValidationError):
+        ModeArgs(setting="shuffle", state="one")
+
+
+def test_a_switch_left_alone_flips() -> None:
+    """Saying "shuffle" is pressing the button, which is the default."""
+    assert ModeArgs(setting="shuffle").state == "toggle"
+    assert ModeArgs(setting="repeat").state == "toggle"
+
+
+@pytest.mark.asyncio
+async def test_the_answer_says_which_way_the_switch_went() -> None:
+    class Switched:
+        def __init__(self, answer: str) -> None:
+            self.answer = answer
+
+        async def mode(self, setting: str, state: str) -> str:
+            return self.answer
+
+    for answer, expected in (
+        ("on", "Shuffle on"),
+        ("off", "Shuffle off"),
+    ):
+        service = MusicService(cast(MusicAdapter, Switched(answer)))
+        result = await service.mode(ModeArgs(setting="shuffle"))
+
+        assert result.ok
+        assert result.data == {"setting": "shuffle", "state": answer}
+        assert result.speech == expected
+
+    service = MusicService(cast(MusicAdapter, Switched("one")))
+    result = await service.mode(ModeArgs(setting="repeat", state="one"))
+
+    assert result.speech == "Repeating this track"
+
+
+@pytest.mark.asyncio
+async def test_a_position_music_does_not_have_is_reported_not_spoken() -> None:
+    class Confused:
+        async def mode(self, setting: str, state: str) -> str:
+            return ""
+
+    service = MusicService(cast(MusicAdapter, Confused()))
+    result = await service.mode(ModeArgs(setting="repeat"))
+
+    assert not result.ok
+    assert result.error is not None
+    assert result.error.code is ToolErrorCode.ADAPTER_FAILED
+
+
 @pytest.mark.asyncio
 async def test_the_volume_is_a_number_music_understands(fake_bin: FakeBin) -> None:
     await MusicAdapter(AppleScriptClient(ProcessRunner())).volume(40)
@@ -377,7 +506,12 @@ def test_the_controls_declare_apple_events_too() -> None:
 
     specs = {spec.name: spec for spec in music_tools(service)}
 
-    assert set(specs) == {"music.play", "music.control", "music.volume"}
+    assert set(specs) == {
+        "music.play",
+        "music.control",
+        "music.mode",
+        "music.volume",
+    }
     for spec in specs.values():
         assert spec.permissions == frozenset({Permission.APPLE_EVENTS})
         assert spec.risk is RiskLevel.SENSITIVE

@@ -196,6 +196,53 @@ def _control(groups: Mapping[str, str]) -> dict[str, object] | None:
     return None if action is None else {"action": action}
 
 
+_SWITCHES = {
+    # English
+    "on": "on",
+    "off": "off",
+    # Portuguese, as a verb ("liga o aleatório") or as a state ("aleatório
+    # ligado"). Both are said; neither is more correct.
+    "liga": "on",
+    "ligar": "on",
+    "ligado": "on",
+    "ligada": "on",
+    "ativa": "on",
+    "activa": "on",
+    "ativar": "on",
+    "desliga": "off",
+    "desligar": "off",
+    "desligado": "off",
+    "desligada": "off",
+    "desativa": "off",
+    "desactiva": "off",
+    "desativar": "off",
+}
+_SWITCH = "|".join(sorted(_SWITCHES, key=len, reverse=True))
+
+
+def _switched(groups: Mapping[str, str], setting: str) -> dict[str, object]:
+    """Whichever side the on/off word landed on, or a press of the button.
+
+    "shuffle on", "turn on shuffle" and "liga o aleatório" put it before the
+    noun or after it, and no user is going to be consistent about which. With
+    neither, the state flips -- which is what a button does.
+    """
+    said = groups.get("before") or groups.get("after") or ""
+    return {"setting": setting, "state": _SWITCHES.get(said.casefold(), "toggle")}
+
+
+def _shuffle(groups: Mapping[str, str]) -> dict[str, object] | None:
+    return _switched(groups, "shuffle")
+
+
+def _repeat(groups: Mapping[str, str]) -> dict[str, object] | None:
+    # "Repeat this song" is repeat's third position, not its on switch, and it
+    # beats an on/off word if somebody says both.
+    if groups.get("one"):
+        return {"setting": "repeat", "state": "one"}
+    return _switched(groups, "repeat")
+
+
 _CHANGES = {
     # English
     "up": "up",
@@ -330,6 +377,38 @@ RULES: tuple[Rule, ...] = (
         rf"(?:\s+(?:the\s+|this\s+|that\s+|a\s+|o\s+|esta\s+|esa\s+)?"
         rf"(?:music|song|track|música|musica|canção|cancao))?$",
         _control,
+    ),
+    # The two switches. Deterministic, and said constantly -- "shuffle" alone
+    # should never cost 1.31s of model router.
+    _rule(
+        "music.mode",
+        rf"^(?:please\s+)?(?:turn\s+)?(?:(?P<before>{_SWITCH})\s+)?"
+        rf"(?:shuffle|shuffling)(?:\s+(?P<after>{_SWITCH}))?"
+        rf"(?:\s+(?:the\s+)?(?:music|songs?|tracks?))?$",
+        _shuffle,
+    ),
+    _rule(
+        "music.mode",
+        rf"^(?:por\s+favor\s+)?(?:(?P<before>{_SWITCH})\s+)?"
+        rf"(?:o\s+|a\s+)?(?:modo\s+)?(?:aleatório|aleatorio|shuffle)"
+        rf"(?:\s+(?P<after>{_SWITCH}))?$",
+        _shuffle,
+    ),
+    _rule(
+        "music.mode",
+        rf"^(?:please\s+)?(?:turn\s+)?(?:(?P<before>{_SWITCH})\s+)?"
+        rf"(?:repeat|loop)(?:\s+(?P<after>{_SWITCH}))?"
+        rf"(?:\s+(?P<one>this|the\s+current)\s+"
+        rf"(?:song|track|one))?$",
+        _repeat,
+    ),
+    _rule(
+        "music.mode",
+        rf"^(?:por\s+favor\s+)?(?:(?P<before>{_SWITCH})\s+)?"
+        rf"(?:a\s+|o\s+)?(?:modo\s+)?(?:repetição|repeticao|repetir|repete)"
+        rf"(?:\s+(?P<one>esta|este)\s+(?:música|musica|faixa|tema))?"
+        rf"(?:\s+(?P<after>{_SWITCH}))?$",
+        _repeat,
     ),
     _rule(
         "music.volume",

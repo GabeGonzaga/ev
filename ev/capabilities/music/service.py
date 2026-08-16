@@ -13,7 +13,13 @@ from collections.abc import Awaitable
 
 from ev.application.speech import Speaker
 from ev.capabilities.music.adapters import MusicAdapter
-from ev.capabilities.music.args import STEP, ControlArgs, PlayArgs, VolumeArgs
+from ev.capabilities.music.args import (
+    STEP,
+    ControlArgs,
+    ModeArgs,
+    PlayArgs,
+    VolumeArgs,
+)
 from ev.domain.naming import closest
 from ev.domain.results import ToolErrorCode, ToolResult
 from ev.infrastructure.macos.applescript import AppleScriptError
@@ -21,6 +27,7 @@ from ev.infrastructure.macos.applescript import AppleScriptError
 PLAY = "music.play"
 CONTROL = "music.control"
 VOLUME = "music.volume"
+MODE = "music.mode"
 
 NOT_FOUND = "nothing in the library matches"
 """What the album and track scripts say when a name is not in the library.
@@ -36,6 +43,17 @@ SPOKEN = {
 }
 """Action to phrase key. The key is looked up, never spoken: an earlier
 version returned it directly and Joana read "music.paused" out loud."""
+
+SWITCHED = {
+    ("shuffle", "on"): "music.shuffle_on",
+    ("shuffle", "off"): "music.shuffle_off",
+    ("repeat", "all"): "music.repeat_all",
+    ("repeat", "one"): "music.repeat_one",
+    ("repeat", "off"): "music.repeat_off",
+}
+"""Where each switch ended up, as a phrase key. Where it *ended up*, not what
+was asked for: "shuffle" alone is a button press, and the useful half of the
+answer is which way it went."""
 
 WITH_TRACK = {"resume", "next", "previous"}
 """The three where naming what is playing now is the useful part of the
@@ -238,6 +256,25 @@ class MusicService:
             CONTROL,
             data={"action": args.action, "track": playing},
             speech=self._speaker.say(key, track=playing),
+        )
+
+    async def mode(self, args: ModeArgs) -> ToolResult:
+        now = await self._adapter.mode(args.setting, args.state)
+
+        key = SWITCHED.get((args.setting, now))
+        if key is None:
+            # Music answered with a position that is not one of its three.
+            # Saying so beats reading an empty string out loud.
+            return ToolResult.failure(
+                MODE,
+                ToolErrorCode.ADAPTER_FAILED,
+                self._speaker.say("music.switch_failed", setting=args.setting),
+            )
+
+        return ToolResult.success(
+            MODE,
+            data={"setting": args.setting, "state": now},
+            speech=self._speaker.say(key),
         )
 
     async def volume(self, args: VolumeArgs) -> ToolResult:

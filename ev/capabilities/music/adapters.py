@@ -239,6 +239,56 @@ on nowPlaying()
 	end tell
 end nowPlaying"""
 
+MODE: Final = """on run argv
+	set theSetting to item 1 of argv
+	set theState to item 2 of argv
+	tell application "Music"
+		if theSetting is "shuffle" then
+			set wanted to (theState is "on")
+			if theState is "toggle" then set wanted to not (shuffle enabled)
+			set shuffle enabled to wanted
+			if wanted then return "on"
+			return "off"
+		else if theSetting is "repeat" then
+			set wanted to theState
+			if wanted is "toggle" then
+				if song repeat is off then
+					set wanted to "all"
+				else
+					set wanted to "off"
+				end if
+			else if wanted is "on" then
+				set wanted to "all"
+			end if
+			if wanted is "one" then
+				set song repeat to one
+			else if wanted is "all" then
+				set song repeat to all
+			else
+				set song repeat to off
+			end if
+			return wanted
+		end if
+		return ""
+	end tell
+end run"""
+"""What was set, not what Music says afterwards.
+
+Reading a switch back immediately after writing it returns the old value:
+`set shuffle enabled to true` followed by `shuffle enabled` answers false, and
+answers true if a `delay 0.4` is put between them. The write lands, the read
+races it. So this returns the value it decided on, which is the same lesson as
+`name of current track` right after `play` -- measured here on Music 1.6.5,
+macOS 26.5.2, where every write was verified to take and every immediate read
+to lie.
+
+Reading *before* writing is fine, which is what makes `toggle` honest: the
+current state comes from Music rather than from something E.V. remembered, so
+a switch somebody flipped in the app is the one being flipped back.
+
+An unrecognised setting touches nothing and returns empty -- the read-only
+path `make applescript` runs."""
+
 VOLUME: Final = """on run argv
 	tell application "Music"
 		set sound volume to (item 1 of argv) as integer
@@ -304,6 +354,10 @@ class MusicAdapter:
 
     async def control(self, action: str) -> str:
         return await self._applescript.run(CONTROL, action)
+
+    async def mode(self, setting: str, state: str) -> str:
+        """Set shuffle or repeat, and answer with the position it is now in."""
+        return await self._applescript.run(MODE, setting, state)
 
     async def volume(self, level: int) -> str:
         return await self._applescript.run(VOLUME, str(level))
