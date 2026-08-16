@@ -22,6 +22,7 @@ import CoreRing from "./CoreRing.vue";
 import HudBeam from "./HudBeam.vue";
 import HudChrome from "./HudChrome.vue";
 import HudGrid from "./HudGrid.vue";
+import TheAmbient from "./TheAmbient.vue";
 import WindowLights from "./WindowLights.vue";
 
 const ev = useAssistantState();
@@ -131,6 +132,13 @@ function onKey(event: KeyboardEvent) {
 
   // The specification gives the chat bar a keyboard shortcut as well as a
   // dock icon. The dock lands in step 5; this is the same store action.
+  if (event.code === "KeyR" && !event.metaKey && !event.ctrlKey) {
+    event.preventDefault();
+    if (ev.stage === "ambient") ev.rest();
+    else ev.sleep();
+    return;
+  }
+
   if (event.code === "KeyC" && !event.metaKey && !event.ctrlKey) {
     event.preventDefault();
     ev.toggle("console");
@@ -149,18 +157,25 @@ function onKey(event: KeyboardEvent) {
   ev.touch();
 }
 
+/// A click on the resting screen puts the display back; anywhere else it is
+/// only a sign of life.
+function leave() {
+  if (ev.stage === "ambient") ev.rest();
+  else ev.touch();
+}
+
 onMounted(() => {
   // The stylesheet still carries the old view's flat grid; this says which
   // display is on screen so the two backgrounds never stack.
   document.documentElement.classList.add("hud-on");
   window.addEventListener("keydown", onKey);
-  window.addEventListener("pointerdown", ev.touch);
+  window.addEventListener("pointerdown", leave);
 });
 
 onBeforeUnmount(() => {
   document.documentElement.classList.remove("hud-on");
   window.removeEventListener("keydown", onKey);
-  window.removeEventListener("pointerdown", ev.touch);
+  window.removeEventListener("pointerdown", leave);
 });
 </script>
 
@@ -201,8 +216,12 @@ onBeforeUnmount(() => {
          drift apart. -->
     <HudBeam v-if="sweeping" :at="painted" />
 
-    <!-- The dock, the widgets and the ambient orb land here in the steps that
-         follow. The stage is deliberately empty until they do. -->
+    <!-- Resting: the room light is up, the grid is gone, and the sphere has
+         the screen. -->
+    <TheAmbient v-if="ev.stage === 'ambient'" :level="ev.audioLevel" />
+
+    <!-- The dock and the widgets land here in the steps that follow. The
+         stage is deliberately empty until they do. -->
   </main>
 </template>
 
