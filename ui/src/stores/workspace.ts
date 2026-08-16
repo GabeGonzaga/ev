@@ -82,19 +82,32 @@ export const useWorkspace = defineStore("workspace", () => {
     return at === -1 ? 0 : at + 1;
   }
 
-  /// Inside the display, and never smaller than a panel. Applied on every
-  /// write rather than only on drop, so a window resized smaller than the
-  /// panel cannot strand one off the edge.
+  /// Wholly on the display, and never smaller than a panel.
+  ///
+  /// Wholly, now: a window used to be allowed to hang off the right edge,
+  /// which took its own resize handles with it. Applied on every write rather
+  /// than only on drop, so a window can never be left somewhere it cannot be
+  /// grabbed again.
   function clamp(where: Floating): Floating {
-    const width = Math.max(LEAST_WIDE, where.width);
-    const height = Math.max(LEAST_TALL, where.height);
+    const room = { wide: window.innerWidth, tall: window.innerHeight };
+    const width = Math.min(Math.max(LEAST_WIDE, where.width), room.wide - MARGIN * 2);
+    const height = Math.min(Math.max(LEAST_TALL, where.height), room.tall - MARGIN * 2);
     return {
       width,
       height,
-      x: Math.min(Math.max(MARGIN - width + 120, where.x), window.innerWidth - MARGIN),
-      y: Math.min(Math.max(0, where.y), window.innerHeight - MARGIN),
+      x: Math.min(Math.max(MARGIN, where.x), Math.max(MARGIN, room.wide - width - MARGIN)),
+      y: Math.min(Math.max(MARGIN, where.y), Math.max(MARGIN, room.tall - height - MARGIN)),
     };
   }
+
+  /// A window made smaller can strand one that was near an edge. Re-clamping
+  /// every stored placement costs nothing and means the display is never
+  /// holding a window somebody cannot reach.
+  window.addEventListener("resize", () => {
+    loose.value = Object.fromEntries(
+      Object.entries(loose.value).map(([name, at]) => [name, clamp(at)]),
+    );
+  });
 
 
   return { loose, placement, isFloating, open, move, raise, depth };

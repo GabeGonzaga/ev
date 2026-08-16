@@ -112,6 +112,9 @@ const repeating = computed(() => playing.value?.repeat !== "off");
 .player {
   display: flex;
   gap: 14px;
+  /* Fills the body, so the progress line and the transport stay on the floor
+     of the window instead of following the cover's height. */
+  flex: 1;
   min-height: 0;
 }
 
@@ -121,8 +124,11 @@ const repeating = computed(() => playing.value?.repeat !== "off");
 .art {
   position: relative;
   flex: 0 0 auto;
-  width: 96px;
-  height: 96px;
+  align-self: flex-start;
+  /* Sized from the window rather than fixed: resizing the player should make
+     the cover bigger, which is most of the reason anybody resizes it. */
+  width: clamp(72px, 30%, 190px);
+  aspect-ratio: 1;
   border: 1px solid var(--panel-border);
 }
 
