@@ -168,7 +168,7 @@ const geometry = computed(() => {
 }
 
 .pane.live {
-  border-color: rgba(58, 160, 255, 0.7);
+  border-color: rgba(63, 165, 246, 0.7);
   box-shadow: var(--neon-glow), 0 20px 60px rgba(0, 0, 0, 0.55);
 }
 
@@ -184,7 +184,7 @@ header {
 .tab {
   padding: 3px 9px;
   border: 1px solid var(--panel-border);
-  background: rgba(58, 160, 255, 0.12);
+  background: rgba(63, 165, 246, 0.12);
   font-family: var(--mono);
   font-size: var(--label);
   font-weight: 500;

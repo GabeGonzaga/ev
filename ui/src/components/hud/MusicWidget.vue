@@ -142,7 +142,7 @@ const repeating = computed(() => playing.value?.repeat !== "off");
   content: "";
   position: absolute;
   inset: 0;
-  background: rgba(58, 160, 255, 0.55);
+  background: rgba(63, 165, 246, 0.55);
   mix-blend-mode: color;
   pointer-events: none;
 }
@@ -153,7 +153,7 @@ const repeating = computed(() => playing.value?.repeat !== "off");
   height: 100%;
   background: repeating-linear-gradient(
     45deg,
-    rgba(58, 160, 255, 0.06) 0 6px,
+    rgba(63, 165, 246, 0.06) 0 6px,
     transparent 6px 12px
   );
 }
@@ -229,7 +229,7 @@ const repeating = computed(() => playing.value?.repeat !== "off");
   top: 0;
   height: 100%;
   background: var(--neon);
-  box-shadow: 0 0 6px rgba(58, 160, 255, 0.7);
+  box-shadow: 0 0 6px rgba(63, 165, 246, 0.7);
 }
 
 .transport {
@@ -270,7 +270,7 @@ const repeating = computed(() => playing.value?.repeat !== "off");
 
 .transport button.on {
   color: var(--neon);
-  filter: drop-shadow(0 0 5px rgba(58, 160, 255, 0.75));
+  filter: drop-shadow(0 0 5px rgba(63, 165, 246, 0.75));
 }
 
 .one {

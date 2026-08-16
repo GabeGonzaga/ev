@@ -119,7 +119,7 @@ function keep() {
 
 .one:hover {
   color: var(--neon-soft);
-  border-color: rgba(58, 160, 255, 0.6);
+  border-color: rgba(63, 165, 246, 0.6);
 }
 
 .drop {
@@ -179,7 +179,7 @@ input {
 
 input:focus {
   outline: none;
-  border-color: rgba(58, 160, 255, 0.7);
+  border-color: rgba(63, 165, 246, 0.7);
 }
 
 .keep {

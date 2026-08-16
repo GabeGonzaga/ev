@@ -31,7 +31,7 @@ defineProps<{
   background: var(--neon-bright);
   box-shadow:
     0 0 10px rgba(143, 203, 255, 0.85),
-    0 0 34px rgba(61, 155, 255, 0.5);
+    0 0 34px rgba(63, 165, 246, 0.5);
   transform: translate3d(0, calc(var(--at) * 100dvh), 0);
   will-change: transform;
   z-index: 4;
@@ -50,7 +50,7 @@ defineProps<{
   background: linear-gradient(
     to bottom,
     transparent,
-    rgba(61, 155, 255, 0.06) 45%,
+    rgba(63, 165, 246, 0.06) 45%,
     rgba(143, 203, 255, 0.28)
   );
 }

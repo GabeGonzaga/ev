@@ -26,8 +26,11 @@ const props = withDefaults(
     level?: number;
     /// Awake with something open on it: the core leaves the middle.
     working?: boolean;
+    /// The camera has the display. The core shrinks into the corner rather
+    /// than leaving: something of it is always visible.
+    badge?: boolean;
   }>(),
-  { lit: 0, voice: "idle", level: 0, working: false },
+  { lit: 0, voice: "idle", level: 0, working: false, badge: false },
 );
 
 const shell = ref<HTMLDivElement | null>(null);
@@ -84,21 +87,47 @@ let turned = 0;
 let dirty = true;
 const still = window.matchMedia("(prefers-reduced-motion: reduce)");
 
-/// Neon, as canvas needs it. Read once and on demand rather than per frame.
-let neon = "58, 160, 255";
-let white = "238, 244, 251";
+/// The palette, as canvas needs it. Read once and on demand rather than per
+/// frame.
+let neon: Rgb = [63, 165, 246];
+let steel: Rgb = [63, 112, 150];
+let ice: Rgb = [196, 222, 243];
+let white: Rgb = [230, 234, 242];
+let live: Rgb = [255, 77, 77];
+
+type Rgb = [number, number, number];
 
 function readPalette() {
   const style = getComputedStyle(document.documentElement);
-  const found = style.getPropertyValue("--neon").trim();
-  if (found.startsWith("#")) neon = hexToRgb(found);
-  const ink = style.getPropertyValue("--ink").trim();
-  if (ink.startsWith("#")) white = hexToRgb(ink);
+  const read = (name: string, fallback: Rgb): Rgb => {
+    const found = style.getPropertyValue(name).trim();
+    return found.startsWith("#") ? hexToRgb(found) : fallback;
+  };
+  neon = read("--neon", neon);
+  steel = read("--ring-steel", steel);
+  ice = read("--ring-ice", ice);
+  white = read("--ink", white);
+  live = read("--live", live);
 }
 
-function hexToRgb(hex: string): string {
+/// Between two colours. The ring's body is the state -- steel while idling,
+/// azure while awake, red while listening -- so the change has to be a mix
+/// rather than a swap, or waking would be a cut in the middle of a sweep.
+function mix(from: Rgb, to: Rgb, at: number): Rgb {
+  const t = Math.min(1, Math.max(0, at));
+  return [
+    Math.round(from[0] + (to[0] - from[0]) * t),
+    Math.round(from[1] + (to[1] - from[1]) * t),
+    Math.round(from[2] + (to[2] - from[2]) * t),
+  ];
+}
+
+const ink = (colour: Rgb, alpha: number) =>
+  `rgba(${colour[0]}, ${colour[1]}, ${colour[2]}, ${alpha})`;
+
+function hexToRgb(hex: string): Rgb {
   const value = Number.parseInt(hex.slice(1), 16);
-  return `${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255}`;
+  return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
 }
 
 function draw(now: number, delta: number) {
@@ -141,6 +170,11 @@ function draw(now: number, delta: number) {
 
   const r = Math.min(wide, tall) * RADIUS * (1 + pulse * 0.03);
 
+  // Colour is state: steel at rest, azure awake, red while listening. The
+  // ring's own body carries it -- a white ring with a coloured glow says the
+  // same thing twice and neither time clearly.
+  const body = listening ? mix(steel, live, 0.85) : mix(steel, neon, lit);
+
   // --- the halo ---------------------------------------------------------
   // Only when awake, and always behind the ring: light around a white
   // circle, never a blue circle.
@@ -166,7 +200,7 @@ function draw(now: number, delta: number) {
     const angle = dot.angle + turned * dot.drift;
     const at = r * dot.at;
     const breath = 0.5 + 0.5 * Math.sin(t * dot.twinkle + dot.phase);
-    ctx.fillStyle = `rgba(${white}, ${0.15 + breath * 0.5})`;
+    ctx.fillStyle = ink(white, 0.15 + breath * 0.5);
     ctx.beginPath();
     ctx.arc(Math.cos(angle) * at, Math.sin(angle) * at, dot.size, 0, TAU);
     ctx.fill();
@@ -182,7 +216,7 @@ function draw(now: number, delta: number) {
       const angle = spin + (i / 12) * TAU;
       const cos = Math.cos(angle);
       const sin = Math.sin(angle);
-      ctx.strokeStyle = `rgba(${white}, ${0.85 * lit})`;
+      ctx.strokeStyle = ink(white, 0.85 * lit);
       ctx.lineWidth = 1;
       if (i % 3 === 0) {
         // Every third is a longer stroke; the rest are single dots.
@@ -191,7 +225,7 @@ function draw(now: number, delta: number) {
         ctx.lineTo(cos * (crown + 6), sin * (crown + 6));
         ctx.stroke();
       } else {
-        ctx.fillStyle = `rgba(${white}, ${0.7 * lit})`;
+        ctx.fillStyle = ink(white, 0.7 * lit);
         ctx.beginPath();
         ctx.arc(cos * crown, sin * crown, 1.2, 0, TAU);
         ctx.fill();
@@ -200,10 +234,27 @@ function draw(now: number, delta: number) {
   }
 
   // --- the ring ---------------------------------------------------------
-  ctx.lineWidth = 1.5;
-  ctx.strokeStyle = `rgba(${white}, ${0.9 + lit * 0.1})`;
+  // Thin while idling, a thick annulus once it is awake.
+  ctx.lineWidth = 1.5 + lit * 2.5;
+  ctx.strokeStyle = ink(body, 0.9);
   ctx.beginPath();
   ctx.arc(0, 0, r, 0, TAU);
+  ctx.stroke();
+
+  // The highlight: a pale-ice arc turning round the inner edge, about two
+  // seconds to the revolution, with a short fragment trailing it. It is the
+  // one white thing on the ring and the only reason a steel circle reads as
+  // an instrument rather than as an outline.
+  const inner = r - (1.5 + lit * 2.5) / 2 - 1;
+  const spin = (turned / 2) * TAU;
+  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = ink(ice, 0.85);
+  ctx.beginPath();
+  ctx.arc(0, 0, inner, spin, spin + (105 * Math.PI) / 180);
+  ctx.stroke();
+  ctx.strokeStyle = ink(ice, 0.45);
+  ctx.beginPath();
+  ctx.arc(0, 0, inner, spin + Math.PI * 1.15, spin + Math.PI * 1.32);
   ctx.stroke();
 
   // --- the wheels -------------------------------------------------------
@@ -211,7 +262,7 @@ function draw(now: number, delta: number) {
     const angle = ((turned / wheel.seconds) % 1) * TAU * (wheel.back ? -1 : 1);
     const sweep = (wheel.sweep * Math.PI) / 180;
     ctx.lineWidth = wheel.at > 1.1 ? 1 : 1.5;
-    ctx.strokeStyle = `rgba(${white}, ${0.7 + lit * 0.3})`;
+    ctx.strokeStyle = ink(mix(white, ice, 0.5), 0.55 + lit * 0.35);
     ctx.beginPath();
     ctx.arc(0, 0, r * wheel.at, angle, angle + sweep);
     ctx.stroke();
@@ -237,13 +288,19 @@ onBeforeUnmount(() => watcher?.disconnect());
 /// Out to the right edge and up in size when a widget opens: the middle of
 /// the display belongs to what was opened, and the core keeps turning at the
 /// side of it, partly off-screen.
-const drift = computed(() =>
-  props.working ? "translateX(26%) scale(1.6)" : "translateX(0) scale(1)",
-);
+const drift = computed(() => {
+  if (props.badge) {
+    // Bottom-right, small, still turning. A quarter of a second: shorter than
+    // the drift, because this one is getting out of the way rather than
+    // taking up a position.
+    return "translate(34%, 33%) scale(0.34)";
+  }
+  return props.working ? "translateX(26%) scale(1.6)" : "translateX(0) scale(1)";
+});
 </script>
 
 <template>
-  <div ref="shell" class="core" :style="{ transform: drift }">
+  <div ref="shell" class="core" :class="{ badge }" :style="{ transform: drift }">
     <canvas ref="canvas" aria-hidden="true" />
     <p class="wordmark">EV</p>
   </div>
@@ -259,6 +316,10 @@ const drift = computed(() =>
   /* Half a second, eased: the drift is a move, not a jump, and it is the
      only thing on screen that travels. */
   transition: transform 0.5s cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+.core.badge {
+  transition-duration: 0.25s;
 }
 
 canvas {

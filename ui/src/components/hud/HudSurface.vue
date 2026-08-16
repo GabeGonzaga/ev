@@ -17,6 +17,7 @@ import { useAudioLevel } from "../../composables/useAudioLevel";
 import { useFrame } from "../../composables/useFrame";
 import { useTelemetry } from "../../composables/useTelemetry";
 import { SLEEP_MS, WAKE_MS, useAssistantState } from "../../stores/assistant";
+import CameraSurface from "./CameraSurface.vue";
 import ConsoleWidget from "./ConsoleWidget.vue";
 import CoreRing from "./CoreRing.vue";
 import DockBar, { type DockAction } from "./DockBar.vue";
@@ -115,7 +116,9 @@ const gridded = computed(() => ev.stage !== "ambient");
 /// The dock is on the three stages that have an interface. Never on the
 /// resting screen and never on the blank one -- both are defined by having
 /// nothing on them.
-const docked = computed(() => ["idle", "waking", "awake"].includes(ev.stage));
+const docked = computed(() =>
+  ["idle", "waking", "awake", "camera"].includes(ev.stage),
+);
 
 /// Lit only while the thing itself is live, which is the whole grammar of
 /// this row.
@@ -131,10 +134,7 @@ const alight = computed(() => ({
 function pick(action: DockAction) {
   ev.touch();
   if (action === "camera") {
-    // The lens belongs to the signed host, and the host is not wired to this
-    // display yet. Saying so beats a button that pretends.
-    ev.say("ev", "The camera is not wired to this display yet.");
-    ev.show("console");
+    ev.watch(ev.stage !== "camera");
     return;
   }
   if (action === "microphone") {
@@ -187,7 +187,8 @@ function onKey(event: KeyboardEvent) {
     // third branch any more -- every widget is a window, so "put the windows
     // back" and "close what is open" were the same act, and the first of them
     // was eating the key.
-    if (ev.open.length) ev.open = [];
+    if (ev.stage === "camera") ev.watch(false);
+    else if (ev.open.length) ev.open = [];
     else if (ev.stage !== "idle") ev.rest();
     return;
   }
@@ -246,6 +247,7 @@ onBeforeUnmount(() => {
       :voice="ev.voice"
       :level="ev.audioLevel"
       :working="ev.working"
+      :badge="ev.badged"
     />
 
     <!-- The band. It is not laid over the transition, it *is* the
@@ -257,6 +259,16 @@ onBeforeUnmount(() => {
     <!-- Resting: the room light is up, the grid is gone, and the sphere has
          the screen. -->
     <TheAmbient v-if="ev.stage === 'ambient'" :level="ev.audioLevel" />
+
+    <!-- The lens. A surface over the display rather than a widget in it: the
+         feed is the thing being looked at, so nothing else competes. -->
+    <CameraSurface
+      v-if="ev.stage === 'camera'"
+      :locale="ev.locale"
+      @close="ev.watch(false)"
+      @live="ev.looking = $event"
+      @said="ev.say('ev', $event)"
+    />
 
     <!-- Summoned, never resident. Everything here can be put away, which is
          what keeps "the resting look of every stage is empty" true. -->
