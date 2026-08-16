@@ -30,7 +30,7 @@ export type Voice = "idle" | "listening" | "thinking" | "speaking";
 /// The things that can be open on the display. Deliberately short: the spec
 /// forbids news and market widgets, because both would mean fetching from the
 /// internet.
-export type Widget = "console" | "music" | "shortcuts";
+export type Widget = "console" | "music" | "shortcuts" | "add";
 
 export interface Turn {
   id: number;
@@ -60,6 +60,13 @@ export const useAssistantState = defineStore("assistant", () => {
   /// 0..1, raw. The ring and the orb smooth it themselves.
   const audioLevel = ref(0);
   const error = ref<string | null>(null);
+  /// The language E.V. answers in, which is also the language its display
+  /// writes dates and speaks back in. Settings will own this when the display
+  /// is wired to the core; pt-PT is the project's default until then.
+  const locale = ref("pt-PT");
+  /// The lens, while it is on. Invariant 8 wants a visible active state, and
+  /// the dock is where it is visible.
+  const looking = ref(false);
 
   /// Awake and something open on it. The core drifts to the right edge and
   /// the middle belongs to the widgets.
@@ -156,6 +163,8 @@ export const useAssistantState = defineStore("assistant", () => {
   return {
     stage,
     voice,
+    locale,
+    looking,
     open,
     transcript,
     audioLevel,

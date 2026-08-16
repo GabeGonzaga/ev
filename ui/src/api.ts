@@ -53,7 +53,16 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
   if (answer.status === 401) {
     throw new Error("This page is not authorised. Reopen the link E.V. printed.");
   }
-  if (!answer.ok) throw new Error(await answer.text());
+  if (!answer.ok) {
+    // Only if it is ours. A static server, a proxy or a captive portal
+    // answers with an HTML page, and printing that into a terminal-styled log
+    // buries the one useful line under a document.
+    const body = await answer.text();
+    const ours = answer.headers.get("content-type")?.includes("json");
+    throw new Error(
+      ours ? body : `${answer.status} ${answer.statusText || "request failed"}`,
+    );
+  }
   return (await answer.json()) as T;
 }
 

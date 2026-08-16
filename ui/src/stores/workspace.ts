@@ -1,16 +1,12 @@
-// Where each panel is: in its slot, or out on its own.
+// Where each window is, and which of them is on top.
 //
-// Docked and floating are two placements of one panel, not two kinds of
-// panel. The frame is identical either way -- what changes is whether the
-// grid decides the geometry or the person does.
-//
-// Remembered in localStorage, and reconciled against the panels that actually
-// exist on every start. A remembered name that no longer exists is how the
-// old view once put a widget on the floor and lost the way back to it, and
-// the fix is cheap enough to do before it happens again.
+// Every widget is a window: the grid of slots this store was originally
+// written for is gone, and with it the idea of a panel being "docked". What
+// is left is geometry and stacking order, remembered in localStorage so a
+// window opens where it was left rather than where it was born.
 
 import { defineStore } from "pinia";
-import { computed, ref, watchEffect } from "vue";
+import { ref, watchEffect } from "vue";
 
 export interface Floating {
   x: number;
@@ -19,6 +15,8 @@ export interface Floating {
   height: number;
 }
 
+/// `"docked"` survives only as the answer for a window nobody has placed
+/// yet -- a widget that has never been opened has no geometry to report.
 export type Placement = "docked" | Floating;
 
 const KEY = "ev.workspace";
@@ -51,16 +49,6 @@ export const useWorkspace = defineStore("workspace", () => {
 
   watchEffect(() => localStorage.setItem(KEY, JSON.stringify(loose.value)));
 
-  /// Forget anything that is not a panel any more.
-  function reconcile(names: readonly string[]) {
-    const known = new Set(names);
-    loose.value = Object.fromEntries(
-      Object.entries(loose.value).filter(([name]) => known.has(name)),
-    );
-    raised.value = raised.value.filter((name) => known.has(name));
-  }
-
-  const floating = computed(() => Object.keys(loose.value));
 
   function placement(name: string): Placement {
     return loose.value[name] ?? "docked";
@@ -78,16 +66,6 @@ export const useWorkspace = defineStore("workspace", () => {
     raise(name);
   }
 
-  function dock(name: string) {
-    const { [name]: _gone, ...rest } = loose.value;
-    loose.value = rest;
-    raised.value = raised.value.filter((each) => each !== name);
-  }
-
-  function toggle(name: string, from: Floating) {
-    if (isFloating(name)) dock(name);
-    else open(name, from);
-  }
 
   function move(name: string, to: Floating) {
     if (!(name in loose.value)) return;
@@ -118,25 +96,6 @@ export const useWorkspace = defineStore("workspace", () => {
     };
   }
 
-  /// Everything back in its slot. One key, and the way out of any arrangement
-  /// that has gone wrong.
-  function dockAll() {
-    loose.value = {};
-    raised.value = [];
-  }
 
-  return {
-    loose,
-    floating,
-    placement,
-    isFloating,
-    open,
-    dock,
-    toggle,
-    move,
-    raise,
-    depth,
-    dockAll,
-    reconcile,
-  };
+  return { loose, placement, isFloating, open, move, raise, depth };
 });

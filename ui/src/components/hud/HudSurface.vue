@@ -17,16 +17,17 @@ import { useAudioLevel } from "../../composables/useAudioLevel";
 import { useFrame } from "../../composables/useFrame";
 import { useTelemetry } from "../../composables/useTelemetry";
 import { SLEEP_MS, WAKE_MS, useAssistantState } from "../../stores/assistant";
-import { useWorkspace } from "../../stores/workspace";
+import ConsoleWidget from "./ConsoleWidget.vue";
 import CoreRing from "./CoreRing.vue";
+import DockBar, { type DockAction } from "./DockBar.vue";
 import HudBeam from "./HudBeam.vue";
 import HudChrome from "./HudChrome.vue";
 import HudGrid from "./HudGrid.vue";
+import ShortcutsStrip from "./ShortcutsStrip.vue";
 import TheAmbient from "./TheAmbient.vue";
 import WindowLights from "./WindowLights.vue";
 
 const ev = useAssistantState();
-const workspace = useWorkspace();
 
 // Wired here rather than in the chrome: the chrome takes what it draws as
 // props, so it can be mounted on its own with numbers made up on the spot.
@@ -110,6 +111,41 @@ const sweeping = computed(
 /// has no business showing graph paper.
 const gridded = computed(() => ev.stage !== "ambient");
 
+/// The dock is on the three stages that have an interface. Never on the
+/// resting screen and never on the blank one -- both are defined by having
+/// nothing on them.
+const docked = computed(() => ["idle", "waking", "awake"].includes(ev.stage));
+
+/// Lit only while the thing itself is live, which is the whole grammar of
+/// this row.
+const alight = computed(() => ({
+  camera: ev.looking,
+  microphone: ev.voice === "listening",
+  music: ev.isOpen("music"),
+  shortcuts: ev.isOpen("shortcuts"),
+  add: ev.isOpen("add"),
+  chat: ev.isOpen("console"),
+}));
+
+function pick(action: DockAction) {
+  ev.touch();
+  if (action === "camera") {
+    // The lens belongs to the signed host, and the host is not wired to this
+    // display yet. Saying so beats a button that pretends.
+    ev.say("ev", "The camera is not wired to this display yet.");
+    ev.show("console");
+    return;
+  }
+  if (action === "microphone") {
+    // Push-to-talk lives in the host too. Until it reports in, this is the
+    // ring's listening state and nothing more -- it opens no microphone, and
+    // it must not look as though it did.
+    ev.voice = ev.voice === "listening" ? "idle" : "listening";
+    return;
+  }
+  ev.toggle(action === "chat" ? "console" : action);
+}
+
 // --- keys ----------------------------------------------------------------
 
 function onKey(event: KeyboardEvent) {
@@ -146,10 +182,11 @@ function onKey(event: KeyboardEvent) {
   }
 
   if (event.key === "Escape") {
-    // Nearest thing first: the windows, then whatever is open, then the
-    // display itself. An arrangement gone wrong has one key that undoes it.
-    if (workspace.floating.length) workspace.dockAll();
-    else if (ev.open.length) ev.open = [];
+    // Nearest thing first: what is open, then the display itself. There is no
+    // third branch any more -- every widget is a window, so "put the windows
+    // back" and "close what is open" were the same act, and the first of them
+    // was eating the key.
+    if (ev.open.length) ev.open = [];
     else if (ev.stage !== "idle") ev.rest();
     return;
   }
@@ -220,8 +257,27 @@ onBeforeUnmount(() => {
          the screen. -->
     <TheAmbient v-if="ev.stage === 'ambient'" :level="ev.audioLevel" />
 
-    <!-- The dock and the widgets land here in the steps that follow. The
-         stage is deliberately empty until they do. -->
+    <!-- Summoned, never resident. Everything here can be put away, which is
+         what keeps "the resting look of every stage is empty" true. -->
+    <ConsoleWidget
+      v-if="ev.isOpen('console')"
+      :locale="ev.locale"
+      @close="ev.hide('console')"
+    />
+    <ShortcutsStrip
+      v-if="ev.isOpen('shortcuts')"
+      :locale="ev.locale"
+      @close="ev.hide('shortcuts')"
+    />
+    <ShortcutsStrip
+      v-if="ev.isOpen('add')"
+      adding
+      :locale="ev.locale"
+      @close="ev.hide('add')"
+      @done="ev.hide('add')"
+    />
+
+    <DockBar v-if="docked" :lit="alight" @pick="pick" />
   </main>
 </template>
 

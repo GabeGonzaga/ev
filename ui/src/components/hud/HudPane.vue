@@ -1,81 +1,64 @@
 <script setup lang="ts">
-// The box every panel is drawn in, wherever it is drawn.
+// The frame everything is drawn in.
 //
-// One frame. Docked in a grid slot or floating over the display, a panel is
-// the same component with the same border, the same header and the same
-// corner ticks -- only the geometry changes hands, from the grid to the
-// person. An interface where a floating window looks different from a docked
-// one is two interfaces, and the difference accumulates quietly: each new
-// panel looks reasonable on its own.
+// One frame: every widget, every popover, every window. Nothing draws its own
+// border, its own header or its own corners, because an interface where two
+// panels differ in their chrome is two interfaces, and the difference
+// accumulates quietly -- each new panel looks reasonable on its own.
 //
-// It also owns the three things every panel has to be able to say: waiting,
-// failed, and here-it-is. A panel that renders only the third one hides the
-// first failure it ever has, and an instrument that goes blank when its
-// sensor breaks is worse than one that says the sensor broke. So the failure
-// is printed, in the panel, as terminal output.
+// A squared body, a thin lit edge, corner brackets, and a small tab at the
+// top carrying an uppercase mono label. The tab is also the handle: there is
+// no separate title bar, because a bar would be one more thing on screen that
+// does nothing else.
 //
-// Everything about the data arrives as a prop, so any panel can be mounted on
-// its own with values typed in by hand.
+// It also owns the three things a panel has to be able to say -- waiting,
+// failed, and here-it-is. A panel that renders only the third hides the first
+// failure it ever has, and an instrument that goes blank when its sensor
+// breaks is worse than one that says the sensor broke.
 
-import { computed, ref } from "vue";
-import { LEAST_TALL, LEAST_WIDE, useWorkspace } from "../../stores/workspace";
+import { computed, onMounted } from "vue";
+import { type Floating, useWorkspace } from "../../stores/workspace";
 
 const props = withDefaults(
   defineProps<{
-    /// The three parts of the header, in `NAME // SUBTITLE // SOURCE` order.
-    /// Missing parts are left out rather than printed as gaps. The name is
-    /// also the panel's identity in the workspace.
+    /// The tab's label, and the window's identity in the workspace.
     name: string;
-    subtitle?: string;
-    source?: string;
     pending?: boolean;
     error?: string | null;
-    /// Nothing wrong, nothing to show yet. Says so in the same voice as the
-    /// loading line, because to a reader they are the same situation.
     empty?: boolean;
     waiting?: string;
-    /// Something in it is live -- a stream arriving, a camera on. Lights the
-    /// border, which is the only thing on this display that means "now".
+    /// Something in it is live. Lights the edge, which is the only thing on
+    /// this display that means "now".
     live?: boolean;
-    /// Off for a popover, which is a frame but not a panel: it has nowhere to
-    /// dock back to.
+    /// Where it opens, the first time. Afterwards it is wherever it was left.
+    at?: Floating;
+    /// Off for a popover: a frame, but not a window -- nothing to move, and
+    /// nothing to remember about it.
     movable?: boolean;
+    closable?: boolean;
   }>(),
-  { waiting: "awaiting stream", movable: true },
+  { waiting: "awaiting stream", movable: true, closable: true },
 );
+
+const emit = defineEmits<{ close: [] }>();
 
 const workspace = useWorkspace();
-const shell = ref<HTMLElement | null>(null);
 
-const label = computed(() =>
-  [props.name, props.subtitle, props.source].filter(Boolean).join(" // "),
-);
-
-const floating = computed(() => props.movable && workspace.isFloating(props.name));
-
-/// Where this panel is on screen right now, whichever way it is placed. Used
-/// to open it exactly where it already is, so picking a panel up does not
-/// teleport it.
-function here() {
-  const box = shell.value?.getBoundingClientRect();
-  if (!box) return { x: 120, y: 120, width: LEAST_WIDE, height: LEAST_TALL };
-  return { x: box.left, y: box.top, width: box.width, height: box.height };
-}
-
-function toggle() {
-  workspace.toggle(props.name, here());
-}
+onMounted(() => {
+  // First time open: put it where it was told to. After that the workspace
+  // knows, and a window opens where it was left.
+  if (props.movable && props.at && !workspace.isFloating(props.name)) {
+    workspace.open(props.name, props.at);
+  }
+});
 
 // --- moving and sizing ---------------------------------------------------
 
 /// Both gestures are the same shape: remember where the pointer started and
-/// what the panel was, then write the difference on every move. Pointer
-/// capture means the panel keeps receiving moves even when the pointer
-/// outruns it, which at any real drag speed it does.
+/// what the window was, then write the difference on every move. Pointer
+/// capture, because at any real drag speed the pointer outruns the window.
 function grab(event: PointerEvent, what: "move" | "size") {
-  if (!floating.value && what === "size") return;
-  if (event.button !== 0) return;
-
+  if (!props.movable || event.button !== 0) return;
   const from = workspace.placement(props.name);
   if (from === "docked") return;
 
@@ -112,7 +95,7 @@ function grab(event: PointerEvent, what: "move" | "size") {
 
 const geometry = computed(() => {
   const at = workspace.placement(props.name);
-  if (!floating.value || at === "docked") return undefined;
+  if (!props.movable || at === "docked") return undefined;
   return {
     left: `${at.x}px`,
     top: `${at.y}px`,
@@ -124,38 +107,30 @@ const geometry = computed(() => {
 </script>
 
 <template>
-  <!-- Floating panes leave the grid for the body. A grid cell carries a
-       transform while it arrives, and a transformed ancestor is the
-       containing block for `position: fixed` -- so a window left inside one
-       would be positioned against its old slot instead of the display. -->
-  <Teleport to="body" :disabled="!floating">
   <section
-    ref="shell"
     class="pane"
-    :class="{ live, floating }"
+    :class="{ live, movable }"
     :style="geometry"
-    @pointerdown="floating && workspace.raise(name)"
+    @pointerdown="movable && workspace.raise(name)"
   >
-    <header :class="{ handle: floating }" @pointerdown="grab($event, 'move')">
-      <span class="label">{{ label }}</span>
-
-      <!-- The way out, and the way back, in one control. There is never a
-           placement with no way to leave it: that is how the old view trapped
-           a widget on the floor with the button to undo it hidden. -->
+    <!-- The tab: small, lit, and the handle. -->
+    <header>
+      <span class="tab" @pointerdown="grab($event, 'move')">{{ name }}</span>
+      <span class="rule" @pointerdown="grab($event, 'move')" />
       <button
-        v-if="movable"
-        class="control"
+        v-if="closable"
+        class="shut"
         type="button"
-        :title="floating ? 'back to its slot' : 'open as a window'"
+        title="close"
         @pointerdown.stop
-        @click="toggle"
+        @click="emit('close')"
       >
-        {{ floating ? "▣" : "◱" }}
+        ×
       </button>
     </header>
 
-    <!-- Corner ticks, one per corner. Brackets rather than a heavier border:
-         the eye reads a corner as a frame and stops looking at it. -->
+    <!-- Corner brackets rather than a heavier border: the eye reads a corner
+         as a frame and stops looking at it. -->
     <span class="tick tl" />
     <span class="tick tr" />
     <span class="tick bl" />
@@ -169,10 +144,8 @@ const geometry = computed(() => {
       <slot v-else />
     </div>
 
-    <!-- Floating only: docked, the grid owns the size. -->
-    <span v-if="floating" class="grip" @pointerdown="grab($event, 'size')" />
+    <span v-if="movable" class="grip" @pointerdown="grab($event, 'size')" />
   </section>
-  </Teleport>
 </template>
 
 <style scoped>
@@ -184,72 +157,68 @@ const geometry = computed(() => {
   min-width: 0;
   background: var(--panel-fill);
   border: 1px solid var(--panel-border);
-  /* Two, and never more. A HUD with rounded panels is a settings screen. */
-  border-radius: 2px;
-  backdrop-filter: blur(8px);
+  /* Squared. A HUD with rounded panels is a settings screen. */
+  border-radius: 0;
+  backdrop-filter: blur(9px);
 }
 
-/* Out of the grid. Same frame, same everything -- it is simply the person
-   holding the geometry now instead of the layout. */
-.pane.floating {
+.pane.movable {
   position: fixed;
-  /* Opaque enough to read over whatever it is covering; the docked ones sit
-     on the background and can afford to be thinner. */
-  background: color-mix(in srgb, var(--panel-fill) 88%, #04070e);
-  border-color: rgba(90, 160, 255, 0.4);
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
 }
 
 .pane.live {
-  border-color: rgba(61, 155, 255, 0.5);
-  box-shadow: var(--neon-glow);
+  border-color: rgba(58, 160, 255, 0.7);
+  box-shadow: var(--neon-glow), 0 20px 60px rgba(0, 0, 0, 0.55);
 }
 
 header {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 8px 6px 10px;
-  border-bottom: 1px solid var(--panel-border);
-}
-
-/* The whole header, not a dedicated grab bar: the bar would be one more thing
-   on screen that does nothing else. */
-header.handle {
-  cursor: grab;
+  padding: 6px 6px 0 8px;
   touch-action: none;
 }
 
-header.handle:active {
+/* Lit, and the only lit thing on a panel that is not doing anything. */
+.tab {
+  padding: 3px 9px;
+  border: 1px solid var(--panel-border);
+  background: rgba(58, 160, 255, 0.12);
+  font-family: var(--mono);
+  font-size: var(--label);
+  font-weight: 500;
+  letter-spacing: var(--label-track);
+  text-transform: uppercase;
+  color: var(--neon-soft);
+  white-space: nowrap;
+  cursor: grab;
+}
+
+.tab:active {
   cursor: grabbing;
 }
 
-.label {
+.rule {
   flex: 1;
-  font-family: var(--mono);
-  font-size: var(--label);
-  letter-spacing: var(--label-track);
-  text-transform: uppercase;
-  color: var(--text-dim);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  height: 1px;
+  background: var(--panel-border);
+  cursor: grab;
 }
 
-.control {
-  flex: 0 0 auto;
-  padding: 0 3px;
+.shut {
+  padding: 0 4px;
   border: 0;
   background: none;
-  font-size: 10px;
+  font-family: var(--mono);
+  font-size: 13px;
   line-height: 1;
-  color: var(--text-dim);
+  color: var(--muted);
   cursor: pointer;
 }
 
-.control:hover {
-  color: var(--neon-bright);
-  text-shadow: var(--neon-glow-text);
+.shut:hover {
+  color: #fff;
 }
 
 .tick {
@@ -293,8 +262,7 @@ header.handle:active {
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  /* Nothing leaves the frame. A pane given one grid row is shorter than its
-     own first line, and the line was hanging out below the border. */
+  /* Nothing leaves the frame. */
   overflow: hidden;
   padding: 10px;
   font-family: var(--mono);
@@ -303,11 +271,11 @@ header.handle:active {
 
 .waiting {
   margin: 0;
-  color: var(--text-dim);
+  color: var(--muted);
 }
 
-/* Printed, not hidden. Red-tinted terminal output, wrapping rather than
-   truncating: the end of an error message is usually the useful half. */
+/* Printed, not hidden. Wrapping rather than truncating: the end of an error
+   message is usually the useful half. */
 .failed {
   margin: 0;
   color: var(--error);
@@ -316,8 +284,7 @@ header.handle:active {
   line-height: 1.55;
 }
 
-/* Sized from the corner the eye already reads as the corner -- the bottom
-   bracket doubles as the grip rather than adding a second mark beside it. */
+/* The corner the eye already reads as a corner doubles as the grip. */
 .grip {
   position: absolute;
   right: 0;
