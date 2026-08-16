@@ -15,6 +15,7 @@ from ev.capabilities.music.args import (
     ModeArgs,
     NowPlayingArgs,
     PlayArgs,
+    SeekArgs,
     VolumeArgs,
 )
 from ev.capabilities.music.service import MusicService
@@ -409,6 +410,62 @@ async def test_each_control_reaches_music_as_itself(fake_bin: FakeBin) -> None:
         assert fake_bin.argv()[-1] == action
 
 
+# --- somewhere in the track -----------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_the_playhead_is_moved_in_whole_seconds(fake_bin: FakeBin) -> None:
+    await MusicAdapter(AppleScriptClient(ProcessRunner())).seek(90)
+
+    assert fake_bin.argv()[-1] == "90"
+
+
+def test_a_place_outside_a_song_is_refused() -> None:
+    for bad in (-1, 21_601):
+        with pytest.raises(ValidationError):
+            SeekArgs(to=bad)
+
+
+class Scrubbing:
+    """A player that clamps, the way the script does."""
+
+    def __init__(self, answer: str) -> None:
+        self.answer = answer
+        self.asked: int | None = None
+
+    async def seek(self, seconds: int) -> str:
+        self.asked = seconds
+        return self.answer
+
+
+@pytest.mark.asyncio
+async def test_where_it_landed_is_what_is_said_not_where_it_was_sent() -> None:
+    """The script clamps a scrub that lands past the end, so announcing the
+    request would be announcing a guess."""
+    player = Scrubbing("143")
+    service = MusicService(cast(MusicAdapter, player))
+
+    result = await service.seek(SeekArgs(to=644))
+
+    assert player.asked == 644
+    assert result.ok
+    assert result.data == {"at": 143}
+    assert result.speech == "At 2:23"
+
+
+@pytest.mark.asyncio
+async def test_seeking_with_nothing_playing_says_so() -> None:
+    service = MusicService(cast(MusicAdapter, Scrubbing("")))
+
+    result = await service.seek(SeekArgs(to=30))
+
+    assert not result.ok
+    # A failure's message is what gets spoken -- the server falls back to it
+    # when there is no speech, which is how every other refusal here works.
+    assert result.error is not None
+    assert result.error.message == "Nothing is playing."
+
+
 # --- what is playing ------------------------------------------------------
 
 
@@ -660,6 +717,7 @@ def test_the_controls_declare_apple_events_too() -> None:
         "music.control",
         "music.mode",
         "music.now_playing",
+        "music.seek",
         "music.volume",
     }
     for name, spec in specs.items():
@@ -668,6 +726,8 @@ def test_the_controls_declare_apple_events_too() -> None:
         # gated by the application's level rather than by its risk.
         reads = name == "music.now_playing"
         assert spec.risk is (RiskLevel.SAFE if reads else RiskLevel.SENSITIVE)
+        # Moving the playhead does something, so it is written down.
+        assert spec.journalled is not reads
 
 
 # --- the name that was not an album ---------------------------------------

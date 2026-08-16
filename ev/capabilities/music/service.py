@@ -21,6 +21,7 @@ from ev.capabilities.music.args import (
     ModeArgs,
     NowPlayingArgs,
     PlayArgs,
+    SeekArgs,
     VolumeArgs,
 )
 from ev.domain.naming import closest
@@ -32,6 +33,7 @@ CONTROL = "music.control"
 VOLUME = "music.volume"
 MODE = "music.mode"
 NOW_PLAYING = "music.now_playing"
+SEEK = "music.seek"
 
 COVER_TYPES = {
     b"\xff\xd8\xff": "image/jpeg",
@@ -41,6 +43,11 @@ COVER_TYPES = {
 scripting dictionary reports a format constant that does not always match what
 `raw data` actually contains, and a JPEG announced as a PNG renders as
 nothing."""
+
+
+def _clock(seconds: int) -> str:
+    """`1:30`. What a person says back about a place in a song."""
+    return f"{seconds // 60}:{seconds % 60:02d}"
 
 
 def _seconds(value: str) -> int:
@@ -286,6 +293,24 @@ class MusicService:
             CONTROL,
             data={"action": args.action, "track": playing},
             speech=self._speaker.say(key, track=playing),
+        )
+
+    async def seek(self, args: SeekArgs) -> ToolResult:
+        landed = await self._adapter.seek(args.to)
+        if not landed:
+            return ToolResult.failure(
+                SEEK,
+                ToolErrorCode.INVALID_ARGUMENTS,
+                self._speaker.say("music.nothing_playing"),
+            )
+
+        where = _seconds(landed)
+        return ToolResult.success(
+            SEEK,
+            data={"at": where},
+            # Where it landed, not where it was asked for: the script clamps,
+            # and announcing the request would be announcing a guess.
+            speech=self._speaker.say("music.seeked", when=_clock(where)),
         )
 
     async def now_playing(self, _args: NowPlayingArgs) -> ToolResult:

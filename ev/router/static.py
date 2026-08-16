@@ -231,6 +231,22 @@ def _switched(groups: Mapping[str, str], setting: str) -> dict[str, object]:
     return {"setting": setting, "state": _SWITCHES.get(said.casefold(), "toggle")}
 
 
+def _seek(groups: Mapping[str, str]) -> dict[str, object] | None:
+    """`1:35` or `95`, both meaning the same place.
+
+    A person says minutes and a display sends seconds, and neither should have
+    to know what the other does.
+    """
+    if groups.get("only"):
+        return {"to": int(groups["only"])}
+
+    minutes = groups.get("minutes")
+    seconds = groups.get("seconds")
+    if minutes is None or seconds is None:
+        return None
+    return {"to": int(minutes) * 60 + int(seconds)}
+
+
 def _shuffle(groups: Mapping[str, str]) -> dict[str, object] | None:
     return _switched(groups, "shuffle")
 
@@ -409,6 +425,23 @@ RULES: tuple[Rule, ...] = (
         rf"(?:\s+(?P<one>esta|este)\s+(?:música|musica|faixa|tema))?"
         rf"(?:\s+(?P<after>{_SWITCH}))?$",
         _repeat,
+    ),
+    # Somewhere in the track. Both spellings people use for a time -- "95"
+    # and "1:35" -- because a display sends seconds and a person says minutes.
+    _rule(
+        "music.seek",
+        r"^(?:please\s+)?(?:seek|skip|jump|go)\s+(?:to|forward\s+to)\s+"
+        r"(?:(?P<minutes>\d{1,2}):(?P<seconds>[0-5]\d)|(?P<only>\d{1,5})"
+        r"(?:\s*(?:s|sec|secs|seconds))?)$",
+        _seek,
+    ),
+    _rule(
+        "music.seek",
+        r"^(?:por\s+favor\s+)?(?:avança|avanca|salta|vai|passa)\s+"
+        r"(?:para|até|ate|a)\s+(?:o\s+|os\s+)?"
+        r"(?:(?P<minutes>\d{1,2}):(?P<seconds>[0-5]\d)|(?P<only>\d{1,5})"
+        r"(?:\s*(?:s|seg|segs|segundos))?)$",
+        _seek,
     ),
     # A read, and the one the display asks for every second. Tier 1 or it
     # would be a model call per poll.

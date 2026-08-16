@@ -311,6 +311,29 @@ can no longer reach, or a player that has just been asked to skip past the end
 of a queue all leave a current track that answers some questions and not
 others; what cannot be read stays empty rather than failing the whole read."""
 
+SEEK: Final = """on run argv
+	set theWhen to (item 1 of argv) as integer
+	tell application "Music"
+		if player state is stopped then return ""
+		set theLength to 0
+		try
+			set theLength to (duration of current track) as integer
+		end try
+		if theWhen < 0 then set theWhen to 0
+		-- A second short of the end rather than the end itself: setting the
+		-- position to the duration is asking Music to stand on the boundary,
+		-- and it answers by moving to the next track.
+		if theLength > 0 and theWhen > (theLength - 1) then set theWhen to theLength - 1
+		set player position to theWhen
+		return (theWhen as text)
+	end tell
+end run"""
+"""Where in the track to stand.
+
+Whole seconds, clamped by the script rather than by the caller: the display
+knows the length it was last told, and a scrub that lands a pixel past the end
+should not skip the song."""
+
 MODE: Final = """on run argv
 	set theSetting to item 1 of argv
 	set theState to item 2 of argv
@@ -426,6 +449,10 @@ class MusicAdapter:
 
     async def control(self, action: str) -> str:
         return await self._applescript.run(CONTROL, action)
+
+    async def seek(self, seconds: int) -> str:
+        """Move the playhead. Answers with where it actually landed."""
+        return await self._applescript.run(SEEK, str(seconds))
 
     async def now_playing(self, artwork: Path | None) -> list[str]:
         """Ten fields: state, name, artist, album, position, length, shuffle,

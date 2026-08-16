@@ -79,6 +79,7 @@ def test_specs_are_json_and_name_the_tools(capsys: pytest.CaptureFixture[str]) -
         "music.mode",
         "music.now_playing",
         "music.play",
+        "music.seek",
         "music.volume",
         "notes.create",
         "reminders.create",

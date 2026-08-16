@@ -39,6 +39,8 @@ PHRASES: dict[str, dict[str, str]] = {
         "music.previous": "Went back",
         "music.previous_track": "Went back to {track}",
         "music.stopped": "Stopped",
+        "music.seeked": "At {when}",
+        "music.nothing_playing": "Nothing is playing.",
         "music.shuffle_on": "Shuffle on",
         "music.shuffle_off": "Shuffle off",
         "music.repeat_all": "Repeat on",
@@ -91,6 +93,8 @@ PHRASES: dict[str, dict[str, str]] = {
         "music.stopped": "Parei",
         # "Aleatório" is what the Music app itself calls it in pt-PT; nobody
         # says "baralhado".
+        "music.seeked": "Em {when}",
+        "music.nothing_playing": "Não está nada a tocar.",
         "music.shuffle_on": "Aleatório ligado",
         "music.shuffle_off": "Aleatório desligado",
         "music.repeat_all": "Repetição ligada",

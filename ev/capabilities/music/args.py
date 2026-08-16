@@ -77,6 +77,18 @@ class ModeArgs(BaseModel):
         return self
 
 
+class SeekArgs(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    to: int = Field(
+        ge=0,
+        # Six hours. Not a real track, and the point is to reject a number
+        # that arrived by accident rather than to police long recordings.
+        le=21_600,
+        description="Where to stand in the track, in seconds from the start.",
+    )
+
+
 class NowPlayingArgs(BaseModel):
     """Nothing to ask for. What is playing is what is playing."""
 

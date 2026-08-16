@@ -17,7 +17,49 @@ import HudPane from "./HudPane.vue";
 const props = withDefaults(defineProps<{ locale?: string }>(), { locale: "pt-PT" });
 const emit = defineEmits<{ close: [] }>();
 
-const { playing, pending, error, at, tell } = useNowPlaying(() => props.locale);
+const { playing, pending, error, at, holding, tell } = useNowPlaying(
+  () => props.locale,
+);
+
+/// Put the playhead where the finger is.
+///
+/// The line is a control, not a readout: press it and the song moves. The
+/// position follows the pointer while it is down and the command is sent once
+/// on release -- a seek per pixel would be a hundred commands to cross a
+/// three-minute track, each one an Apple Event and a journal entry.
+function scrub(event: PointerEvent) {
+  const length = playing.value?.length ?? 0;
+  if (!length || event.button !== 0) return;
+
+  const rail = event.currentTarget as HTMLElement;
+  const line = rail.getBoundingClientRect();
+  rail.setPointerCapture(event.pointerId);
+  holding.value = true;
+
+  function place(x: number) {
+    const part = Math.min(1, Math.max(0, (x - line.left) / line.width));
+    at.value = Math.round(part * length);
+  }
+
+  function move(moved: PointerEvent) {
+    place(moved.clientX);
+  }
+
+  function done(up: PointerEvent) {
+    place(up.clientX);
+    rail.releasePointerCapture(up.pointerId);
+    rail.removeEventListener("pointermove", move);
+    rail.removeEventListener("pointerup", done);
+    rail.removeEventListener("pointercancel", done);
+    holding.value = false;
+    void tell(`seek to ${at.value}`);
+  }
+
+  place(event.clientX);
+  rail.addEventListener("pointermove", move);
+  rail.addEventListener("pointerup", done);
+  rail.addEventListener("pointercancel", done);
+}
 
 const along = computed(() => {
   const length = playing.value?.length ?? 0;
@@ -88,7 +130,12 @@ const words = computed(() => playing.value?.lyrics?.trim() ?? "");
         <div class="along">
           <span class="from">{{ clock(at) }}</span>
           <!-- A line, not a bar. Everything on this display is one pixel. -->
-          <span class="rail"><span class="done" :style="{ width: along + '%' }" /></span>
+          <span class="rail" :class="{ holding }" @pointerdown="scrub">
+            <span class="line">
+              <span class="done" :style="{ width: along + '%' }" />
+              <span class="head" :style="{ left: along + '%' }" />
+            </span>
+          </span>
           <span class="to">{{ clock(playing.length) }}</span>
         </div>
 
@@ -278,9 +325,19 @@ const words = computed(() => playing.value?.lyrics?.trim() ?? "");
   font-variant-numeric: tabular-nums;
 }
 
+/* The line stays one pixel. What grows is the room to hit it: seven pixels
+   above and below, invisible, because a one-pixel control is a control nobody
+   can use. */
 .rail {
-  position: relative;
   flex: 1;
+  padding: 7px 0;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.line {
+  position: relative;
+  display: block;
   height: 1px;
   background: rgba(200, 224, 245, 0.18);
 }
@@ -292,6 +349,26 @@ const words = computed(() => playing.value?.lyrics?.trim() ?? "");
   height: 100%;
   background: var(--neon);
   box-shadow: 0 0 6px rgba(63, 165, 246, 0.7);
+}
+
+/* The playhead. Small and dim until the line is touched, so it reads as a
+   place rather than as a handle demanding to be used. */
+.head {
+  position: absolute;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%;
+  background: var(--neon-soft);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.rail:hover .head,
+.rail.holding .head {
+  opacity: 1;
+  box-shadow: 0 0 8px rgba(63, 165, 246, 0.9);
 }
 
 .transport {
