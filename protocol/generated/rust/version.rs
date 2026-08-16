@@ -2,4 +2,4 @@
 //
 // The handshake compares this exactly, so a hand-written copy is a
 // silent refusal waiting to happen -- which is what it was.
-pub const PROTOCOL_VERSION: &str = "1.7";
+pub const PROTOCOL_VERSION: &str = "1.8";

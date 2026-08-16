@@ -239,6 +239,34 @@ on nowPlaying()
 	end tell
 end nowPlaying"""
 
+NOW_PLAYING: Final = """on run argv
+	if application "Music" is not running then return "stopped"
+	tell application "Music"
+		if player state is stopped then return "stopped"
+		set st to player state as text
+		try
+			set nm to name of current track
+			set ar to artist of current track
+			set al to album of current track
+			set dur to (duration of current track) as text
+			set pos to (player position) as text
+		on error
+			-- Playing or paused with no reachable track: the same nothing the
+			-- transport scripts report, so the reader agrees with them.
+			return "stopped"
+		end try
+	end tell
+	set AppleScript's text item delimiters to tab
+	return {st, nm, ar, al, pos, dur} as text
+end run"""
+"""What is on right now, for the player widget. A read, so it never launches
+Music -- `application "Music" is running` is the one check that does not, and a
+stopped or closed player answers "stopped" rather than waking anything up.
+
+Tab-joined because a linefeed, the delimiter the list scripts use, turns up in
+no track title but is cheaper to fear than to allow: six fields, one line, one
+split on the other side."""
+
 VOLUME: Final = """on run argv
 	tell application "Music"
 		set sound volume to (item 1 of argv) as integer
@@ -318,3 +346,38 @@ class MusicAdapter:
         """Music's own mute, so unmuting restores the level rather than
         inventing one."""
         return await self._applescript.run(MUTE, "true" if silent else "false")
+
+    async def now_playing(self) -> dict[str, object] | None:
+        """What Music is on, or None when nothing is.
+
+        A best-effort read for the player widget: if Music is closed, stopped,
+        or Automation is not granted, the script says "stopped" or the call
+        raises, and either way the answer is None -- a resting player, never an
+        error the person cannot act on.
+        """
+        answer = (await self._applescript.run(NOW_PLAYING)).strip()
+        if answer == "stopped":
+            return None
+
+        fields = answer.split("\t")
+        if len(fields) < 6:
+            return None
+
+        state, title, artist, album, position, duration = fields[:6]
+        return {
+            "state": state.strip(),
+            "title": title,
+            "artist": artist,
+            "album": album,
+            "position": _seconds(position),
+            "duration": _seconds(duration),
+        }
+
+
+def _seconds(value: str) -> int:
+    """Music answers position and duration as a real -- "213.0" -- and the
+    widget wants whole seconds. A value it cannot read is zero, not a crash."""
+    try:
+        return int(float(value))
+    except ValueError:
+        return 0

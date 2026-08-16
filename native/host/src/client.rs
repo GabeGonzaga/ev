@@ -373,4 +373,26 @@ impl Client {
 
         serde_json::to_value(response.payload).map_err(|error| Error::Malformed(error.to_string()))
     }
+
+    /// What Music is on right now, for the player widget. The payload carries
+    /// `now`: an object with the track and its position, or null when nothing
+    /// is playing. A read that fills a view, so it never refuses over a
+    /// resting player -- it answers null.
+    pub fn now_playing(&mut self) -> Result<Value, Error> {
+        let response = self.request(json!({ "type": "now.playing" }))?;
+
+        if !response.ok {
+            let why = response
+                .error
+                .map(|error| error.message)
+                .unwrap_or_else(|| "refused".to_string());
+            return Err(Error::Refused(why));
+        }
+
+        Ok(serde_json::to_value(response.payload)
+            .map_err(|error| Error::Malformed(error.to_string()))?
+            .get("now")
+            .cloned()
+            .unwrap_or(Value::Null))
+    }
 }

@@ -6,7 +6,7 @@ from pydantic import ValidationError
 from ev.application.applications import ApplicationLedger
 from ev.application.policy import PermissionLedger, PermissionPolicy
 from ev.application.speech import Speaker
-from ev.capabilities.music.adapters import MusicAdapter
+from ev.capabilities.music.adapters import NOW_PLAYING, MusicAdapter
 from ev.capabilities.music.args import ControlArgs, PlayArgs, VolumeArgs
 from ev.capabilities.music.service import MusicService
 from ev.capabilities.music.tools import music_tools
@@ -766,3 +766,69 @@ async def test_the_kind_asked_for_is_looked_at_first() -> None:
     result = await service.play(PlayArgs(name="clancy", kind="track"))
 
     assert result.data["kind"] == "track"
+
+
+@pytest.mark.asyncio
+async def test_now_playing_parses_what_music_answers(
+    fake_bin: FakeBin, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Tab-joined, the way the reader asks for it: the state, then the track,
+    # then its position and length as reals.
+    monkeypatch.setenv(
+        "EV_FAKE_STDOUT",
+        "playing\tStill into You\tParamore\tParamore\t124.5\t216.0",
+    )
+    adapter = MusicAdapter(AppleScriptClient(ProcessRunner()))
+
+    now = await adapter.now_playing()
+
+    assert fake_bin.command() == "osascript"
+    # A read carries no argv to interpolate, so the whole of what reaches
+    # osascript is the source and nothing else: this guards the reader against
+    # quietly mangling it. The parse below is what is really under test.
+    assert fake_bin.argv()[1] == NOW_PLAYING
+    assert now == {
+        "state": "playing",
+        "title": "Still into You",
+        "artist": "Paramore",
+        "album": "Paramore",
+        "position": 124,
+        "duration": 216,
+    }
+
+
+@pytest.mark.asyncio
+async def test_nothing_playing_is_none(
+    fake_bin: FakeBin, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A stopped or closed player answers the one word, and the widget draws a
+    # resting player rather than an empty track.
+    monkeypatch.setenv("EV_FAKE_STDOUT", "stopped")
+    adapter = MusicAdapter(AppleScriptClient(ProcessRunner()))
+
+    assert await adapter.now_playing() is None
+
+
+@pytest.mark.asyncio
+async def test_a_truncated_answer_is_none_not_a_half_track(
+    fake_bin: FakeBin, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Fewer than six fields is an answer that lost something in transit; a
+    # half-filled player is worse than a resting one.
+    monkeypatch.setenv("EV_FAKE_STDOUT", "playing\tStill into You")
+    adapter = MusicAdapter(AppleScriptClient(ProcessRunner()))
+
+    assert await adapter.now_playing() is None
+
+
+@pytest.mark.asyncio
+async def test_the_read_that_cannot_reach_music_is_a_resting_player() -> None:
+    # The service turns a script that raised -- Automation off, Music wedged --
+    # into None, so a poll that fails is a resting player, not a failed turn.
+    class Wedged:
+        async def now_playing(self) -> dict[str, object] | None:
+            raise AppleScriptError("Music got an error: Application isn't running")
+
+    service = MusicService(Wedged(), Speaker("en"))  # type: ignore[arg-type]
+
+    assert await service.now_playing() is None

@@ -227,6 +227,22 @@ class MusicService:
             speech=self._speaker.say("music.playing", name=name),
         )
 
+    async def now_playing(self) -> dict[str, object] | None:
+        """What is playing, for the player widget to draw itself.
+
+        A status read rather than a routed tool, the way `history` is: it fills
+        a view and is asked many times a second, so it goes straight to the
+        adapter instead of through the router and a confirmation. Still one
+        door -- the AppleScript client -- and best-effort: None when nothing is
+        on, or when Music cannot be reached at all.
+        """
+        try:
+            return await self._adapter.now_playing()
+        except AppleScriptError:
+            # A player that cannot be read is a resting player here, not a
+            # failed turn: the widget shows nothing rather than an error.
+            return None
+
     async def control(self, args: ControlArgs) -> ToolResult:
         playing = await self._adapter.control(args.action)
 
