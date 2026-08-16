@@ -19,11 +19,8 @@ const props = withDefaults(
     telemetry: Telemetry | null;
     pending?: boolean;
     error?: string | null;
-    /// How much of the frame the sweep has painted in, 0..1 -- the same
-    /// number the grid takes, so the two cannot come up at different rates.
-    painted?: number;
   }>(),
-  { painted: 1, pending: false, error: null },
+  { pending: false, error: null },
 );
 
 /// Bottom left: what E.V. is running on. Bottom right: how it is doing.
@@ -43,7 +40,7 @@ const right = computed(() => {
 </script>
 
 <template>
-  <div class="chrome" :style="{ '--painted': painted }" aria-hidden="true">
+  <div class="chrome" aria-hidden="true">
     <!-- A rangefinder scale down the left edge. Gradients rather than several
          hundred elements: the browser draws these as one paint, and nothing
          here ever changes. -->
@@ -77,16 +74,6 @@ const right = computed(() => {
   pointer-events: none;
   z-index: 2;
   font-family: var(--mono);
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    #000 calc(var(--painted) * (100% + 60px) - 60px),
-    transparent calc(var(--painted) * (100% + 60px))
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    #000 calc(var(--painted) * (100% + 60px) - 60px),
-    transparent calc(var(--painted) * (100% + 60px))
-  );
 }
 
 /* Every tick 12px, every fifth longer and brighter -- two gradients stacked,

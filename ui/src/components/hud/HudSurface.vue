@@ -19,6 +19,7 @@ import { useTelemetry } from "../../composables/useTelemetry";
 import { SLEEP_MS, WAKE_MS, useAssistantState } from "../../stores/assistant";
 import { useWorkspace } from "../../stores/workspace";
 import CoreRing from "./CoreRing.vue";
+import HudBeam from "./HudBeam.vue";
 import HudChrome from "./HudChrome.vue";
 import HudGrid from "./HudGrid.vue";
 import WindowLights from "./WindowLights.vue";
@@ -77,17 +78,32 @@ function clamp(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 
-const easeOut = (t: number) => 1 - (1 - t) ** 3;
+// Quadratic, not cubic. A cubic ease-out puts the band 93% of the way down
+// the screen in the first half of the window and leaves it crawling the last
+// few pixels -- which reads as a flash followed by a wait rather than as one
+// pass. Measured, not guessed: 380ms into an 820ms sweep had it at 0.974.
+const easeOut = (t: number) => 1 - (1 - t) ** 2;
 
 /// The band, and therefore the painting: it crosses in one pass, eased out,
 /// so it arrives at the bottom edge slowing rather than hitting it.
 const painted = computed(() =>
-  still.matches ? target.value : easeOut(clamp(swept.value / 0.78)),
+  // Calm still animates -- it just animates an opacity instead of a
+  // boundary. Jumping to the target here would make "cross-fade instead" a
+  // cut, which is the one thing it is not.
+  still.matches ? swept.value : easeOut(clamp(swept.value / 0.88)),
 );
 
-/// How much neon is in the grid. Trails the band a little, so the squares
-/// brighten behind it rather than ahead of it.
-const lit = computed(() => (still.matches ? target.value : clamp(swept.value * 1.15)));
+/// How much neon is around the ring. The halo ramps in over the same window
+/// the band is crossing, so the two land together rather than one waiting for
+/// the other.
+const lit = computed(() =>
+  still.matches ? swept.value : clamp(swept.value * 1.15),
+);
+
+/// The band is on screen only while it is crossing -- one pass, then gone.
+const sweeping = computed(
+  () => !still.matches && swept.value > 0 && swept.value < 1,
+);
 
 /// The grid is on every stage except ambient, which lifts the room light and
 /// has no business showing graph paper.
@@ -154,13 +170,12 @@ onBeforeUnmount(() => {
          four stages share the near-black display and its grid. -->
     <div class="wash" :class="{ lifted: ev.stage === 'ambient' }" />
 
-    <HudGrid v-if="gridded" :lit="lit" :painted="painted" />
+    <HudGrid v-if="gridded" :painted="painted" :calm="still.matches" />
     <HudChrome
       v-if="gridded"
       :telemetry="telemetry"
       :pending="telemetryPending"
       :error="telemetryError"
-      :painted="painted"
     />
 
     <!-- A frameless window with nothing to grab cannot be moved, and this
@@ -179,6 +194,12 @@ onBeforeUnmount(() => {
       :level="ev.audioLevel"
       :working="ev.working"
     />
+
+    <!-- The band. It is not laid over the transition, it *is* the
+         transition: the same number that puts it at a height is the boundary
+         the grid brightens across, so the light and what it lights cannot
+         drift apart. -->
+    <HudBeam v-if="sweeping" :at="painted" />
 
     <!-- The dock, the widgets and the ambient orb land here in the steps that
          follow. The stage is deliberately empty until they do. -->
