@@ -23,6 +23,8 @@ export interface Playing {
   shuffle: boolean;
   repeat: "off" | "all" | "one" | string;
   cover: string | null;
+  /// Whatever the file carries, which for a streamed track is nothing.
+  lyrics: string;
 }
 
 export interface NowPlaying {

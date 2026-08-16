@@ -250,6 +250,7 @@ NOW_PLAYING: Final = """on run argv
 	set outLen to "0"
 	set outShuffle to "off"
 	set outRepeat to "off"
+	set outLyrics to ""
 	tell application "Music"
 		set outState to player state as text
 		if outState is not "stopped" then
@@ -266,6 +267,9 @@ NOW_PLAYING: Final = """on run argv
 				else if song repeat is all then
 					set outRepeat to "all"
 				end if
+				try
+					set outLyrics to lyrics of theTrack
+				end try
 				if artPath is not "" then
 					try
 						set theArt to raw data of artwork 1 of theTrack
@@ -283,7 +287,7 @@ NOW_PLAYING: Final = """on run argv
 	end if
 	return outState & linefeed & outName & linefeed & outArtist & linefeed & \
 		outAlbum & linefeed & outPos & linefeed & outLen & linefeed & \
-		outShuffle & linefeed & outRepeat & linefeed & wroteArt
+		outShuffle & linefeed & outRepeat & linefeed & wroteArt & linefeed & outLyrics
 end run
 
 on writeArt(theData, thePath)
@@ -294,7 +298,7 @@ on writeArt(theData, thePath)
 	end try
 	close access outFile
 end writeArt"""
-"""What is playing, and the cover, in one round trip.
+"""What is playing, the cover and the lyrics, in one round trip.
 
 The file is written *outside* the `tell` block, through a handler called with
 `my`. `open for access` and `write` belong to AppleScript, not to Music, and
@@ -424,16 +428,20 @@ class MusicAdapter:
         return await self._applescript.run(CONTROL, action)
 
     async def now_playing(self, artwork: Path | None) -> list[str]:
-        """Nine lines: state, name, artist, album, position, length, shuffle,
-        repeat, and where the cover was written -- or empty if there was none.
+        """Ten fields: state, name, artist, album, position, length, shuffle,
+        repeat, where the cover was written, and the lyrics.
+
+        The lyrics come last and are not split. They are the one field with
+        newlines of its own, and splitting the whole answer on linefeed would
+        turn a song into nine fields and a mess.
         """
         answer = await self._applescript.run(
             NOW_PLAYING, str(artwork) if artwork else ""
         )
-        lines = answer.split("\n")
+        fields = answer.split("\n", 9)
         # A short answer is a script that stopped early, not a track with
         # missing fields; padding keeps the caller from indexing off the end.
-        return [*lines, *([""] * (9 - len(lines)))][:9]
+        return [*fields, *([""] * (10 - len(fields)))][:10]
 
     async def mode(self, setting: str, state: str) -> str:
         """Set shuffle or repeat, and answer with the position it is now in."""

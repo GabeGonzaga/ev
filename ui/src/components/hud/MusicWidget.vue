@@ -9,8 +9,9 @@
 // The cover is the album's own, read out of the local library. Nothing here
 // fetches anything.
 
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { clock, useNowPlaying } from "../../composables/useNowPlaying";
+import { type Floating, useWorkspace } from "../../stores/workspace";
 import HudPane from "./HudPane.vue";
 
 const props = withDefaults(defineProps<{ locale?: string }>(), { locale: "pt-PT" });
@@ -30,6 +31,34 @@ const tag = computed(() => {
 });
 
 const repeating = computed(() => playing.value?.repeat !== "off");
+
+// --- the lyrics ----------------------------------------------------------
+
+const NAME = "apple_music";
+const workspace = useWorkspace();
+const reading = ref(false);
+/// What shape it was before, so closing the lyrics gives that back rather
+/// than leaving a tall window somebody has to resize by hand.
+let wasWide: Floating | null = null;
+
+/// A page of words wants a page's shape. Turning the window portrait is the
+/// whole gesture: the cover goes to the top, the words run down the rest.
+function flip() {
+  const now = workspace.placement(NAME);
+  if (!reading.value) {
+    if (now !== "docked") wasWide = { ...now };
+    reading.value = true;
+    if (now !== "docked") {
+      workspace.move(NAME, { ...now, width: 360, height: 560 });
+    }
+    return;
+  }
+
+  reading.value = false;
+  if (wasWide) workspace.move(NAME, wasWide);
+}
+
+const words = computed(() => playing.value?.lyrics?.trim() ?? "");
 </script>
 
 <template>
@@ -43,7 +72,7 @@ const repeating = computed(() => playing.value?.repeat !== "off");
     :at="{ x: 470, y: 150, width: 400, height: 168 }"
     @close="emit('close')"
   >
-    <div v-if="playing" class="player">
+    <div v-if="playing" class="player" :class="{ reading }">
       <div class="art">
         <img v-if="playing.cover" :src="playing.cover" :alt="playing.album" />
         <span v-else class="nothing" />
@@ -51,6 +80,7 @@ const repeating = computed(() => playing.value?.repeat !== "off");
       </div>
 
       <div class="what">
+
         <p class="track" :title="playing.track">{{ playing.track || "—" }}</p>
         <p class="by" :title="playing.artist">{{ playing.artist }}</p>
         <p class="on" :title="playing.album">{{ playing.album }}</p>
@@ -102,13 +132,53 @@ const repeating = computed(() => playing.value?.repeat !== "off");
             </svg>
             <span v-if="playing.repeat === 'one'" class="one">1</span>
           </button>
+          <button
+            :class="{ on: reading }"
+            type="button"
+            title="lyrics"
+            @click="flip"
+          >
+            <svg viewBox="0 0 24 24">
+              <path d="M4 6h16M4 10.5h11M4 15h16M4 19.5h9" />
+            </svg>
+          </button>
         </div>
       </div>
+    </div>
+
+    <!-- The words, under everything, when the window has been turned for
+         them. Empty is said plainly: Apple Music keeps its own lyrics to
+         itself, and inventing some would be worse than none. -->
+    <div v-if="playing && reading" class="lyrics">
+      <p v-if="words" class="words">{{ words }}</p>
+      <p v-else class="none">
+        &gt; no lyrics on this track.<br />
+        Music only hands over what the file itself carries, and a streamed
+        track carries none.
+      </p>
     </div>
   </HudPane>
 </template>
 
 <style scoped>
+/* Turned for reading: the cover on top, the words down the rest of the
+   window. Same components, a different axis. */
+.player.reading {
+  flex-direction: column;
+  flex: 0 0 auto;
+}
+
+.player.reading .art {
+  align-self: center;
+  width: clamp(96px, 46%, 190px);
+}
+
+.player.reading .track,
+.player.reading .by,
+.player.reading .on {
+  text-align: center;
+}
+
 .player {
   display: flex;
   gap: 14px;
@@ -277,6 +347,40 @@ const repeating = computed(() => playing.value?.repeat !== "off");
 .transport button.on {
   color: var(--neon);
   filter: drop-shadow(0 0 5px rgba(63, 165, 246, 0.75));
+}
+
+.lyrics {
+  flex: 1;
+  min-height: 0;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--panel-border);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--neon-dim) transparent;
+}
+
+.lyrics::-webkit-scrollbar {
+  width: 4px;
+}
+
+.lyrics::-webkit-scrollbar-thumb {
+  background: var(--neon-dim);
+}
+
+.words {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.65;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.none {
+  margin: 0;
+  line-height: 1.6;
+  font-size: 11px;
+  color: var(--muted);
 }
 
 .one {

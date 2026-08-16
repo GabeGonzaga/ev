@@ -431,11 +431,30 @@ async def test_a_short_answer_is_padded_rather_than_indexed_off_the_end(
     """A script that stopped early must not become an IndexError upstream."""
     monkeypatch.setenv("EV_FAKE_STDOUT", "paused\nAirplane Mode")
 
-    lines = await MusicAdapter(AppleScriptClient(ProcessRunner())).now_playing(None)
+    fields = await MusicAdapter(AppleScriptClient(ProcessRunner())).now_playing(None)
 
-    assert len(lines) == 9
-    assert lines[0] == "paused"
-    assert lines[8] == ""
+    assert len(fields) == 10
+    assert fields[0] == "paused"
+    assert fields[9] == ""
+
+
+@pytest.mark.asyncio
+async def test_a_song_with_verses_does_not_become_nine_fields_and_a_mess(
+    fake_bin: FakeBin, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Lyrics are the one field with newlines of its own, so they come last
+    and are not split."""
+    monkeypatch.setenv(
+        "EV_FAKE_STDOUT",
+        "playing\nNikes\nFrank Ocean\nBlonde\n62\n314\non\nall\n/tmp/art\n"
+        "first line\nsecond line\n\nafter a blank one",
+    )
+
+    fields = await MusicAdapter(AppleScriptClient(ProcessRunner())).now_playing(None)
+
+    assert len(fields) == 10
+    assert fields[8] == "/tmp/art"
+    assert fields[9] == "first line\nsecond line\n\nafter a blank one"
 
 
 class Reading:
@@ -457,6 +476,7 @@ class Reading:
             "on",
             "all",
             self.cover,
+            "  a verse\nand another  ",
         ]
 
 
@@ -481,6 +501,9 @@ async def test_what_is_playing_is_reported_for_a_display_to_draw(
     assert result.data["shuffle"] is True
     assert result.data["repeat"] == "all"
     assert str(result.data["cover"]).startswith("data:image/jpeg;base64,")
+    # Trimmed at the ends and untouched in the middle: a blank line inside a
+    # song is the song's.
+    assert result.data["lyrics"] == "a verse\nand another"
 
 
 @pytest.mark.asyncio

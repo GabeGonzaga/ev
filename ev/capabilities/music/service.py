@@ -306,6 +306,7 @@ class MusicService:
             shuffle,
             repeating,
             cover,
+            words,
         ) = await self._adapter.now_playing(self._artwork)
 
         return ToolResult.success(
@@ -320,6 +321,11 @@ class MusicService:
                 "shuffle": shuffle == "on",
                 "repeat": repeating,
                 "cover": self._cover(cover, name, album),
+                # Whatever the file carries. Apple Music's streamed catalogue
+                # keeps its own time-synced lyrics to itself, so this is empty
+                # for almost everything -- and empty is the honest answer
+                # rather than a reason to go and fetch some.
+                "lyrics": words.strip(),
             },
             # Nothing is said out loud: this is a display reading itself, and
             # a status line spoken every second is not an assistant.
