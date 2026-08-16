@@ -42,7 +42,7 @@ async def _where(applescript: AppleScriptClient) -> int:
     found it."""
     answer = await applescript.run(
         'on run\n\ttell application "Music"\n'
-        "\t\tif player state is stopped then return \"0\"\n"
+        '\t\tif player state is stopped then return "0"\n'
         "\t\treturn (player position as integer) as text\n"
         "\tend tell\nend run"
     )
