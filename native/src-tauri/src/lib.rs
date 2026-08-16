@@ -143,6 +143,7 @@ fn room(app: &AppHandle, samples: Vec<i16>) {
                     ok: turn.response.ok,
                     outcome: "ran".into(),
                     error: turn.response.error.as_ref().map(|e| e.message.clone()),
+                    data: turn.response.payload.get("data").cloned(),
                 },
             );
         }
@@ -167,6 +168,7 @@ fn follow(app: &AppHandle) {
                 ok: false,
                 outcome: "failed".into(),
                 error: Some(error),
+                data: None,
             },
         ),
     };
@@ -265,6 +267,11 @@ struct TurnResult {
     ok: bool,
     outcome: String,
     error: Option<String>,
+    /// Whatever the tool returned. The daemon's payload already carries it --
+    /// `music.now_playing` answers the track and its cover here -- and the
+    /// browser shell already passes it through, so until this field existed
+    /// the same widget filled in one shell and stayed empty in the other.
+    data: Option<serde_json::Value>,
 }
 
 /// What starts a turn.
@@ -359,6 +366,7 @@ fn run_turn(app: &AppHandle, input: Input, locale: Option<String>) -> Result<Tur
             .unwrap_or("ran")
             .to_string(),
         error: turn.response.error.as_ref().map(|e| e.message.clone()),
+        data: payload.get("data").cloned(),
     })
 }
 
@@ -590,6 +598,7 @@ fn hold(app: &AppHandle) {
                     ok: false,
                     outcome: "failed".into(),
                     error: Some(error),
+                    data: None,
                 },
             ),
         };
