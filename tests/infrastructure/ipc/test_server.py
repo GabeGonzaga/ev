@@ -427,7 +427,7 @@ async def test_an_unbound_confirmation_declines() -> None:
 async def test_a_refused_handshake_reaches_the_client(state: Path) -> None:
     core = Core()
     async for _ in start(state, core):
-        with pytest.raises(DaemonRefused, match=r"speaks 1\.7"):
+        with pytest.raises(DaemonRefused, match=r"speaks 1\.8"):
             async with IpcClient(socket_path(state), protocol="0.9"):
                 pass
         break
@@ -1048,3 +1048,52 @@ async def test_the_name_alone_asks_for_the_next_thing(state: Path) -> None:
     finally:
         task.cancel()
         await server.aclose()
+
+
+async def test_now_playing_reaches_the_widget(state: Path) -> None:
+    from protocol.messages import NowPlayingQuery
+
+    async def now_playing() -> dict[str, object] | None:
+        return {
+            "state": "playing",
+            "title": "Still into You",
+            "artist": "Paramore",
+            "album": "Paramore",
+            "position": 124,
+            "duration": 216,
+        }
+
+    core = Core()
+    server = IpcServer(
+        path=socket_path(state),
+        handle=core.handle,
+        confirmation=SessionConfirmation(),
+        now_playing=now_playing,
+    )
+    await server.start()
+    task = asyncio.create_task(server.serve_forever())
+
+    try:
+        async with IpcClient(socket_path(state)) as client:
+            answer = await client._send(NowPlayingQuery())
+
+        assert answer["ok"] is True
+        assert answer["payload"]["now"]["title"] == "Still into You"
+        assert answer["payload"]["now"]["position"] == 124
+    finally:
+        task.cancel()
+        await server.aclose()
+
+
+async def test_a_daemon_that_cannot_read_music_answers_null(state: Path) -> None:
+    # No reader wired: the payload's `now` is null and the widget draws a
+    # resting player, never a fault it cannot act on.
+    from protocol.messages import NowPlayingQuery
+
+    core = Core()
+    async for _ in start(state, core):
+        async with IpcClient(socket_path(state)) as client:
+            answer = await client._send(NowPlayingQuery())
+
+    assert answer["ok"] is True
+    assert answer["payload"]["now"] is None

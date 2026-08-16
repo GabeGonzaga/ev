@@ -42,14 +42,14 @@ MAX_IMAGE_BASE64 = 8_000_000
 leaves room for a camera that hands over something larger without leaving the
 field unbounded."""
 
-PROTOCOL_VERSION = "1.7"
+PROTOCOL_VERSION = "1.8"
 """Major.minor. The handshake compares it exactly: a mismatch refuses the
 connection rather than degrading into a conversation neither side understands.
 
 1.1 added `audio.submit`; 1.2 added `history.query`; 1.3 gave it `query`; 1.4
 added `vision.submit`; 1.5 added `permission.report`; 1.6 carried the
 application and the assurance into a confirmation, and an answer back; 1.7
-added `wake` to `audio.submit`. A client that knows an
+added `wake` to `audio.submit`; 1.8 added `now.playing`. A client that knows an
 earlier version is refused rather than served a subset, because "some of the
 protocol" is not a protocol.
 """
@@ -165,6 +165,18 @@ class HistoryQuery(Message):
     )
 
 
+class NowPlayingQuery(Message):
+    """What Music is on right now, for the player widget.
+
+    A request, not an event: the widget asks as it draws, the same way it asks
+    for history. The answer arrives in the response payload as `now` -- an
+    object with `state`, `title`, `artist`, `album`, `position` and `duration`,
+    or null when nothing is playing.
+    """
+
+    type: Literal["now.playing"] = "now.playing"
+
+
 class VisionSubmit(Message):
     """One frame, and optionally what to ask about it.
 
@@ -221,6 +233,7 @@ Command = Annotated[
     | VisionSubmit
     | ConfirmationRespond
     | HistoryQuery
+    | NowPlayingQuery
     | PermissionReport
     | SessionCancel,
     Field(discriminator="type"),

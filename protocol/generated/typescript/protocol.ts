@@ -62,6 +62,7 @@ export type Command =
   | VisionSubmit
   | ConfirmationRespond
   | HistoryQuery
+  | NowPlayingQuery
   | PermissionReport
   | SessionCancel;
 /**
@@ -130,8 +131,9 @@ export type Limit = number;
  */
 export type Query = string | null;
 export type Type11 = "history.query";
-export type Type12 = "permission.report";
-export type Type13 = "session.cancel";
+export type Type12 = "now.playing";
+export type Type13 = "permission.report";
+export type Type14 = "session.cancel";
 export type Id2 = string;
 export type Code = string;
 export type Message = string;
@@ -306,6 +308,17 @@ export interface HistoryQuery {
   type?: Type11;
 }
 /**
+ * What Music is on right now, for the player widget.
+ *
+ * A request, not an event: the widget asks as it draws, the same way it asks
+ * for history. The answer arrives in the response payload as `now` -- an
+ * object with `state`, `title`, `artist`, `album`, `position` and `duration`,
+ * or null when nothing is playing.
+ */
+export interface NowPlayingQuery {
+  type?: Type12;
+}
+/**
  * What macOS said about a permission, from the process it said it to.
  *
  * Invariant 7: permission state is reported by the signed host, never
@@ -320,10 +333,10 @@ export interface HistoryQuery {
 export interface PermissionReport {
   permission: Permission;
   state: PermissionState;
-  type?: Type12;
+  type?: Type13;
 }
 export interface SessionCancel {
-  type?: Type13;
+  type?: Type14;
 }
 export interface Response {
   error?: ResponseError | null;

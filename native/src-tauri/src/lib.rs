@@ -492,6 +492,21 @@ async fn history(limit: u32, query: Option<String>) -> Result<serde_json::Value,
     .map_err(|error| error.to_string())?
 }
 
+/// What Music is on, for the player widget. A read that fills a view, so it
+/// answers null rather than an error when nothing is playing or the read is
+/// not reachable -- the widget draws a resting player either way.
+#[tauri::command]
+async fn now_playing() -> Result<serde_json::Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut client = Client::connect(&socket()).map_err(|error| error.to_string())?;
+        client
+            .now_playing()
+            .map_err(|error: ev_host::client::Error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
 #[tauri::command]
 fn set_locale(locale: Option<String>, session: State<'_, Session>) {
     if let Ok(mut slot) = session.locale.lock() {
@@ -704,6 +719,7 @@ pub fn run() {
             window_control,
             look,
             history,
+            now_playing,
             set_locale,
             set_shortcut,
             settings,

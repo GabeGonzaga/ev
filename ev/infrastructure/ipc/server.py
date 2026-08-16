@@ -45,6 +45,7 @@ from protocol.messages import (
     Hello,
     HistoryPage,
     HistoryQuery,
+    NowPlayingQuery,
     PermissionReport,
     Request,
     Response,
@@ -229,6 +230,7 @@ Handler = Callable[..., Awaitable[ToolResult | Clarification | None]]
 """`(text)` or `(text, locale)`. The locale is what the answer is spoken in,
 and the daemon has it -- `utterance.submit` carries it."""
 History = Callable[[int, int | None, str | None], Awaitable[list[JournalEntry]]]
+NowPlaying = Callable[[], Awaitable[dict[str, object] | None]]
 """How the daemon reads the trail back. The journal owns the storage; this is
 the only shape the socket knows about."""
 
@@ -278,6 +280,7 @@ class IpcServer:
         report: Reporter | None = None,
         remember: Rememberer | None = None,
         history: History | None = None,
+        now_playing: NowPlaying | None = None,
         on_close: Callable[[], Awaitable[None]] | None = None,
         confirmation_timeout: float = CONFIRMATION_TIMEOUT,
         turn_lock: asyncio.Lock | None = None,
@@ -290,6 +293,7 @@ class IpcServer:
         self._report = report
         self._remember_level = remember
         self._history = history
+        self._now_playing = now_playing
         self._confirmation = confirmation
         self._on_close = on_close
         self._confirmation_timeout = confirmation_timeout
@@ -448,6 +452,10 @@ class IpcServer:
 
         if isinstance(command, HistoryQuery):
             await self._history_query(session, request.id, command)
+            return
+
+        if isinstance(command, NowPlayingQuery):
+            await self._now_playing_query(session, request.id, command)
             return
 
         if isinstance(command, AudioSubmit):
@@ -622,6 +630,16 @@ class IpcServer:
         await session.send(
             Response(id=request_id, ok=True, payload=json.loads(page.model_dump_json()))
         )
+
+    async def _now_playing_query(
+        self, session: Session, request_id: str, command: NowPlayingQuery
+    ) -> None:
+        # No reader wired, or nothing on: either way the payload's `now` is
+        # null and the widget draws a resting player. A read that fills a view
+        # never refuses -- a 503 would only reach the person as a fault they
+        # cannot act on, once a second.
+        now = await self._now_playing() if self._now_playing is not None else None
+        await session.send(Response(id=request_id, ok=True, payload={"now": now}))
 
     async def _hello(self, session: Session, request_id: str, hello: Hello) -> None:
         if hello.protocol != PROTOCOL_VERSION:
