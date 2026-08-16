@@ -18,6 +18,7 @@ import { useFrame } from "../../composables/useFrame";
 import { useTelemetry } from "../../composables/useTelemetry";
 import { SLEEP_MS, WAKE_MS, useAssistantState } from "../../stores/assistant";
 import { useWorkspace } from "../../stores/workspace";
+import CoreRing from "./CoreRing.vue";
 import HudChrome from "./HudChrome.vue";
 import HudGrid from "./HudGrid.vue";
 import WindowLights from "./WindowLights.vue";
@@ -112,6 +113,14 @@ function onKey(event: KeyboardEvent) {
     return;
   }
 
+  // The specification gives the chat bar a keyboard shortcut as well as a
+  // dock icon. The dock lands in step 5; this is the same store action.
+  if (event.code === "KeyC" && !event.metaKey && !event.ctrlKey) {
+    event.preventDefault();
+    ev.toggle("console");
+    return;
+  }
+
   if (event.key === "Escape") {
     // Nearest thing first: the windows, then whatever is open, then the
     // display itself. An arrangement gone wrong has one key that undoes it.
@@ -161,8 +170,18 @@ onBeforeUnmount(() => {
       <WindowLights />
     </div>
 
-    <!-- The core, the dock, the widgets and the ambient orb land here in the
-         steps that follow. The stage is deliberately empty until they do. -->
+    <!-- The core. Not on the blank stage, which is the grid on its own, and
+         not in ambient, where the plasma orb takes its place. -->
+    <CoreRing
+      v-if="ev.ringed"
+      :lit="lit"
+      :voice="ev.voice"
+      :level="ev.audioLevel"
+      :working="ev.working"
+    />
+
+    <!-- The dock, the widgets and the ambient orb land here in the steps that
+         follow. The stage is deliberately empty until they do. -->
   </main>
 </template>
 
