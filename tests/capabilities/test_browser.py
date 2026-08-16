@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 from pydantic import ValidationError
 
@@ -13,6 +15,106 @@ from ev.domain.risk import RiskLevel
 from ev.infrastructure.macos.processes import ProcessRunner
 from ev.registry import CallRecord, Registry
 from tests.conftest import FakeBin
+
+EXPECTED_WINDOW_SOURCE = """on run argv
+\tset theUrl to item 1 of argv
+\tset theApp to item 2 of argv
+\tset theBounds to {item 3 of argv as integer, item 4 of argv as integer, \u00ac
+\t\titem 5 of argv as integer, item 6 of argv as integer}
+\tif theApp is "com.google.chrome" then
+\t\ttell application "Google Chrome"
+\t\t\tactivate
+\t\t\tset theWindow to make new window
+\t\t\tset URL of active tab of theWindow to theUrl
+\t\t\tset bounds of theWindow to theBounds
+\t\tend tell
+\t\treturn "window"
+\telse if theApp is "com.apple.safari" then
+\t\ttell application "Safari"
+\t\t\tactivate
+\t\t\tset theWindow to make new document with properties {URL:theUrl}
+\t\t\tset bounds of window 1 to theBounds
+\t\tend tell
+\t\treturn "window"
+\tend if
+\treturn ""
+end run"""
+"""Written out rather than imported: the point of the assertion is that this
+exact text is what reaches osascript."""
+
+
+class Windowing:
+    """An adapter that reports whether it was asked for a window."""
+
+    def __init__(self, *, can: bool) -> None:
+        self.can = can
+        self.windowed: tuple[str, tuple[int, int, int, int]] | None = None
+        self.opened: list[str] = []
+
+    async def open_small(self, url: str, where: tuple[int, int, int, int]) -> bool:
+        self.windowed = (url, where)
+        return self.can
+
+    async def open_url(self, url: str) -> None:
+        self.opened.append(url)
+
+
+@pytest.mark.asyncio
+async def test_a_window_is_asked_of_the_browser_not_drawn_by_ev() -> None:
+    adapter = Windowing(can=True)
+    service = BrowserService(cast(OpenAdapter, adapter))
+
+    result = await service.open_url(
+        OpenUrlArgs.model_validate({"url": "https://github.com", "where": "window"})
+    )
+
+    assert adapter.windowed is not None
+    assert adapter.windowed[0] == "https://github.com/"
+    # The browser opened it, so `open(1)` was never needed.
+    assert adapter.opened == []
+    assert result.data["where"] == "window"
+
+
+@pytest.mark.asyncio
+async def test_a_browser_that_cannot_be_told_gets_a_plain_open() -> None:
+    """An unfamiliar browser has an unfamiliar dictionary, so the page still
+    opens -- as a tab, and the fallback says so rather than claiming a
+    window."""
+    adapter = Windowing(can=False)
+    service = BrowserService(cast(OpenAdapter, adapter))
+
+    result = await service.open_url(
+        OpenUrlArgs.model_validate({"url": "https://github.com", "where": "window"})
+    )
+
+    assert adapter.opened == ["https://github.com/"]
+    assert result.data["where"] == "tab"
+
+
+@pytest.mark.asyncio
+async def test_a_tab_never_asks_for_a_window() -> None:
+    adapter = Windowing(can=True)
+    service = BrowserService(cast(OpenAdapter, adapter))
+
+    await service.open_url(OpenUrlArgs.model_validate({"url": "https://github.com"}))
+
+    assert adapter.windowed is None
+    assert adapter.opened == ["https://github.com/"]
+
+
+@pytest.mark.asyncio
+async def test_the_window_script_is_exactly_this(fake_bin: FakeBin) -> None:
+    from ev.infrastructure.macos.applescript import AppleScriptClient
+
+    adapter = OpenAdapter(ProcessRunner(), AppleScriptClient(ProcessRunner()))
+
+    await adapter.open_small("https://github.com", (900, 60, 1420, 700))
+
+    argv = fake_bin.argv()
+    assert argv[1] == EXPECTED_WINDOW_SOURCE
+    # The URL and the bounds travel as arguments, never as source.
+    assert argv[3] == "https://github.com"
+    assert argv[-4:] == ["900", "60", "1420", "700"]
 
 
 class CollectingJournal:

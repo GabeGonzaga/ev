@@ -51,17 +51,36 @@ function keep() {
     @close="emit('close')"
   >
     <div class="strip">
-      <button
-        v-for="one in shortcuts.saved"
-        :key="one.id"
-        class="one"
-        type="button"
-        :title="`open ${one.url}`"
-        @click="run(`open ${one.url}`)"
-      >
-        {{ one.label }}
-        <span class="drop" title="forget it" @click.stop="shortcuts.forget(one.id)">×</span>
-      </button>
+      <span v-for="one in shortcuts.saved" :key="one.id" class="one">
+        <span class="named" :title="one.url">{{ one.label }}</span>
+        <!-- Two ways in, both of them the browser's. E.V. renders no page:
+             a window and a tab differ in the shape of somebody else's
+             window, not in who did the fetching. -->
+        <button
+          class="way"
+          type="button"
+          :title="`open ${one.url} in a small window`"
+          @click="run(`open ${one.url} in a window`)"
+        >
+          window
+        </button>
+        <button
+          class="way"
+          type="button"
+          :title="`open ${one.url} in a tab`"
+          @click="run(`open ${one.url}`)"
+        >
+          tab
+        </button>
+        <button
+          class="drop"
+          type="button"
+          title="forget it"
+          @click="shortcuts.forget(one.id)"
+        >
+          ×
+        </button>
+      </span>
       <p v-if="!shortcuts.saved.length" class="none">&gt; nothing saved yet</p>
     </div>
   </HudPane>
@@ -107,24 +126,43 @@ function keep() {
 .one {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   padding: 4px 8px;
   border: 1px solid var(--panel-border);
-  background: none;
   font-family: var(--mono);
   font-size: 11px;
   letter-spacing: 0.08em;
   color: var(--muted);
+}
+
+.named {
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+/* The two ways, said in words. Icons for "window" and "tab" would be two
+   rectangles differing by a few pixels, which is a puzzle rather than a
+   choice. */
+.way {
+  border: 0;
+  background: none;
+  font: inherit;
+  letter-spacing: 0.14em;
+  color: var(--muted);
   cursor: pointer;
 }
 
-.one:hover {
+.way:hover {
   color: var(--neon-soft);
-  border-color: rgba(63, 165, 246, 0.6);
+  text-shadow: var(--neon-glow-text);
 }
 
 .drop {
-  color: rgba(200, 224, 245, 0.35);
+  border: 0;
+  background: none;
+  font: inherit;
+  color: rgba(200, 224, 245, 0.3);
+  cursor: pointer;
 }
 
 .drop:hover {

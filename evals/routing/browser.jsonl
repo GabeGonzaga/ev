@@ -20,3 +20,5 @@
 {"id": "open-url-spoken-dot", "locale": "pt-PT", "utterance": "abre github ponto com", "tool": "browser.open_url", "arguments": {"url": "https://github.com"}}
 {"id": "open-url-spaced-dot", "locale": "en", "utterance": "open example . com/pricing", "tool": "browser.open_url", "arguments": {"url": "https://example.com/pricing"}}
 {"id": "open-url-spaced-dot", "locale": "pt-PT", "utterance": "abre example . com/pricing", "tool": "browser.open_url", "arguments": {"url": "https://example.com/pricing"}}
+{"id": "open-window", "locale": "en", "utterance": "open github.com in a window", "tool": "browser.open_url", "arguments": {"url": "https://github.com", "where": "window"}}
+{"id": "open-window", "locale": "pt-PT", "utterance": "abre o github.com numa janela", "tool": "browser.open_url", "arguments": {"url": "https://github.com", "where": "window"}}

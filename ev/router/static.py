@@ -74,6 +74,12 @@ def normalise(utterance: str) -> str:
     return prepare(utterance).casefold()
 
 
+def _url_window(groups: Mapping[str, str]) -> dict[str, object] | None:
+    """The same URL, in a window of its own."""
+    found = _url(groups)
+    return None if found is None else {**found, "where": "window"}
+
+
 def _url(groups: Mapping[str, str]) -> dict[str, object] | None:
     # "github dot com" and "github . com" are the same address as
     # "github.com". A URL has no spaces in it, so what is left after joining
@@ -361,6 +367,22 @@ def _note(groups: Mapping[str, str]) -> dict[str, object] | None:
 
 
 RULES: tuple[Rule, ...] = (
+    # A window of its own, said before the plain rule so "in a window" is not
+    # swallowed as part of the address.
+    _rule(
+        "browser.open_url",
+        rf"^(?:please\s+)?(?:open|go\s+to|browse\s+to|visit|pull\s+up)\s+"
+        rf"(?:the\s+)?(?:site\s+|website\s+|page\s+)?{_URL}"
+        rf"\s+in\s+(?:a\s+)?(?:small\s+|mini\s+)?window$",
+        _url_window,
+    ),
+    _rule(
+        "browser.open_url",
+        rf"^(?:por\s+favor\s+)?(?:abre|abrir|abra|vai\s+ao|vai\s+à|vai\s+a|"
+        rf"vai\s+para)\s+(?:o\s+|a\s+)?(?:site\s+|página\s+|pagina\s+)?{_URL}"
+        rf"\s+(?:n[ua]m?a?\s+)?(?:pequena\s+)?janela(?:\s+pequena)?$",
+        _url_window,
+    ),
     _rule(
         "browser.open_url",
         rf"^(?:please\s+)?(?:open|go\s+to|browse\s+to|visit|pull\s+up)\s+"
