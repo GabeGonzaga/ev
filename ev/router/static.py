@@ -410,6 +410,21 @@ RULES: tuple[Rule, ...] = (
         rf"(?:\s+(?P<after>{_SWITCH}))?$",
         _shuffle,
     ),
+    # "Cycle" is repeat's third position on its own -- said bare it means this
+    # song again, not the switch. It is a separate rule for exactly that
+    # reason: adding it to the verbs above would have made it a toggle.
+    _rule(
+        "music.mode",
+        r"^(?:please\s+)?cycle"
+        r"(?:\s+(?:this|the\s+current)\s+(?:song|track|one))?$",
+        lambda _groups: {"setting": "repeat", "state": "one"},
+    ),
+    _rule(
+        "music.mode",
+        r"^(?:por\s+favor\s+)?(?:põe\s+|poe\s+|coloca\s+|mete\s+)?"
+        r"(?:em\s+)?ciclo(?:\s+(?:esta|este)\s+(?:música|musica|faixa|tema))?$",
+        lambda _groups: {"setting": "repeat", "state": "one"},
+    ),
     _rule(
         "music.mode",
         rf"^(?:please\s+)?(?:turn\s+)?(?:(?P<before>{_SWITCH})\s+)?"
