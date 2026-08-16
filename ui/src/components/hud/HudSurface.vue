@@ -246,7 +246,8 @@ onBeforeUnmount(() => {
       :lit="lit"
       :voice="ev.voice"
       :level="ev.audioLevel"
-      :working="ev.working"
+      :working="ev.aside"
+      :tucked="ev.tucked"
       :badge="ev.badged"
     />
 

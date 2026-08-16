@@ -47,7 +47,7 @@ function keep() {
   <HudPane
     v-if="!adding"
     name="shortcuts"
-    :at="{ x: 34, y: 404, width: 300, height: 150 }"
+    :at="{ x: 60, y: 150, width: 520, height: 300 }"
     @close="emit('close')"
   >
     <div class="strip">

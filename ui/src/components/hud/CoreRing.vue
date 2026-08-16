@@ -24,13 +24,16 @@ const props = withDefaults(
     voice?: Voice;
     /// 0..1, raw. Smoothed here.
     level?: number;
-    /// Awake with something open on it: the core leaves the middle.
+    /// A wide window is open: the core leaves the middle for it.
     working?: boolean;
+    /// Something narrow is open: the core stays put and makes room by being
+    /// smaller, so windows can be dragged across the middle of the display.
+    tucked?: boolean;
     /// The camera has the display. The core shrinks into the corner rather
     /// than leaving: something of it is always visible.
     badge?: boolean;
   }>(),
-  { lit: 0, voice: "idle", level: 0, working: false, badge: false },
+  { lit: 0, voice: "idle", level: 0, working: false, tucked: false, badge: false },
 );
 
 const shell = ref<HTMLDivElement | null>(null);
@@ -295,7 +298,10 @@ const drift = computed(() => {
     // taking up a position.
     return "translate(34%, 33%) scale(0.34)";
   }
-  return props.working ? "translateX(26%) scale(1.6)" : "translateX(0) scale(1)";
+  if (props.working) return "translateX(26%) scale(1.6)";
+  // A little smaller, and not one pixel to either side.
+  if (props.tucked) return "translateX(0) scale(0.72)";
+  return "translateX(0) scale(1)";
 });
 </script>
 

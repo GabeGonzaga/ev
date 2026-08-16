@@ -33,6 +33,11 @@ export type Voice = "idle" | "listening" | "thinking" | "speaking";
 /// internet.
 export type Widget = "console" | "music" | "shortcuts" | "add";
 
+/// The wide ones. Only these push the core out of the middle: a window big
+/// enough to want the centre gets it, and everything else is small enough to
+/// sit beside a core that has simply made room.
+const WIDE: readonly Widget[] = ["shortcuts"];
+
 export interface Turn {
   id: number;
   who: "user" | "ev";
@@ -69,9 +74,19 @@ export const useAssistantState = defineStore("assistant", () => {
   /// the dock is where it is visible.
   const looking = ref(false);
 
-  /// Awake and something open on it. The core drifts to the right edge and
-  /// the middle belongs to the widgets.
+  /// Awake and something open on it.
   const working = computed(() => stage.value === "awake" && open.value.length > 0);
+
+  /// A wide window is up, so the core leaves the middle for it.
+  const aside = computed(
+    () => working.value && open.value.some((each) => WIDE.includes(each)),
+  );
+
+  /// Something narrow is up. The core stays where it is and only makes
+  /// itself smaller -- moving it to the edge for a 400px panel is a lot of
+  /// travel to free room nobody needed, and it leaves the middle of the
+  /// display as somewhere windows can be dragged through.
+  const tucked = computed(() => working.value && !aside.value);
 
   /// Whether the ring is on screen at all -- ambient replaces it with the orb,
   /// blank has nothing.
@@ -189,6 +204,8 @@ export const useAssistantState = defineStore("assistant", () => {
     audioLevel,
     error,
     working,
+    aside,
+    tucked,
     ringed,
     badged,
     watch: watch_,
