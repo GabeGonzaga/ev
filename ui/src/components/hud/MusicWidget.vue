@@ -74,6 +74,18 @@ const tag = computed(() => {
 
 const repeating = computed(() => playing.value?.repeat !== "off");
 
+/// Off, all, one, off -- the three positions a music app's repeat button
+/// walks, and the reason "cycle" exists as a word. Each is the sentence a
+/// person would say for it, so the button and the voice reach the same place
+/// by the same route.
+const ROUND: Record<string, { says: string; then: string }> = {
+  off: { says: "repeat on", then: "repeat everything" },
+  all: { says: "cycle", then: "repeat this track" },
+  one: { says: "repeat off", then: "stop repeating" },
+};
+
+const nextRepeat = computed(() => ROUND[playing.value?.repeat ?? "off"] ?? ROUND.off);
+
 // --- the lyrics ----------------------------------------------------------
 
 const NAME = "apple_music";
@@ -170,8 +182,8 @@ const words = computed(() => playing.value?.lyrics?.trim() ?? "");
           <button
             type="button"
             :class="{ on: repeating }"
-            :title="playing.repeat === 'one' ? 'repeating this track' : 'repeat'"
-            @click="tell('repeat')"
+            :title="nextRepeat.then"
+            @click="tell(nextRepeat.says)"
           >
             <svg viewBox="0 0 24 24">
               <path d="M4 12V9a3 3 0 0 1 3-3h13M20 12v3a3 3 0 0 1-3 3H4" />
