@@ -217,6 +217,7 @@ def build_registry(
     frames: Frames,
     vision: Vision,
     macros: Path | None = None,
+    artwork: Path | None = None,
 ) -> Registry:
     registry = Registry(
         policy=PermissionPolicy(ledger, applications=access),
@@ -251,7 +252,7 @@ def build_registry(
             ),
             applications,
         ),
-        *music_tools(MusicService(MusicAdapter(applescript), speaker)),
+        *music_tools(MusicService(MusicAdapter(applescript), speaker, artwork)),
         *notes_tools(NotesService(NotesAdapter(applescript), speaker)),
         *reminders_tools(RemindersService(RemindersAdapter(applescript), speaker)),
         *language_tools(LanguageService(generation)),
@@ -336,6 +337,9 @@ def build(
         frames=frames,
         vision=eyes,
         macros=macros_path(database.parent) if database is not None else None,
+        # Beside the journal, and overwritten: one cover at a time, and never
+        # in the repository.
+        artwork=(database.parent / "artwork.bin") if database is not None else None,
     )
 
     return Application(
@@ -926,21 +930,6 @@ async def serve(
             return await journal.search(query, limit=limit)
         return await journal.recent(limit=limit, before=before)
 
-    # The player widget asks what is on many times a second. That is a read,
-    # like history: it fills a view, so it goes straight to the adapter through
-    # its own stateless AppleScript client -- reporting Automation evidence to
-    # the same ledger as every other Apple Event -- rather than through the
-    # router and a confirmation for every poll.
-    music = MusicService(
-        MusicAdapter(
-            AppleScriptClient(ProcessRunner(), report=application.ledger.update)
-        ),
-        application.speaker,
-    )
-
-    async def now_playing() -> dict[str, object] | None:
-        return await music.now_playing()
-
     server = IpcServer(
         path=socket_path(database.parent),
         handle=handle,  # type: ignore[arg-type]
@@ -954,7 +943,6 @@ async def serve(
         # "Always" and "never", from whoever was asked.
         remember=application.access.remember,
         history=history,
-        now_playing=now_playing,
         on_close=application.aclose,
         turn_lock=turns,
     )
@@ -972,7 +960,6 @@ async def serve(
             state_dir=database.parent,
             handle=handle,  # type: ignore[arg-type]
             history=history,
-            now_playing=now_playing,
             transcribe=transcribe,
             look=look,
             remember=application.access.remember,

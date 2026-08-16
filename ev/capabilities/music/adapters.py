@@ -7,6 +7,7 @@ string and not a program.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Final
 
 from ev.infrastructure.macos.applescript import AppleScriptClient
@@ -240,32 +241,121 @@ on nowPlaying()
 end nowPlaying"""
 
 NOW_PLAYING: Final = """on run argv
-	if application "Music" is not running then return "stopped"
+	set artPath to item 1 of argv
+	set theArt to missing value
+	set outName to ""
+	set outArtist to ""
+	set outAlbum to ""
+	set outPos to "0"
+	set outLen to "0"
+	set outShuffle to "off"
+	set outRepeat to "off"
 	tell application "Music"
-		if player state is stopped then return "stopped"
-		set st to player state as text
-		try
-			set nm to name of current track
-			set ar to artist of current track
-			set al to album of current track
-			set dur to (duration of current track) as text
-			set pos to (player position) as text
-		on error
-			-- Playing or paused with no reachable track: the same nothing the
-			-- transport scripts report, so the reader agrees with them.
-			return "stopped"
-		end try
+		set outState to player state as text
+		if outState is not "stopped" then
+			try
+				set theTrack to current track
+				set outName to name of theTrack
+				set outArtist to artist of theTrack
+				set outAlbum to album of theTrack
+				set outPos to (player position as integer) as text
+				set outLen to (duration of theTrack as integer) as text
+				if shuffle enabled then set outShuffle to "on"
+				if song repeat is one then
+					set outRepeat to "one"
+				else if song repeat is all then
+					set outRepeat to "all"
+				end if
+				if artPath is not "" then
+					try
+						set theArt to raw data of artwork 1 of theTrack
+					end try
+				end if
+			end try
+		end if
 	end tell
-	set AppleScript's text item delimiters to tab
-	return {st, nm, ar, al, pos, dur} as text
-end run"""
-"""What is on right now, for the player widget. A read, so it never launches
-Music -- `application "Music" is running` is the one check that does not, and a
-stopped or closed player answers "stopped" rather than waking anything up.
+	set wroteArt to ""
+	if theArt is not missing value then
+		try
+			my writeArt(theArt, artPath)
+			set wroteArt to artPath
+		end try
+	end if
+	return outState & linefeed & outName & linefeed & outArtist & linefeed & \
+		outAlbum & linefeed & outPos & linefeed & outLen & linefeed & \
+		outShuffle & linefeed & outRepeat & linefeed & wroteArt
+end run
 
-Tab-joined because a linefeed, the delimiter the list scripts use, turns up in
-no track title but is cheaper to fear than to allow: six fields, one line, one
-split on the other side."""
+on writeArt(theData, thePath)
+	set outFile to open for access (POSIX file thePath) with write permission
+	try
+		set eof outFile to 0
+		write theData to outFile
+	end try
+	close access outFile
+end writeArt"""
+"""What is playing, and the cover, in one round trip.
+
+The file is written *outside* the `tell` block, through a handler called with
+`my`. `open for access` and `write` belong to AppleScript, not to Music, and
+sending them to Music is the failure that compiles perfectly and then says
+"Music got an error" at runtime -- the same shape as the `set text item
+delimiters` bug this project already shipped once.
+
+Reading is guarded rather than assumed. A track that is streaming, one Music
+can no longer reach, or a player that has just been asked to skip past the end
+of a queue all leave a current track that answers some questions and not
+others; what cannot be read stays empty rather than failing the whole read."""
+
+MODE: Final = """on run argv
+	set theSetting to item 1 of argv
+	set theState to item 2 of argv
+	tell application "Music"
+		if theSetting is "shuffle" then
+			set wanted to (theState is "on")
+			if theState is "toggle" then set wanted to not (shuffle enabled)
+			set shuffle enabled to wanted
+			if wanted then return "on"
+			return "off"
+		else if theSetting is "repeat" then
+			set wanted to theState
+			if wanted is "toggle" then
+				if song repeat is off then
+					set wanted to "all"
+				else
+					set wanted to "off"
+				end if
+			else if wanted is "on" then
+				set wanted to "all"
+			end if
+			if wanted is "one" then
+				set song repeat to one
+			else if wanted is "all" then
+				set song repeat to all
+			else
+				set song repeat to off
+			end if
+			return wanted
+		end if
+		return ""
+	end tell
+end run"""
+"""What was set, not what Music says afterwards.
+
+Reading a switch back immediately after writing it returns the old value:
+`set shuffle enabled to true` followed by `shuffle enabled` answers false, and
+answers true if a `delay 0.4` is put between them. The write lands, the read
+races it. So this returns the value it decided on, which is the same lesson as
+`name of current track` right after `play` -- measured here on Music 1.6.5,
+macOS 26.5.2, where every write was verified to take and every immediate read
+to lie.
+
+Reading *before* writing is fine, which is what makes `toggle` honest: the
+current state comes from Music rather than from something E.V. remembered, so
+a switch somebody flipped in the app is the one being flipped back.
+
+An unrecognised setting touches nothing and returns empty -- the read-only
+path `make applescript` runs."""
 
 VOLUME: Final = """on run argv
 	tell application "Music"
@@ -333,6 +423,22 @@ class MusicAdapter:
     async def control(self, action: str) -> str:
         return await self._applescript.run(CONTROL, action)
 
+    async def now_playing(self, artwork: Path | None) -> list[str]:
+        """Nine lines: state, name, artist, album, position, length, shuffle,
+        repeat, and where the cover was written -- or empty if there was none.
+        """
+        answer = await self._applescript.run(
+            NOW_PLAYING, str(artwork) if artwork else ""
+        )
+        lines = answer.split("\n")
+        # A short answer is a script that stopped early, not a track with
+        # missing fields; padding keeps the caller from indexing off the end.
+        return [*lines, *([""] * (9 - len(lines)))][:9]
+
+    async def mode(self, setting: str, state: str) -> str:
+        """Set shuffle or repeat, and answer with the position it is now in."""
+        return await self._applescript.run(MODE, setting, state)
+
     async def volume(self, level: int) -> str:
         return await self._applescript.run(VOLUME, str(level))
 
@@ -346,38 +452,3 @@ class MusicAdapter:
         """Music's own mute, so unmuting restores the level rather than
         inventing one."""
         return await self._applescript.run(MUTE, "true" if silent else "false")
-
-    async def now_playing(self) -> dict[str, object] | None:
-        """What Music is on, or None when nothing is.
-
-        A best-effort read for the player widget: if Music is closed, stopped,
-        or Automation is not granted, the script says "stopped" or the call
-        raises, and either way the answer is None -- a resting player, never an
-        error the person cannot act on.
-        """
-        answer = (await self._applescript.run(NOW_PLAYING)).strip()
-        if answer == "stopped":
-            return None
-
-        fields = answer.split("\t")
-        if len(fields) < 6:
-            return None
-
-        state, title, artist, album, position, duration = fields[:6]
-        return {
-            "state": state.strip(),
-            "title": title,
-            "artist": artist,
-            "album": album,
-            "position": _seconds(position),
-            "duration": _seconds(duration),
-        }
-
-
-def _seconds(value: str) -> int:
-    """Music answers position and duration as a real -- "213.0" -- and the
-    widget wants whole seconds. A value it cannot read is zero, not a crash."""
-    try:
-        return int(float(value))
-    except ValueError:
-        return 0

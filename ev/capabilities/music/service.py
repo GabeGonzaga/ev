@@ -9,11 +9,20 @@ the real list, never passed through freely" -- and a playlist called
 
 from __future__ import annotations
 
+from base64 import b64encode
 from collections.abc import Awaitable
+from pathlib import Path
 
 from ev.application.speech import Speaker
 from ev.capabilities.music.adapters import MusicAdapter
-from ev.capabilities.music.args import STEP, ControlArgs, PlayArgs, VolumeArgs
+from ev.capabilities.music.args import (
+    STEP,
+    ControlArgs,
+    ModeArgs,
+    NowPlayingArgs,
+    PlayArgs,
+    VolumeArgs,
+)
 from ev.domain.naming import closest
 from ev.domain.results import ToolErrorCode, ToolResult
 from ev.infrastructure.macos.applescript import AppleScriptError
@@ -21,6 +30,26 @@ from ev.infrastructure.macos.applescript import AppleScriptError
 PLAY = "music.play"
 CONTROL = "music.control"
 VOLUME = "music.volume"
+MODE = "music.mode"
+NOW_PLAYING = "music.now_playing"
+
+COVER_TYPES = {
+    b"\xff\xd8\xff": "image/jpeg",
+    b"\x89PNG": "image/png",
+}
+"""Sniffed from the bytes rather than taken from Music's own answer. The
+scripting dictionary reports a format constant that does not always match what
+`raw data` actually contains, and a JPEG announced as a PNG renders as
+nothing."""
+
+
+def _seconds(value: str) -> int:
+    """Music answers in whole seconds, or in nothing at all."""
+    try:
+        return max(0, int(value))
+    except ValueError:
+        return 0
+
 
 NOT_FOUND = "nothing in the library matches"
 """What the album and track scripts say when a name is not in the library.
@@ -37,6 +66,17 @@ SPOKEN = {
 """Action to phrase key. The key is looked up, never spoken: an earlier
 version returned it directly and Joana read "music.paused" out loud."""
 
+SWITCHED = {
+    ("shuffle", "on"): "music.shuffle_on",
+    ("shuffle", "off"): "music.shuffle_off",
+    ("repeat", "all"): "music.repeat_all",
+    ("repeat", "one"): "music.repeat_one",
+    ("repeat", "off"): "music.repeat_off",
+}
+"""Where each switch ended up, as a phrase key. Where it *ended up*, not what
+was asked for: "shuffle" alone is a button press, and the useful half of the
+answer is which way it went."""
+
 WITH_TRACK = {"resume", "next", "previous"}
 """The three where naming what is playing now is the useful part of the
 answer. Each has its own phrase, because "Skipped" and "Skipped to X" do not
@@ -44,9 +84,17 @@ compose by concatenation in every language -- pt-PT wants "para", not "to"."""
 
 
 class MusicService:
-    def __init__(self, adapter: MusicAdapter, speaker: Speaker | None = None) -> None:
+    def __init__(
+        self,
+        adapter: MusicAdapter,
+        speaker: Speaker | None = None,
+        artwork: Path | None = None,
+    ) -> None:
         self._adapter = adapter
         self._speaker = speaker or Speaker()
+        self._artwork = artwork
+        self._seen: str | None = None
+        self._cover_url: str | None = None
 
     async def play(self, args: PlayArgs) -> ToolResult:
         if args.kind == "playlist":
@@ -227,22 +275,6 @@ class MusicService:
             speech=self._speaker.say("music.playing", name=name),
         )
 
-    async def now_playing(self) -> dict[str, object] | None:
-        """What is playing, for the player widget to draw itself.
-
-        A status read rather than a routed tool, the way `history` is: it fills
-        a view and is asked many times a second, so it goes straight to the
-        adapter instead of through the router and a confirmation. Still one
-        door -- the AppleScript client -- and best-effort: None when nothing is
-        on, or when Music cannot be reached at all.
-        """
-        try:
-            return await self._adapter.now_playing()
-        except AppleScriptError:
-            # A player that cannot be read is a resting player here, not a
-            # failed turn: the widget shows nothing rather than an error.
-            return None
-
     async def control(self, args: ControlArgs) -> ToolResult:
         playing = await self._adapter.control(args.action)
 
@@ -254,6 +286,93 @@ class MusicService:
             CONTROL,
             data={"action": args.action, "track": playing},
             speech=self._speaker.say(key, track=playing),
+        )
+
+    async def now_playing(self, _args: NowPlayingArgs) -> ToolResult:
+        """What is playing, for a display to draw.
+
+        Changes nothing. It still goes through the same door and the same
+        application level as everything else that reaches into Music -- the
+        level governs whether E.V. may touch the application at all, and
+        reading it is touching it.
+        """
+        (
+            state,
+            name,
+            artist,
+            album,
+            at,
+            length,
+            shuffle,
+            repeating,
+            cover,
+        ) = await self._adapter.now_playing(self._artwork)
+
+        return ToolResult.success(
+            NOW_PLAYING,
+            data={
+                "state": state,
+                "track": name,
+                "artist": artist,
+                "album": album,
+                "at": _seconds(at),
+                "length": _seconds(length),
+                "shuffle": shuffle == "on",
+                "repeat": repeating,
+                "cover": self._cover(cover, name, album),
+            },
+            # Nothing is said out loud: this is a display reading itself, and
+            # a status line spoken every second is not an assistant.
+            speech=None,
+        )
+
+    def _cover(self, wrote: str, track: str, album: str) -> str | None:
+        """The cover as a data URL, re-read only when the record changes.
+
+        Artwork is a few hundred kilobytes and the display asks every second;
+        the file is only rewritten when Music has a different record open, and
+        the bytes are only turned into a string that often too.
+        """
+        if not wrote:
+            return None
+
+        seen = f"{album}\u0000{track}"
+        if seen == self._seen and self._cover_url is not None:
+            return self._cover_url
+
+        try:
+            raw = Path(wrote).read_bytes()
+        except OSError:
+            return None
+
+        kind = next(
+            (mime for magic, mime in COVER_TYPES.items() if raw.startswith(magic)),
+            None,
+        )
+        if kind is None:
+            return None
+
+        self._seen = seen
+        self._cover_url = f"data:{kind};base64,{b64encode(raw).decode('ascii')}"
+        return self._cover_url
+
+    async def mode(self, args: ModeArgs) -> ToolResult:
+        now = await self._adapter.mode(args.setting, args.state)
+
+        key = SWITCHED.get((args.setting, now))
+        if key is None:
+            # Music answered with a position that is not one of its three.
+            # Saying so beats reading an empty string out loud.
+            return ToolResult.failure(
+                MODE,
+                ToolErrorCode.ADAPTER_FAILED,
+                self._speaker.say("music.switch_failed", setting=args.setting),
+            )
+
+        return ToolResult.success(
+            MODE,
+            data={"setting": args.setting, "state": now},
+            speech=self._speaker.say(key),
         )
 
     async def volume(self, args: VolumeArgs) -> ToolResult:

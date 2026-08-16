@@ -16,6 +16,11 @@ export interface TurnResult {
   outcome: "ran" | "unsure" | "not_understood" | "confirm" | string;
   speech?: string | null;
   error?: string | null;
+  /// Whatever the tool returned. A reading tool puts its answer here --
+  /// `music.now_playing` its track and its cover -- and the payload already
+  /// carried it, so nothing in the protocol had to change to let a widget
+  /// draw one.
+  data?: Record<string, unknown>;
   // Present only when outcome is "confirm": the turn is parked, waiting.
   tool?: string;
   risk?: string;
@@ -53,7 +58,16 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
   if (answer.status === 401) {
     throw new Error("This page is not authorised. Reopen the link E.V. printed.");
   }
-  if (!answer.ok) throw new Error(await answer.text());
+  if (!answer.ok) {
+    // Only if it is ours. A static server, a proxy or a captive portal
+    // answers with an HTML page, and printing that into a terminal-styled log
+    // buries the one useful line under a document.
+    const body = await answer.text();
+    const ours = answer.headers.get("content-type")?.includes("json");
+    throw new Error(
+      ours ? body : `${answer.status} ${answer.statusText || "request failed"}`,
+    );
+  }
   return (await answer.json()) as T;
 }
 
@@ -119,31 +133,6 @@ export const setLocale = (locale: string | null) =>
   inTauri ? callTauri<void>("set_locale", { locale }) : Promise.resolve();
 
 export const canRecordHere = !inTauri;
-
-/// What Music is playing right now, for the player widget.
-///
-/// A read, not a tool: it drives a view, so it goes the same way `history` and
-/// `settings` do -- a direct command in the app, a GET on the web surface --
-/// rather than through the router. Still one door: on macOS it is an Apple
-/// Event to Music, gated exactly as the transport tools are. Null when nothing
-/// is playing, or when the read is not wired yet on this surface, so the widget
-/// shows a resting player rather than an error.
-export interface NowPlaying {
-  state: "playing" | "paused" | "stopped";
-  title: string;
-  artist: string;
-  album: string;
-  position: number;
-  duration: number;
-  // A data URL when the library has cover art to give; the widget draws its
-  // own tile when it does not, so this staying null is not a broken image.
-  artwork?: string | null;
-}
-
-export const nowPlaying = (): Promise<NowPlaying | null> =>
-  inTauri
-    ? callTauri<NowPlaying | null>("now_playing")
-    : http<NowPlaying | null>("/api/now-playing");
 
 /// Answering a question the core asked mid-turn. The page decides nothing on
 /// the user's behalf: this only carries what they clicked.

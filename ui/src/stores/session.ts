@@ -27,6 +27,10 @@ export const useSession = defineStore("session", () => {
   /// browser, where the name can be seen in the CLI but not changed here.
   const wake = ref<api.Wake | null>(null);
   const wakeTrouble = ref("");
+  /// Bumped each time the name is heard with nothing behind it. A count
+  /// rather than a flag: two calls in a row are two events, and a flag that
+  /// is already true says nothing the second time.
+  const woke = ref(0);
   const shortcutTrouble = ref<string | null>(null);
   // A question the core is waiting on. While this is set, a turn is parked on
   // the other side and nothing has run.
@@ -128,6 +132,7 @@ export const useSession = defineStore("session", () => {
       state.value = "listening";
       heard.value = null;
       said.value = [];
+      woke.value += 1;
     },
   );
 
@@ -138,6 +143,7 @@ export const useSession = defineStore("session", () => {
       state.value = "listening";
       heard.value = null;
       said.value = [];
+      woke.value += 1;
       trouble.value = null;
     },
     (result) => {
@@ -258,7 +264,7 @@ export const useSession = defineStore("session", () => {
 
   return {
     state, heard, said, trouble, entries, locale, question, search,
-    shortcut, shortcutTrouble, camera, listening, wake, wakeTrouble, name,
+    shortcut, shortcutTrouble, camera, listening, wake, wakeTrouble, name, woke,
     ask, speak, look, answer, refresh, choose, load, bind,
   };
 });

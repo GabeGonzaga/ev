@@ -11,6 +11,8 @@ So each script is run here on a path with no side effect:
 * album, track and playlist are asked for a name that cannot exist, so they
   fail in their own words after reaching the library
 * control is given an action matching no branch, so it only reads the player
+* the switch script is given a setting matching no branch, so shuffle and
+  repeat are left exactly as the user set them
 * step moves the volume by zero, so the arithmetic and the clamping run
 * the note is asked for a folder that cannot exist, and the reminder for a
   list that cannot exist, so both fail before they make anything
@@ -82,6 +84,9 @@ async def main() -> int:
     # exercises `my nowPlaying()`, which compiled perfectly while being sent
     # to Music -- "Can't continue nowPlaying", found by running it.
     await expect_value("control", adapter.control("noop"))
+    # Likewise: no branch matches, so neither switch is written and whatever
+    # the user has shuffle and repeat set to survives the check.
+    await expect_value("switches", adapter.mode("noop", "toggle"))
     await expect_value("volume step", adapter.step(0))
 
     print("running every notes script against Notes")

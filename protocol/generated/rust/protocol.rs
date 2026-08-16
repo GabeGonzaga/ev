@@ -371,9 +371,6 @@ impl AudioSubmit {
 #[doc = "      \"$ref\": \"#/$defs/HistoryQuery\""]
 #[doc = "    },"]
 #[doc = "    {"]
-#[doc = "      \"$ref\": \"#/$defs/NowPlayingQuery\""]
-#[doc = "    },"]
-#[doc = "    {"]
 #[doc = "      \"$ref\": \"#/$defs/PermissionReport\""]
 #[doc = "    },"]
 #[doc = "    {"]
@@ -386,7 +383,6 @@ impl AudioSubmit {
 #[doc = "      \"confirmation.respond\": \"#/$defs/ConfirmationRespond\","]
 #[doc = "      \"hello\": \"#/$defs/Hello\","]
 #[doc = "      \"history.query\": \"#/$defs/HistoryQuery\","]
-#[doc = "      \"now.playing\": \"#/$defs/NowPlayingQuery\","]
 #[doc = "      \"permission.report\": \"#/$defs/PermissionReport\","]
 #[doc = "      \"session.cancel\": \"#/$defs/SessionCancel\","]
 #[doc = "      \"utterance.submit\": \"#/$defs/UtteranceSubmit\","]
@@ -406,7 +402,6 @@ pub enum Command {
     VisionSubmit(VisionSubmit),
     ConfirmationRespond(ConfirmationRespond),
     HistoryQuery(HistoryQuery),
-    NowPlayingQuery(NowPlayingQuery),
     PermissionReport(PermissionReport),
     SessionCancel(SessionCancel),
 }
@@ -438,11 +433,6 @@ impl ::std::convert::From<ConfirmationRespond> for Command {
 impl ::std::convert::From<HistoryQuery> for Command {
     fn from(value: HistoryQuery) -> Self {
         Self::HistoryQuery(value)
-    }
-}
-impl ::std::convert::From<NowPlayingQuery> for Command {
-    fn from(value: NowPlayingQuery) -> Self {
-        Self::NowPlayingQuery(value)
     }
 }
 impl ::std::convert::From<PermissionReport> for Command {
@@ -689,7 +679,7 @@ impl ConfirmationRespond {
 #[doc = "    }"]
 #[doc = "  },"]
 #[doc = "  \"additionalProperties\": false,"]
-#[doc = "  \"x-ev-protocol-version\": \"1.8\""]
+#[doc = "  \"x-ev-protocol-version\": \"1.7\""]
 #[doc = "}"]
 #[doc = r" ```"]
 #[doc = r" </details>"]
@@ -1227,45 +1217,6 @@ impl JournalEntry {
         Default::default()
     }
 }
-#[doc = "What Music is on right now, for the player widget.\n\nA request, not an event: the widget asks as it draws, the same way it asks\nfor history. The answer arrives in the response payload as `now` -- an\nobject with `state`, `title`, `artist`, `album`, `position` and `duration`,\nor null when nothing is playing."]
-#[doc = r""]
-#[doc = r" <details><summary>JSON schema</summary>"]
-#[doc = r""]
-#[doc = r" ```json"]
-#[doc = "{"]
-#[doc = "  \"title\": \"NowPlayingQuery\","]
-#[doc = "  \"description\": \"What Music is on right now, for the player widget.\\n\\nA request, not an event: the widget asks as it draws, the same way it asks\\nfor history. The answer arrives in the response payload as `now` -- an\\nobject with `state`, `title`, `artist`, `album`, `position` and `duration`,\\nor null when nothing is playing.\","]
-#[doc = "  \"type\": \"object\","]
-#[doc = "  \"properties\": {"]
-#[doc = "    \"type\": {"]
-#[doc = "      \"title\": \"Type\","]
-#[doc = "      \"default\": \"now.playing\","]
-#[doc = "      \"type\": \"string\","]
-#[doc = "      \"const\": \"now.playing\""]
-#[doc = "    }"]
-#[doc = "  },"]
-#[doc = "  \"additionalProperties\": false"]
-#[doc = "}"]
-#[doc = r" ```"]
-#[doc = r" </details>"]
-#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug)]
-#[serde(deny_unknown_fields)]
-pub struct NowPlayingQuery {
-    #[serde(rename = "type", default = "defaults::now_playing_query_type")]
-    pub type_: ::std::string::String,
-}
-impl ::std::default::Default for NowPlayingQuery {
-    fn default() -> Self {
-        Self {
-            type_: defaults::now_playing_query_type(),
-        }
-    }
-}
-impl NowPlayingQuery {
-    pub fn builder() -> builder::NowPlayingQuery {
-        Default::default()
-    }
-}
 #[doc = "A capability macOS gates behind TCC."]
 #[doc = r""]
 #[doc = r" <details><summary>JSON schema</summary>"]
@@ -1553,9 +1504,6 @@ impl ::std::convert::TryFrom<::std::string::String> for PermissionState {
 #[doc = "          \"$ref\": \"#/$defs/HistoryQuery\""]
 #[doc = "        },"]
 #[doc = "        {"]
-#[doc = "          \"$ref\": \"#/$defs/NowPlayingQuery\""]
-#[doc = "        },"]
-#[doc = "        {"]
 #[doc = "          \"$ref\": \"#/$defs/PermissionReport\""]
 #[doc = "        },"]
 #[doc = "        {"]
@@ -1568,7 +1516,6 @@ impl ::std::convert::TryFrom<::std::string::String> for PermissionState {
 #[doc = "          \"confirmation.respond\": \"#/$defs/ConfirmationRespond\","]
 #[doc = "          \"hello\": \"#/$defs/Hello\","]
 #[doc = "          \"history.query\": \"#/$defs/HistoryQuery\","]
-#[doc = "          \"now.playing\": \"#/$defs/NowPlayingQuery\","]
 #[doc = "          \"permission.report\": \"#/$defs/PermissionReport\","]
 #[doc = "          \"session.cancel\": \"#/$defs/SessionCancel\","]
 #[doc = "          \"utterance.submit\": \"#/$defs/UtteranceSubmit\","]
@@ -3157,46 +3104,6 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    pub struct NowPlayingQuery {
-        type_: ::std::result::Result<::std::string::String, ::std::string::String>,
-    }
-    impl ::std::default::Default for NowPlayingQuery {
-        fn default() -> Self {
-            Self {
-                type_: Ok(super::defaults::now_playing_query_type()),
-            }
-        }
-    }
-    impl NowPlayingQuery {
-        pub fn type_<T>(mut self, value: T) -> Self
-        where
-            T: ::std::convert::TryInto<::std::string::String>,
-            T::Error: ::std::fmt::Display,
-        {
-            self.type_ = value
-                .try_into()
-                .map_err(|e| format!("error converting supplied value for type_: {e}"));
-            self
-        }
-    }
-    impl ::std::convert::TryFrom<NowPlayingQuery> for super::NowPlayingQuery {
-        type Error = super::error::ConversionError;
-        fn try_from(
-            value: NowPlayingQuery,
-        ) -> ::std::result::Result<Self, super::error::ConversionError> {
-            Ok(Self {
-                type_: value.type_?,
-            })
-        }
-    }
-    impl ::std::convert::From<super::NowPlayingQuery> for NowPlayingQuery {
-        fn from(value: super::NowPlayingQuery) -> Self {
-            Self {
-                type_: Ok(value.type_),
-            }
-        }
-    }
-    #[derive(Clone, Debug)]
     pub struct PermissionChanged {
         permission: ::std::result::Result<super::Permission, ::std::string::String>,
         state: ::std::result::Result<super::PermissionState, ::std::string::String>,
@@ -4051,9 +3958,6 @@ pub mod defaults {
     }
     pub(super) fn history_query_type() -> ::std::string::String {
         "history.query".to_string()
-    }
-    pub(super) fn now_playing_query_type() -> ::std::string::String {
-        "now.playing".to_string()
     }
     pub(super) fn permission_changed_type() -> ::std::string::String {
         "permission.changed".to_string()

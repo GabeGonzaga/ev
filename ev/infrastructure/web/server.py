@@ -51,9 +51,6 @@ given."""
 
 Transcriber = Callable[[Path, str], Awaitable[str]]
 History = Callable[[int, int | None, str | None], Awaitable[list[JournalEntry]]]
-NowPlaying = Callable[[], Awaitable[dict[str, object] | None]]
-"""What Music is on, for the player widget. A read that fills a view, so it is
-a GET and never a turn -- null when nothing is playing."""
 
 
 def _asking(request: ConfirmationRequest) -> dict[str, Any]:
@@ -130,7 +127,6 @@ class WebSurface:
         state_dir: Path,
         handle: Handler,
         history: History | None = None,
-        now_playing: NowPlaying | None = None,
         transcribe: Transcriber | None = None,
         look: Looker | None = None,
         remember: Callable[[str, AccessLevel], None] | None = None,
@@ -145,7 +141,6 @@ class WebSurface:
         # being asked.
         self._confirmation = confirmation
         self._history = history
-        self._now_playing = now_playing
         self._transcribe = transcribe
         self._look = look
         self._remember_level = remember
@@ -175,7 +170,6 @@ class WebSurface:
         app.router.add_post("/api/audio", self._audio_route)
         app.router.add_post("/api/vision", self._vision_route)
         app.router.add_get("/api/history", self._history_route)
-        app.router.add_get("/api/now-playing", self._now_playing_route)
 
         if self._assets is not None and self._assets.is_dir():
             app.router.add_get("/", self._index)
@@ -365,11 +359,3 @@ class WebSurface:
         return web.json_response(
             {"entries": [json.loads(entry.model_dump_json()) for entry in entries]}
         )
-
-    async def _now_playing_route(self, request: web.Request) -> web.StreamResponse:
-        # A daemon without the read answers "nothing playing" rather than an
-        # error: the widget draws a resting player either way, and a 503 would
-        # only fill its console with a fault it cannot act on.
-        if self._now_playing is None:
-            return web.json_response(None)
-        return web.json_response(await self._now_playing())

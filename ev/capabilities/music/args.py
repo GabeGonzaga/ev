@@ -38,6 +38,51 @@ class PlayArgs(BaseModel):
     )
 
 
+Setting = Literal["shuffle", "repeat"]
+"""The two switches on a music app that stay where you put them. Everything
+else in `Action` happens once; these are state."""
+
+Switch = Literal["on", "off", "toggle", "one"]
+"""What to do with one of them.
+
+`toggle` is the default because that is what a button is: pressing it once
+turns the thing on, pressing it again turns it off. Saying "shuffle" is
+pressing the button, and the current state is read from Music rather than
+remembered here -- E.V. is not the only thing that touches these.
+
+`one` is repeat's third position. Music's `song repeat` is off, all or one,
+and "repeat this song" is a thing people say.
+"""
+
+
+class ModeArgs(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    setting: Setting = Field(description="Which switch: shuffle or repeat.")
+
+    state: Switch = Field(
+        default="toggle",
+        description=(
+            "on, off, or toggle to flip it. Use 'one' with repeat to repeat "
+            "the current track rather than the whole queue."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _one_is_a_repeat_position(self) -> Self:
+        # Shuffling "one" is not a thing, and a model that asks for it has
+        # misunderstood the question rather than found a hidden feature.
+        if self.setting == "shuffle" and self.state == "one":
+            raise ValueError("'one' is a repeat position, not a shuffle state")
+        return self
+
+
+class NowPlayingArgs(BaseModel):
+    """Nothing to ask for. What is playing is what is playing."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
 class ControlArgs(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 

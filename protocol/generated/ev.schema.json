@@ -336,20 +336,6 @@
       "title": "JournalEntry",
       "type": "object"
     },
-    "NowPlayingQuery": {
-      "additionalProperties": false,
-      "description": "What Music is on right now, for the player widget.\n\nA request, not an event: the widget asks as it draws, the same way it asks\nfor history. The answer arrives in the response payload as `now` -- an\nobject with `state`, `title`, `artist`, `album`, `position` and `duration`,\nor null when nothing is playing.",
-      "properties": {
-        "type": {
-          "const": "now.playing",
-          "default": "now.playing",
-          "title": "Type",
-          "type": "string"
-        }
-      },
-      "title": "NowPlayingQuery",
-      "type": "object"
-    },
     "Permission": {
       "description": "A capability macOS gates behind TCC.",
       "enum": [
@@ -430,7 +416,6 @@
               "confirmation.respond": "#/$defs/ConfirmationRespond",
               "hello": "#/$defs/Hello",
               "history.query": "#/$defs/HistoryQuery",
-              "now.playing": "#/$defs/NowPlayingQuery",
               "permission.report": "#/$defs/PermissionReport",
               "session.cancel": "#/$defs/SessionCancel",
               "utterance.submit": "#/$defs/UtteranceSubmit",
@@ -456,9 +441,6 @@
             },
             {
               "$ref": "#/$defs/HistoryQuery"
-            },
-            {
-              "$ref": "#/$defs/NowPlayingQuery"
             },
             {
               "$ref": "#/$defs/PermissionReport"
@@ -855,5 +837,5 @@
   },
   "title": "Envelope",
   "type": "object",
-  "x-ev-protocol-version": "1.8"
+  "x-ev-protocol-version": "1.7"
 }

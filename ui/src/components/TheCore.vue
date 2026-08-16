@@ -3,12 +3,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { State } from "../stores/session";
 import { useAppearance } from "../stores/appearance";
 
-/// `energy` is E.V.'s voice, 0..1, when something can measure it. Nothing can
-/// yet -- the TTS audio is played by the signed host, not by this window, so
-/// the amplitude is on the wrong side of the socket. Until the host emits a
-/// level event, the sphere synthesises one from its state (below), and a real
-/// number passed here takes over the moment one exists.
-const props = defineProps<{ state: State; ambient?: boolean; energy?: number | null }>();
+const props = defineProps<{ state: State; ambient?: boolean }>();
 const appearance = useAppearance();
 const canvas = ref<HTMLCanvasElement | null>(null);
 
@@ -98,18 +93,6 @@ function scheme(): Scheme {
       ? { deep: mix(live, [40, 0, 0], 0.2), near: mix(live, [255, 255, 255], 0.5), glow: live, comp: "lighter" }
       : { deep: mix(live, [255, 255, 255], 0.55), near: live, glow: live, comp: "source-over" };
   }
-  // Idle on the working display is dim steel, not azure: in the reference the
-  // resting ring reads almost charcoal with a pale highlight, and the colour
-  // arriving is what says "awake". The ambient screen keeps its full blue --
-  // there the orb is the only thing on, and dim would read as broken.
-  if (props.state === "idle" && !props.ambient && isDark) {
-    return {
-      deep: mix(accent, [72, 88, 108], 0.55),
-      near: mix(ringTop, [170, 186, 202], 0.55),
-      glow: mix(accent, [40, 56, 76], 0.5),
-      comp: "lighter",
-    };
-  }
   return isDark
     ? { deep: accent, near: mix(ringTop, [255, 255, 255], 0.35), glow: accent, comp: "lighter" }
     : { deep: mix(accent, [255, 255, 255], 0.55), near: mix(accent, [8, 40, 96], 0.15), glow: accent, comp: "source-over" };
@@ -121,29 +104,6 @@ function scheme(): Scheme {
 function rate(): number {
   const pace = props.state === "idle" ? 1 : props.state === "speaking" ? 0.6 : 0.34;
   return 0.24 / pace;
-}
-
-/// How awake the sphere looks, 0..1. Idle rests; thinking and listening lift
-/// it a little; speaking drives it with a syllable-like envelope so the orb
-/// reads as moving to E.V.'s voice rather than merely glowing. Two sines at
-/// unrelated periods give the cadence of speech instead of a hum. A real
-/// amplitude, when the host ever emits one, arrives as `energy` and wins.
-function loudness(t: number): number {
-  if (props.energy != null) return Math.max(0, Math.min(1, props.energy));
-  if (reduce) return props.state === "idle" ? 0.15 : 0.4;
-  switch (props.state) {
-    case "speaking": {
-      const a = 0.5 + 0.5 * Math.sin(t * 6.1);
-      const b = 0.5 + 0.5 * Math.sin(t * 13.7 + 1.3);
-      return 0.35 + 0.6 * Math.pow(a * 0.6 + b * 0.4, 1.5);
-    }
-    case "listening":
-      return 0.46 + 0.12 * Math.sin(t * 3.1);
-    case "thinking":
-      return 0.4 + 0.1 * Math.sin(t * 2.2);
-    default:
-      return 0.16 + 0.06 * Math.sin(t * 1.2);
-  }
 }
 
 let ctx: CanvasRenderingContext2D | null = null;
@@ -205,13 +165,7 @@ function draw(now: number) {
   }
   const t = now / 1000;
   const { deep, near, glow, comp } = scheme();
-  // The voice, measured or synthesised, drives both how bright the sphere
-  // burns and how far it swells. The crown around it stays put: an outer
-  // frame that pulsed with every syllable would read as a wobble, not a HUD.
-  const loud = loudness(t);
-  const breathe = reduce ? 0.9 : 0.66 + 0.4 * loud;
-  const swell = reduce ? 1 : 1 + 0.06 * (loud - 0.3);
-  const r = R * swell;
+  const breathe = reduce ? 0.9 : 0.78 + 0.22 * (0.5 + 0.5 * Math.sin(t * 1.7));
   const cosY = Math.cos(yaw);
   const sinY = Math.sin(yaw);
   const cosT = Math.cos(TILT);
@@ -222,11 +176,9 @@ function draw(now: number) {
   ctx.globalCompositeOperation = comp;
 
   // A soft halo the sphere sits inside. Quieter in daylight, where it is a
-  // tint on white rather than light in the dark -- and quieter still while
-  // idle on the working display, where the reference ring barely glows.
-  const idleDim = props.state === "idle" && !props.ambient;
-  const haloA = isDark ? (idleDim ? 0.09 : 0.16) : 0.08;
-  const halo = ctx.createRadialGradient(cx, cy, r * 0.15, cx, cy, r * 1.55);
+  // tint on white rather than light in the dark.
+  const haloA = isDark ? 0.16 : 0.08;
+  const halo = ctx.createRadialGradient(cx, cy, R * 0.15, cx, cy, R * 1.55);
   halo.addColorStop(0, rgba(glow, haloA * breathe));
   halo.addColorStop(0.55, rgba(glow, haloA * 0.4 * breathe));
   halo.addColorStop(1, rgba(glow, 0));
@@ -240,8 +192,8 @@ function draw(now: number) {
     ctx.beginPath();
     for (let s = 0; s <= 64; s++) {
       const p = orbitPoint((s / 64) * Math.PI * 2, e, cosY, sinY);
-      const px = cx + p.x * r * 1.16;
-      const py = cy + p.y * r * 1.16;
+      const px = cx + p.x * R * 1.16;
+      const py = cy + p.y * R * 1.16;
       s === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
     }
     ctx.stroke();
@@ -261,7 +213,7 @@ function draw(now: number) {
     const size = (0.5 + 1.7 * dn) * (0.85 + 0.15 * tw);
     ctx.fillStyle = rgba(mix(deep, near, dn), a);
     ctx.beginPath();
-    ctx.arc(cx + x2 * r, cy + y1 * r, size, 0, Math.PI * 2);
+    ctx.arc(cx + x2 * R, cy + y1 * R, size, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -277,8 +229,8 @@ function draw(now: number) {
         started = false;
         continue;
       }
-      const px = cx + p.x * r * 1.16;
-      const py = cy + p.y * r * 1.16;
+      const px = cx + p.x * R * 1.16;
+      const py = cy + p.y * R * 1.16;
       started ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
       started = true;
     }
@@ -293,7 +245,7 @@ function draw(now: number) {
     const spark = isDark ? mix(deep, [220, 240, 255], dn) : mix(deep, near, dn);
     ctx.fillStyle = rgba(spark, 0.55 + 0.45 * dn);
     ctx.beginPath();
-    ctx.arc(cx + p.x * r * 1.16, cy + p.y * r * 1.16, 1.6 + 1.8 * dn, 0, Math.PI * 2);
+    ctx.arc(cx + p.x * R * 1.16, cy + p.y * R * 1.16, 1.6 + 1.8 * dn, 0, Math.PI * 2);
     ctx.fill();
     ctx.shadowBlur = 0;
   }

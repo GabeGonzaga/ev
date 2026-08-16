@@ -54,6 +54,16 @@ class ToolSpec[ArgsT: BaseModel]:
     application checked is the one that would actually be touched.
     """
 
+    journalled: bool = True
+    """Whether a call is written to the journal.
+
+    True for everything that does something. False only for a pure read that a
+    display polls -- the journal is the record of what E.V. did to this
+    machine, and an entry a second saying it looked at the music player buries
+    the entries that matter (ADR 0038). Policy, permissions and confirmation
+    are unaffected: a read still goes through the same door.
+    """
+
     assurance: Assurance = Assurance.NONE
     """A floor the tool sets for itself, whatever the application's level says.
     For what cannot be undone, or what speaks to other people in the user's
@@ -265,6 +275,9 @@ class Registry:
         arguments: dict[str, object],
         result: ToolResult,
     ) -> ToolResult:
+        if not spec.journalled:
+            return result
+
         # A journal failure is not swallowed: an action that ran without being
         # recorded is a defect, and the flush semantics are step 5's decision.
         await self._journal.record(

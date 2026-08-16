@@ -55,16 +55,17 @@ onBeforeUnmount(() => clearInterval(timer));
   font-size: clamp(40px, 8vmin, 66px);
   letter-spacing: 0.05em;
   font-variant-numeric: tabular-nums;
-  color: var(--text);
+  /* One of the two things on this display allowed to be pure white. */
+  color: #fff;
   text-shadow: 0 0 24px rgba(var(--accent), 0.32);
 }
 
 .date {
   margin: 4px 0 0;
   font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.3em;
+  font-size: var(--label);
+  letter-spacing: var(--label-track);
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--text-dim);
 }
 </style>

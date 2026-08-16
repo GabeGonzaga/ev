@@ -4,8 +4,21 @@ from __future__ import annotations
 
 from typing import Any
 
-from ev.capabilities.music.args import ControlArgs, PlayArgs, VolumeArgs
-from ev.capabilities.music.service import CONTROL, PLAY, VOLUME, MusicService
+from ev.capabilities.music.args import (
+    ControlArgs,
+    ModeArgs,
+    NowPlayingArgs,
+    PlayArgs,
+    VolumeArgs,
+)
+from ev.capabilities.music.service import (
+    CONTROL,
+    MODE,
+    NOW_PLAYING,
+    PLAY,
+    VOLUME,
+    MusicService,
+)
 from ev.domain.permissions import Permission
 from ev.domain.risk import RiskLevel
 from ev.registry import ToolSpec
@@ -42,6 +55,39 @@ def music_tools(service: MusicService) -> tuple[ToolSpec[Any], ...]:
             permissions=APPLE_EVENTS,
             # Always this one, so the level set for it governs every call.
             application=lambda _args: "Music",
+        ),
+        ToolSpec(
+            name=MODE,
+            description=(
+                "Turn shuffle or repeat on or off. Left alone, the state flips "
+                "-- saying 'shuffle' is pressing the button. Repeat also takes "
+                "'one' for repeating the current track."
+            ),
+            args=ModeArgs,
+            risk=RiskLevel.SENSITIVE,
+            handler=service.mode,
+            permissions=APPLE_EVENTS,
+            # Always this one, so the level set for it governs every call.
+            application=lambda _args: "Music",
+        ),
+        ToolSpec(
+            name=NOW_PLAYING,
+            description=(
+                "What Music is playing right now: track, artist, album, how "
+                "far in, and whether shuffle and repeat are on. Changes "
+                "nothing."
+            ),
+            args=NowPlayingArgs,
+            risk=RiskLevel.SAFE,
+            handler=service.now_playing,
+            permissions=APPLE_EVENTS,
+            # Same application, same level: reading Music is still reaching
+            # into Music, and the level governs whether E.V. may.
+            application=lambda _args: "Music",
+            # A display asks this every second while it is open. The journal
+            # records what E.V. did to the machine, and this did nothing --
+            # see docs/adr/0038.
+            journalled=False,
         ),
         ToolSpec(
             name=VOLUME,
