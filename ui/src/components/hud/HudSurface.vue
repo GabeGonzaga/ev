@@ -20,14 +20,17 @@ import { useAudioLevel } from "../../composables/useAudioLevel";
 import { useFrame } from "../../composables/useFrame";
 import { useTelemetry } from "../../composables/useTelemetry";
 import { SLEEP_MS, WAKE_MS, useAssistantState } from "../../stores/assistant";
+import { useWorkspace } from "../../stores/workspace";
 import HudBeam from "./HudBeam.vue";
 import ConversationPanel from "./ConversationPanel.vue";
+import HudPane from "./HudPane.vue";
 import HudChrome from "./HudChrome.vue";
 import HudGrid from "./HudGrid.vue";
 import VoiceOrb from "./VoiceOrb.vue";
 import { useConversation } from "../../composables/useConversation";
 
 const ev = useAssistantState();
+const workspace = useWorkspace();
 
 // Wired here rather than in the chrome: the chrome takes what it draws as
 // props, so it can be mounted on its own with numbers made up on the spot.
@@ -154,8 +157,10 @@ function arriving(index: number): Record<string, string> {
   const at = clamp((progress.value - (FIRST_PANEL + index * STAGGER)) / PANEL_FADE);
   return {
     opacity: String(at),
-    // From 0.98, so it settles into place rather than growing into it.
-    transform: `scale(${0.98 + at * 0.02})`,
+    // From 0.98, so it settles into place rather than growing into it. Left
+    // off entirely once it has arrived: a transform, even `scale(1)`, makes
+    // its element the containing block for anything fixed inside it.
+    ...(at < 1 ? { transform: `scale(${0.98 + at * 0.02})` } : {}),
   };
 }
 
@@ -179,11 +184,22 @@ function onKey(event: KeyboardEvent) {
     return;
   }
 
-  if (event.key === "Escape" && ev.state !== "IDLE") ev.sleep();
-  else ev.touch();
+  if (event.key === "Escape") {
+    // Nearest thing first: put the windows back before putting the display
+    // away. An arrangement that has gone wrong has one key that undoes it.
+    if (workspace.floating.length) workspace.dockAll();
+    else if (ev.state !== "IDLE") ev.sleep();
+    return;
+  }
+
+  ev.touch();
 }
 
 onMounted(() => {
+  // A remembered name that is no longer a panel is how the old view once put
+  // a widget on the floor and lost the way back to it.
+  workspace.reconcile(SLOTS.map((slot) => slot.name));
+
   // The stylesheet still carries the old view's flat grid; this says which
   // display is on screen so the two backgrounds never stack.
   document.documentElement.classList.add("hud-on");
@@ -220,7 +236,6 @@ onBeforeUnmount(() => {
           v-for="(slot, index) in SLOTS"
           :key="slot.name"
           class="cell"
-          :class="{ slot: !slot.built }"
           :style="{ gridArea: slot.area, ...arriving(index) }"
         >
           <ConversationPanel
@@ -230,10 +245,15 @@ onBeforeUnmount(() => {
             :error="conversation.error.value"
             @revealed="conversation.settle"
           />
-          <span v-else class="slot-name">{{ slot.name }}</span>
+          <!-- Not built yet, and drawn in the same frame as the ones that
+               are. A placeholder in different clothes teaches the wrong
+               shape of the display. -->
+          <HudPane v-else :name="slot.name" subtitle="panel" empty waiting="not built yet" />
         </div>
-        <div class="slot dock" :style="{ gridArea: 'dock', ...arriving(SLOTS.length) }">
-          <span class="slot-name">dock</span>
+        <!-- The quick action dock lands here in step 5. Left as room rather
+             than as a panel: it is a row of buttons, not a framed thing. -->
+        <div class="dock" :style="{ gridArea: 'dock', ...arriving(SLOTS.length) }">
+          <span>dock</span>
         </div>
       </div>
     </section>
@@ -357,24 +377,15 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
-/* Not built yet: a dashed outline with the name of what belongs in it, so
-   the geometry can be judged before anything has been built into it. */
-.slot {
-  place-items: center;
-  border: 1px dashed rgba(120, 180, 255, 0.16);
-}
-
-.slot-name {
+.dock {
+  display: grid;
+  place-items: end center;
+  padding-bottom: 6px;
   font-family: var(--mono);
   font-size: var(--label);
   letter-spacing: var(--label-track);
   text-transform: uppercase;
-  color: var(--text-dim);
-}
-
-.dock {
-  border-style: none;
-  align-self: end;
+  color: rgba(120, 180, 255, 0.22);
 }
 
 /* Asked not to animate: the beam never renders, the journey is not run, and

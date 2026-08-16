@@ -154,33 +154,6 @@
   --accent-lit: 255, 210, 230;
 }
 
-/* --- dark, which is the one it was drawn for --------------------------- */
-
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --page: var(--bg-hud);
-  /* Cyan at the top of the ring, electric blue at the bottom. */
-  --ring-top: 143, 203, 255;
-  --panel: var(--panel-fill);
-  --panel-edge: var(--panel-border);
-  --panel-lit: rgba(var(--accent), 0.75);
-  --field: rgba(4, 10, 18, 0.55);
-  --text: #dce7f5;
-  --display: 300;
-  --muted: rgba(220, 231, 245, 0.62);
-  --faint: var(--text-dim);
-  --line: var(--hud-line);
-  /* What accent-coloured *text* uses. In the dark that is the lit end of the
-     palette; in daylight the same colour would be invisible, so it is the
-     accent taken towards ink instead. */
-  --ink: rgb(var(--accent-lit));
-  --glow: var(--neon-glow);
-  --grid: var(--hud-line);
-  --ok: #46d39a;
-  --bad: var(--error);
-  --live: #ff4d4d;
-}
-
 /* --- light, which is the same display in daylight ---------------------- */
 
 :root[data-theme="light"] {
@@ -204,6 +177,46 @@
   --ok: #0f8a5f;
   --bad: #c92a2a;
   --live: #e03131;
+}
+
+/* --- dark, which is the one it was drawn for ---------------------------
+ *
+ * Placed after the light theme, and claimed by the HUD as well as by the
+ * setting. The instrument has one palette by construction -- near-black navy,
+ * one neon, pure white spent only on the clock and the wordmark -- and there
+ * is no light version of it. On a Mac set to light, `--text` used to resolve
+ * to navy while the panels stayed dark, which is dark text on a dark panel:
+ * the transcript was there and unreadable.
+ *
+ * So while the HUD is on screen it takes this palette whatever the system
+ * says. If a daylight instrument is ever wanted it needs designing, not
+ * inheriting.
+ */
+
+:root[data-theme="dark"],
+:root.hud-on {
+  color-scheme: dark;
+  --page: var(--bg-hud);
+  /* Cyan at the top of the ring, electric blue at the bottom. */
+  --ring-top: 143, 203, 255;
+  --panel: var(--panel-fill);
+  --panel-edge: var(--panel-border);
+  --panel-lit: rgba(var(--accent), 0.75);
+  --field: rgba(4, 10, 18, 0.55);
+  --text: #dce7f5;
+  --display: 300;
+  --muted: rgba(220, 231, 245, 0.62);
+  --faint: var(--text-dim);
+  --line: var(--hud-line);
+  /* What accent-coloured *text* uses. In the dark that is the lit end of the
+     palette; in daylight the same colour would be invisible, so it is the
+     accent taken towards ink instead. */
+  --ink: rgb(var(--accent-lit));
+  --glow: var(--neon-glow);
+  --grid: var(--hud-line);
+  --ok: #46d39a;
+  --bad: var(--error);
+  --live: #ff4d4d;
 }
 
 body {
