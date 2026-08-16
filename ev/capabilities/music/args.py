@@ -77,6 +77,12 @@ class ModeArgs(BaseModel):
         return self
 
 
+class NowPlayingArgs(BaseModel):
+    """Nothing to ask for. What is playing is what is playing."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
 class ControlArgs(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 

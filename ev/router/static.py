@@ -410,6 +410,20 @@ RULES: tuple[Rule, ...] = (
         rf"(?:\s+(?P<after>{_SWITCH}))?$",
         _repeat,
     ),
+    # A read, and the one the display asks for every second. Tier 1 or it
+    # would be a model call per poll.
+    _rule(
+        "music.now_playing",
+        r"^(?:what(?:'s|s| is)\s+)?(?:playing|now\s+playing|current\s+track)"
+        r"(?:\s+(?:now|right\s+now))?\??$",
+        lambda _groups: {},
+    ),
+    _rule(
+        "music.now_playing",
+        r"^(?:o\s+que\s+(?:é\s+que\s+)?(?:está|esta)\s+a\s+tocar|"
+        r"a\s+tocar\s+agora|que\s+(?:música|musica)\s+(?:é\s+esta|e\s+esta))\??$",
+        lambda _groups: {},
+    ),
     _rule(
         "music.volume",
         r"^(?:set\s+)?(?:the\s+)?volume\s+(?:to\s+)?(?P<level>\d{1,3})$",

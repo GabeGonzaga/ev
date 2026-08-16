@@ -217,6 +217,7 @@ def build_registry(
     frames: Frames,
     vision: Vision,
     macros: Path | None = None,
+    artwork: Path | None = None,
 ) -> Registry:
     registry = Registry(
         policy=PermissionPolicy(ledger, applications=access),
@@ -251,7 +252,7 @@ def build_registry(
             ),
             applications,
         ),
-        *music_tools(MusicService(MusicAdapter(applescript), speaker)),
+        *music_tools(MusicService(MusicAdapter(applescript), speaker, artwork)),
         *notes_tools(NotesService(NotesAdapter(applescript), speaker)),
         *reminders_tools(RemindersService(RemindersAdapter(applescript), speaker)),
         *language_tools(LanguageService(generation)),
@@ -336,6 +337,9 @@ def build(
         frames=frames,
         vision=eyes,
         macros=macros_path(database.parent) if database is not None else None,
+        # Beside the journal, and overwritten: one cover at a time, and never
+        # in the repository.
+        artwork=(database.parent / "artwork.bin") if database is not None else None,
     )
 
     return Application(

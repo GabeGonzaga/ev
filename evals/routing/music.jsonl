@@ -56,3 +56,7 @@
 {"id": "repeat-one", "locale": "pt-PT", "utterance": "repete esta música", "tool": "music.mode", "arguments": {"setting": "repeat", "state": "one"}}
 {"id": "skip", "locale": "en", "utterance": "skip", "tool": "music.control", "arguments": {"action": "next"}}
 {"id": "skip", "locale": "pt-PT", "utterance": "salta", "tool": "music.control", "arguments": {"action": "next"}}
+{"id": "now-playing", "locale": "en", "utterance": "now playing", "tool": "music.now_playing", "arguments": {}}
+{"id": "now-playing", "locale": "pt-PT", "utterance": "o que está a tocar", "tool": "music.now_playing", "arguments": {}}
+{"id": "now-playing-question", "locale": "en", "utterance": "what's playing", "tool": "music.now_playing", "arguments": {}}
+{"id": "now-playing-question", "locale": "pt-PT", "utterance": "a tocar agora", "tool": "music.now_playing", "arguments": {}}

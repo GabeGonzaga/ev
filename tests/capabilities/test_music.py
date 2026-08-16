@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import cast
 
 import pytest
@@ -9,7 +10,13 @@ from ev.application.applications import ApplicationLedger
 from ev.application.policy import PermissionLedger, PermissionPolicy
 from ev.application.speech import Speaker
 from ev.capabilities.music.adapters import MusicAdapter
-from ev.capabilities.music.args import ControlArgs, ModeArgs, PlayArgs, VolumeArgs
+from ev.capabilities.music.args import (
+    ControlArgs,
+    ModeArgs,
+    NowPlayingArgs,
+    PlayArgs,
+    VolumeArgs,
+)
 from ev.capabilities.music.service import MusicService
 from ev.capabilities.music.tools import music_tools
 from ev.domain.access import AccessLevel
@@ -402,6 +409,125 @@ async def test_each_control_reaches_music_as_itself(fake_bin: FakeBin) -> None:
         assert fake_bin.argv()[-1] == action
 
 
+# --- what is playing ------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_the_cover_is_written_where_it_was_told_to(
+    fake_bin: FakeBin, tmp_path: Path
+) -> None:
+    adapter = MusicAdapter(AppleScriptClient(ProcessRunner()))
+    where = tmp_path / "artwork.bin"
+
+    await adapter.now_playing(where)
+
+    assert fake_bin.argv()[-1] == str(where)
+
+
+@pytest.mark.asyncio
+async def test_a_short_answer_is_padded_rather_than_indexed_off_the_end(
+    fake_bin: FakeBin, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A script that stopped early must not become an IndexError upstream."""
+    monkeypatch.setenv("EV_FAKE_STDOUT", "paused\nAirplane Mode")
+
+    lines = await MusicAdapter(AppleScriptClient(ProcessRunner())).now_playing(None)
+
+    assert len(lines) == 9
+    assert lines[0] == "paused"
+    assert lines[8] == ""
+
+
+class Reading:
+    """A player that answers a read, and counts how often it was asked."""
+
+    def __init__(self, cover: str) -> None:
+        self.asked = 0
+        self.cover = cover
+
+    async def now_playing(self, artwork: Path | None) -> list[str]:
+        self.asked += 1
+        return [
+            "playing",
+            "Nikes",
+            "Frank Ocean",
+            "Blonde",
+            "62",
+            "314",
+            "on",
+            "all",
+            self.cover,
+        ]
+
+
+@pytest.mark.asyncio
+async def test_what_is_playing_is_reported_for_a_display_to_draw(
+    tmp_path: Path,
+) -> None:
+    cover = tmp_path / "artwork.bin"
+    cover.write_bytes(b"\xff\xd8\xff" + b"jpeg bytes")
+    service = MusicService(cast(MusicAdapter, Reading(str(cover))))
+
+    result = await service.now_playing(NowPlayingArgs())
+
+    assert result.ok
+    # Nothing is said out loud: a status line spoken every second is not an
+    # assistant.
+    assert result.speech is None
+    assert result.data["track"] == "Nikes"
+    assert result.data["artist"] == "Frank Ocean"
+    assert result.data["at"] == 62
+    assert result.data["length"] == 314
+    assert result.data["shuffle"] is True
+    assert result.data["repeat"] == "all"
+    assert str(result.data["cover"]).startswith("data:image/jpeg;base64,")
+
+
+@pytest.mark.asyncio
+async def test_the_cover_is_read_once_per_record(tmp_path: Path) -> None:
+    """Artwork is a few hundred kilobytes and the display asks every second."""
+    cover = tmp_path / "artwork.bin"
+    cover.write_bytes(b"\x89PNG" + b"png bytes")
+    service = MusicService(cast(MusicAdapter, Reading(str(cover))))
+
+    first = await service.now_playing(NowPlayingArgs())
+    cover.unlink()  # gone: a second read of the file would fail
+    again = await service.now_playing(NowPlayingArgs())
+
+    assert again.data["cover"] == first.data["cover"]
+    assert str(first.data["cover"]).startswith("data:image/png;base64,")
+
+
+@pytest.mark.asyncio
+async def test_something_that_is_not_an_image_is_not_offered_as_one(
+    tmp_path: Path,
+) -> None:
+    cover = tmp_path / "artwork.bin"
+    cover.write_bytes(b"not an image at all")
+    service = MusicService(cast(MusicAdapter, Reading(str(cover))))
+
+    result = await service.now_playing(NowPlayingArgs())
+
+    assert result.data["cover"] is None
+
+
+def test_reading_the_player_is_not_written_to_the_journal() -> None:
+    """ADR 0038. Everything else about the call is unchanged."""
+    service = MusicService(MusicAdapter(AppleScriptClient(ProcessRunner())))
+    specs = {spec.name: spec for spec in music_tools(service)}
+
+    reading = specs["music.now_playing"]
+    assert reading.journalled is False
+    assert reading.risk is RiskLevel.SAFE
+    # Still the same door: same permission, same application, same level.
+    assert reading.permissions == frozenset({Permission.APPLE_EVENTS})
+    assert reading.application is not None
+
+    for name, spec in specs.items():
+        if name != "music.now_playing":
+            assert spec.journalled is True
+
+
 # --- shuffle and repeat ---------------------------------------------------
 
 
@@ -510,11 +636,15 @@ def test_the_controls_declare_apple_events_too() -> None:
         "music.play",
         "music.control",
         "music.mode",
+        "music.now_playing",
         "music.volume",
     }
-    for spec in specs.values():
+    for name, spec in specs.items():
         assert spec.permissions == frozenset({Permission.APPLE_EVENTS})
-        assert spec.risk is RiskLevel.SENSITIVE
+        # Reading what is playing changes nothing, so it is safe -- and it is
+        # gated by the application's level rather than by its risk.
+        reads = name == "music.now_playing"
+        assert spec.risk is (RiskLevel.SAFE if reads else RiskLevel.SENSITIVE)
 
 
 # --- the name that was not an album ---------------------------------------

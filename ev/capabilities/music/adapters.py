@@ -7,6 +7,7 @@ string and not a program.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Final
 
 from ev.infrastructure.macos.applescript import AppleScriptClient
@@ -239,6 +240,73 @@ on nowPlaying()
 	end tell
 end nowPlaying"""
 
+NOW_PLAYING: Final = """on run argv
+	set artPath to item 1 of argv
+	set theArt to missing value
+	set outName to ""
+	set outArtist to ""
+	set outAlbum to ""
+	set outPos to "0"
+	set outLen to "0"
+	set outShuffle to "off"
+	set outRepeat to "off"
+	tell application "Music"
+		set outState to player state as text
+		if outState is not "stopped" then
+			try
+				set theTrack to current track
+				set outName to name of theTrack
+				set outArtist to artist of theTrack
+				set outAlbum to album of theTrack
+				set outPos to (player position as integer) as text
+				set outLen to (duration of theTrack as integer) as text
+				if shuffle enabled then set outShuffle to "on"
+				if song repeat is one then
+					set outRepeat to "one"
+				else if song repeat is all then
+					set outRepeat to "all"
+				end if
+				if artPath is not "" then
+					try
+						set theArt to raw data of artwork 1 of theTrack
+					end try
+				end if
+			end try
+		end if
+	end tell
+	set wroteArt to ""
+	if theArt is not missing value then
+		try
+			my writeArt(theArt, artPath)
+			set wroteArt to artPath
+		end try
+	end if
+	return outState & linefeed & outName & linefeed & outArtist & linefeed & \
+		outAlbum & linefeed & outPos & linefeed & outLen & linefeed & \
+		outShuffle & linefeed & outRepeat & linefeed & wroteArt
+end run
+
+on writeArt(theData, thePath)
+	set outFile to open for access (POSIX file thePath) with write permission
+	try
+		set eof outFile to 0
+		write theData to outFile
+	end try
+	close access outFile
+end writeArt"""
+"""What is playing, and the cover, in one round trip.
+
+The file is written *outside* the `tell` block, through a handler called with
+`my`. `open for access` and `write` belong to AppleScript, not to Music, and
+sending them to Music is the failure that compiles perfectly and then says
+"Music got an error" at runtime -- the same shape as the `set text item
+delimiters` bug this project already shipped once.
+
+Reading is guarded rather than assumed. A track that is streaming, one Music
+can no longer reach, or a player that has just been asked to skip past the end
+of a queue all leave a current track that answers some questions and not
+others; what cannot be read stays empty rather than failing the whole read."""
+
 MODE: Final = """on run argv
 	set theSetting to item 1 of argv
 	set theState to item 2 of argv
@@ -354,6 +422,18 @@ class MusicAdapter:
 
     async def control(self, action: str) -> str:
         return await self._applescript.run(CONTROL, action)
+
+    async def now_playing(self, artwork: Path | None) -> list[str]:
+        """Nine lines: state, name, artist, album, position, length, shuffle,
+        repeat, and where the cover was written -- or empty if there was none.
+        """
+        answer = await self._applescript.run(
+            NOW_PLAYING, str(artwork) if artwork else ""
+        )
+        lines = answer.split("\n")
+        # A short answer is a script that stopped early, not a track with
+        # missing fields; padding keeps the caller from indexing off the end.
+        return [*lines, *([""] * (9 - len(lines)))][:9]
 
     async def mode(self, setting: str, state: str) -> str:
         """Set shuffle or repeat, and answer with the position it is now in."""
