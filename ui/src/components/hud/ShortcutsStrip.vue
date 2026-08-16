@@ -23,7 +23,7 @@ const emit = defineEmits<{ close: []; done: [] }>();
 const ev = useAssistantState();
 const shortcuts = useShortcuts();
 const label = ref("");
-const says = ref("");
+const link = ref("");
 
 async function run(text: string) {
   ev.say("user", text);
@@ -36,9 +36,9 @@ async function run(text: string) {
 }
 
 function keep() {
-  shortcuts.add(label.value, says.value);
+  shortcuts.add(label.value, link.value);
   label.value = "";
-  says.value = "";
+  link.value = "";
   emit("done");
 }
 </script>
@@ -56,8 +56,8 @@ function keep() {
         :key="one.id"
         class="one"
         type="button"
-        :title="one.says"
-        @click="run(one.says)"
+        :title="`open ${one.url}`"
+        @click="run(`open ${one.url}`)"
       >
         {{ one.label }}
         <span class="drop" title="forget it" @click.stop="shortcuts.forget(one.id)">×</span>
@@ -81,12 +81,13 @@ function keep() {
         <input v-model="label" spellcheck="false" autocomplete="off" placeholder="github" />
       </label>
       <label>
-        <span>says</span>
+        <span>link</span>
         <input
-          v-model="says"
+          v-model="link"
           spellcheck="false"
           autocomplete="off"
-          placeholder="open github.com"
+          inputmode="url"
+          placeholder="github.com"
         />
       </label>
       <button class="keep" type="submit">[ save ]</button>
