@@ -1,38 +1,36 @@
-// What E.V. is doing, and what the display should therefore look like.
+// What the display is showing, and what E.V. is doing.
 //
-// One store for the whole HUD. The surface, the orb, the chrome and every
-// panel read the same state out of here, because a display whose parts each
-// keep their own idea of what is happening will eventually show two of them
-// at once.
+// Two axes, deliberately separate. The **stage** is where the interface is:
+// blank, idle, waking, awake, ambient. The **voice** is what E.V. is doing
+// inside whatever stage that is: listening, thinking, speaking. They are not
+// the same question -- E.V. can be listening on the awake ring or on the
+// ambient orb, and the display should answer both without one state having to
+// enumerate the other.
 //
-// Nothing here talks to the core. The wake word, the transcript and the audio
-// level are all stubs -- see `triggerWake` -- and the seam is deliberately
-// narrow so that replacing them is one function each.
+// Working is not stored. A display is working when it is awake and something
+// is open on it, which is a fact about the widgets rather than a fifth thing
+// to keep in sync with them.
+//
+// Nothing here talks to the core yet. The wake word is a stub -- see
+// `triggerWake` -- and the seam is narrow on purpose.
 
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 
-/// IDLE      waiting to be called; the clock and the orb, nothing else
-/// WAKING    the ~900ms reveal; the beam is crossing the screen
-/// ACTIVE    the HUD is up and nothing is being said
-/// LISTENING taking an utterance
-/// THINKING  routing it
-/// SPEAKING  answering
-export type AssistantState =
-  | "IDLE"
-  | "WAKING"
-  | "ACTIVE"
-  | "LISTENING"
-  | "THINKING"
-  | "SPEAKING";
+/// blank   the grid and nothing else; the empty stage
+/// idle    the thin white ring, arcs turning, waiting to be called
+/// waking  the sweep, once, ~700-900ms
+/// awake   the neon ring, crown and dock: "I'm listening"
+/// ambient the plasma orb and the clock; a bedside presence
+export type Stage = "blank" | "idle" | "waking" | "awake" | "ambient";
 
-export type PanelName =
-  | "conversation"
-  | "camera"
-  | "media"
-  | "web"
-  | "headlines"
-  | "chart";
+/// What E.V. is doing, which the core drives and the ring reflects.
+export type Voice = "idle" | "listening" | "thinking" | "speaking";
+
+/// The things that can be open on the display. Deliberately short: the spec
+/// forbids news and market widgets, because both would mean fetching from the
+/// internet.
+export type Widget = "console" | "music" | "shortcuts";
 
 export interface Turn {
   id: number;
@@ -42,107 +40,110 @@ export interface Turn {
   streaming?: boolean;
 }
 
-/// How long the reveal takes, and how long undoing it takes. Undoing is
-/// faster: leaving a screen should never feel like a ceremony.
-export const WAKE_MS = 900;
-export const SLEEP_MS = 500;
+/// The sweep, and undoing it. Undoing is faster: leaving a screen should
+/// never feel like a ceremony.
+export const WAKE_MS = 820;
+export const SLEEP_MS = 480;
 
-/// Back to IDLE after a minute and a half of nothing. Long enough to read an
-/// answer and think about it, short enough that a room left alone goes dark.
+/// How long the core takes to drift to the edge and back.
+export const DRIFT_MS = 500;
+
+/// Back to idle after a minute and a half of nothing. Long enough to read an
+/// answer and think about it, short enough that a room left alone goes quiet.
 export const IDLE_AFTER_MS = 90_000;
 
 export const useAssistantState = defineStore("assistant", () => {
-  const state = ref<AssistantState>("IDLE");
+  const stage = ref<Stage>("idle");
+  const voice = ref<Voice>("idle");
+  const open = ref<Widget[]>([]);
   const transcript = ref<Turn[]>([]);
-  /// 0..1, smoothed by whoever writes it. The orb reads this and nothing else.
+  /// 0..1, raw. The ring and the orb smooth it themselves.
   const audioLevel = ref(0);
   const error = ref<string | null>(null);
-  const activePanels = ref<PanelName[]>([
-    "conversation",
-    "camera",
-    "media",
-    "web",
-    "headlines",
-    "chart",
-  ]);
 
-  /// Awake covers every state that is not the clock: the HUD is on screen and
-  /// the chrome is drawn. WAKING is included because the beam is revealing it.
-  const awake = computed(() => state.value !== "IDLE");
-  /// Busy means a turn is in flight, and a turn in flight is not idle no
-  /// matter how long since the last key was pressed.
-  const busy = computed(() =>
-    ["LISTENING", "THINKING", "SPEAKING"].includes(state.value),
+  /// Awake and something open on it. The core drifts to the right edge and
+  /// the middle belongs to the widgets.
+  const working = computed(() => stage.value === "awake" && open.value.length > 0);
+
+  /// Whether the ring is on screen at all -- ambient replaces it with the orb,
+  /// blank has nothing.
+  const ringed = computed(() =>
+    ["idle", "waking", "awake"].includes(stage.value),
   );
+
+  /// A turn is in flight. Not idle however long since the last key.
+  const busy = computed(() => voice.value !== "idle");
 
   let waking = 0;
   let idling = 0;
 
-  /// Something happened, so the idle countdown starts again. Called by the
-  /// surface on any input and by every transition below.
+  /// Something happened, so the countdown back to idle starts again.
   function touch() {
     window.clearTimeout(idling);
-    if (state.value === "IDLE") return;
+    if (stage.value !== "awake") return;
     idling = window.setTimeout(() => {
-      // A turn that is still running is not an idle screen.
-      if (busy.value) return touch();
-      sleep();
+      // A turn still running is not an idle screen, and neither is a display
+      // with something open on it.
+      if (busy.value || open.value.length) return touch();
+      rest();
     }, IDLE_AFTER_MS);
   }
 
-  /// The wake word, stubbed. Bound to the spacebar by the surface until the
-  /// core's own wake loop is wired to it -- the core already hears the name;
-  /// this store is not yet listening to the core.
+  /// The name, or the hotkey. Stubbed until the core's own wake loop reaches
+  /// this store -- the core already hears the name; this does not yet listen
+  /// to the core.
   function triggerWake() {
-    if (state.value !== "IDLE") return;
+    if (stage.value === "waking" || stage.value === "awake") return;
     error.value = null;
-    state.value = "WAKING";
+    stage.value = "waking";
     window.clearTimeout(waking);
     waking = window.setTimeout(() => {
-      state.value = "ACTIVE";
+      stage.value = "awake";
       touch();
     }, WAKE_MS);
   }
 
-  function sleep() {
+  /// Back to the thin white ring. The glow fades out rather than cutting.
+  function rest() {
     window.clearTimeout(waking);
     window.clearTimeout(idling);
-    state.value = "IDLE";
+    stage.value = "idle";
+    voice.value = "idle";
     audioLevel.value = 0;
   }
 
-  /// The three working states, and the way back to ACTIVE. Separate functions
-  /// rather than one setter: a state machine whose transitions are all
-  /// `state = x` is not a state machine, it is a variable.
-  function listen() {
-    if (!awake.value) return;
-    state.value = "LISTENING";
+  /// The bedside presence: orb and clock, nothing else.
+  function sleep() {
+    window.clearTimeout(waking);
+    window.clearTimeout(idling);
+    stage.value = "ambient";
+    open.value = [];
+  }
+
+  /// The clean screen: the grid on its own.
+  function clear() {
+    stage.value = stage.value === "blank" ? "idle" : "blank";
+    open.value = [];
+  }
+
+  function show(widget: Widget) {
+    if (stage.value !== "awake") triggerWake();
+    if (!open.value.includes(widget)) open.value = [...open.value, widget];
     touch();
   }
 
-  function think() {
-    if (!awake.value) return;
-    state.value = "THINKING";
+  function hide(widget: Widget) {
+    open.value = open.value.filter((each) => each !== widget);
     touch();
   }
 
-  function speak() {
-    if (!awake.value) return;
-    state.value = "SPEAKING";
-    touch();
+  function toggle(widget: Widget) {
+    if (open.value.includes(widget)) hide(widget);
+    else show(widget);
   }
 
-  function settle() {
-    if (!awake.value) return;
-    state.value = "ACTIVE";
-    touch();
-  }
-
-  function togglePanel(name: PanelName) {
-    activePanels.value = activePanels.value.includes(name)
-      ? activePanels.value.filter((panel) => panel !== name)
-      : [...activePanels.value, name];
-    touch();
+  function isOpen(widget: Widget): boolean {
+    return open.value.includes(widget);
   }
 
   function say(who: Turn["who"], text: string, streaming = false): Turn {
@@ -153,20 +154,23 @@ export const useAssistantState = defineStore("assistant", () => {
   }
 
   return {
-    state,
+    stage,
+    voice,
+    open,
     transcript,
     audioLevel,
     error,
-    activePanels,
-    awake,
+    working,
+    ringed,
     busy,
     triggerWake,
+    rest,
     sleep,
-    listen,
-    think,
-    speak,
-    settle,
-    togglePanel,
+    clear,
+    show,
+    hide,
+    toggle,
+    isOpen,
     say,
     touch,
   };

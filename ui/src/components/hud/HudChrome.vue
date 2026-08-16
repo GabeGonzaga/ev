@@ -1,13 +1,15 @@
 <script setup lang="ts">
-// The furniture: rulers, brackets, a notch, and a line of numbers.
+// The furniture: an edge scale, a notch, corner brackets, and two short
+// readings tucked into the bottom corners.
 //
 // None of it does anything, and that is the point. An instrument is legible
 // partly because of the marks around what it is measuring -- the scale on a
 // rangefinder, the frame on a viewfinder -- and a screen with only content on
-// it reads as a web page. This is the frame.
+// it reads as a web page. This is the frame, and on the blank stage it is the
+// only thing there, so it has to look intentional on its own.
 //
-// Nothing in here is interactive and nothing in here should ever be: it sits
-// over the whole display, so it declines the pointer entirely.
+// Nothing here is interactive and nothing here should ever be: it sits over
+// the whole display, so it declines the pointer entirely.
 
 import { computed } from "vue";
 import { asUptime, type Telemetry } from "../../composables/useTelemetry";
@@ -15,39 +17,37 @@ import { asUptime, type Telemetry } from "../../composables/useTelemetry";
 const props = withDefaults(
   defineProps<{
     telemetry: Telemetry | null;
-    pending: boolean;
-    error: string | null;
-    /// How much of the frame the beam has uncovered, 0..1. The same number
-    /// the grid takes, so the two cannot come up at different rates.
-    reveal?: number;
+    pending?: boolean;
+    error?: string | null;
+    /// How much of the frame the sweep has painted in, 0..1 -- the same
+    /// number the grid takes, so the two cannot come up at different rates.
+    painted?: number;
   }>(),
-  { reveal: 1 },
+  { painted: 1, pending: false, error: null },
 );
 
-/// Dense, uppercase, and dull. Nobody reads this; they check that it is
-/// moving, and they read it only on the day something is wrong.
-const strip = computed(() => {
-  const found = props.telemetry;
-  if (!found) return "";
-  return [
-    `UP ${asUptime(found.uptime)}`,
-    `MODEL ${found.model}`,
-    `RTT ${found.latency}MS`,
-    `MIC ${found.mic}`,
-    `LINK ${found.connection}`,
-  ]
-    .join("  //  ")
-    .toUpperCase();
+/// Bottom left: what E.V. is running on. Bottom right: how it is doing.
+/// Short, because nobody reads these -- they glance to see that they are
+/// still moving, and read them only on the day something is wrong.
+const left = computed(() => {
+  if (props.error) return "CORE UNREACHABLE";
+  if (!props.telemetry) return "";
+  return `EV · ${props.telemetry.model}`.toUpperCase();
+});
+
+const right = computed(() => {
+  if (props.error) return props.error.toUpperCase();
+  if (!props.telemetry) return "";
+  return `${asUptime(props.telemetry.uptime)} · ${props.telemetry.latency}MS`;
 });
 </script>
 
 <template>
-  <div class="chrome" :style="{ '--reveal': reveal }" aria-hidden="true">
-    <!-- Rangefinder scales down the left edge and across the top. Gradients
-         rather than several hundred elements: the browser draws these as one
-         paint each, and nothing here ever changes. -->
-    <div class="ruler left" />
-    <div class="ruler top" />
+  <div class="chrome" :style="{ '--painted': painted }" aria-hidden="true">
+    <!-- A rangefinder scale down the left edge. Gradients rather than several
+         hundred elements: the browser draws these as one paint, and nothing
+         here ever changes. -->
+    <div class="ruler" />
 
     <!-- The notch: steps down, across and back up. It marks the middle of the
          top edge, and that is its whole job. -->
@@ -65,14 +65,8 @@ const strip = computed(() => {
     <span class="corner bl" />
     <span class="corner br" />
 
-    <!-- The bottom edge. Loading and failure are printed here rather than
-         hidden: an instrument that goes quiet when its telemetry breaks is
-         worse than one that says so. -->
-    <p class="telemetry" :class="{ failed: error }">
-      <template v-if="error">TELEMETRY UNAVAILABLE // {{ error }}</template>
-      <template v-else-if="pending">&gt; awaiting telemetry<span class="caret" /></template>
-      <template v-else>{{ strip }}</template>
-    </p>
+    <p class="reading at-left" :class="{ failed: error }">{{ left }}</p>
+    <p class="reading at-right" :class="{ failed: error }">{{ right }}</p>
   </div>
 </template>
 
@@ -83,79 +77,43 @@ const strip = computed(() => {
   pointer-events: none;
   z-index: 2;
   font-family: var(--mono);
-  /* The ramp leaves the screen as the reveal completes, or the telemetry
-     strip spends the rest of the session behind the tail of it. */
   -webkit-mask-image: linear-gradient(
     to bottom,
-    #000 calc(var(--reveal) * (100% + 60px) - 60px),
-    transparent calc(var(--reveal) * (100% + 60px))
+    #000 calc(var(--painted) * (100% + 60px) - 60px),
+    transparent calc(var(--painted) * (100% + 60px))
   );
   mask-image: linear-gradient(
     to bottom,
-    #000 calc(var(--reveal) * (100% + 60px) - 60px),
-    transparent calc(var(--reveal) * (100% + 60px))
+    #000 calc(var(--painted) * (100% + 60px) - 60px),
+    transparent calc(var(--painted) * (100% + 60px))
   );
 }
 
-/* Every tick 12px, every fifth one longer and brighter -- two gradients
-   stacked, the long one drawn over the short one. */
+/* Every tick 12px, every fifth longer and brighter -- two gradients stacked,
+   the long one drawn over the short one. */
 .ruler {
   position: absolute;
-  opacity: 0.9;
-}
-
-.ruler.left {
   top: 0;
   bottom: 0;
   left: 0;
   width: 14px;
   background-image:
+    repeating-linear-gradient(to bottom, var(--neon-dim) 0 1px, transparent 1px 60px),
     repeating-linear-gradient(
       to bottom,
-      var(--neon-dim) 0 1px,
-      transparent 1px 60px
-    ),
-    repeating-linear-gradient(to bottom, var(--hud-line) 0 1px, transparent 1px 12px);
+      rgba(200, 224, 245, 0.22) 0 1px,
+      transparent 1px 12px
+    );
   background-size: 13px 100%, 6px 100%;
   background-repeat: no-repeat, no-repeat;
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 12%, #000 88%, transparent);
-  mask-image: linear-gradient(to bottom, transparent, #000 12%, #000 88%, transparent);
-}
-
-.ruler.top {
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 14px;
-  background-image:
-    repeating-linear-gradient(to right, var(--neon-dim) 0 1px, transparent 1px 60px),
-    repeating-linear-gradient(to right, var(--hud-line) 0 1px, transparent 1px 12px);
-  background-size: 100% 13px, 100% 6px;
-  background-repeat: no-repeat, no-repeat;
-  /* Fades at both ends, and steps aside in the middle so the notch has the
-     top edge to itself. */
   -webkit-mask-image: linear-gradient(
-    to right,
+    to bottom,
     transparent,
-    #000 12%,
-    #000 calc(50% - 130px),
-    transparent calc(50% - 118px),
-    transparent calc(50% + 118px),
-    #000 calc(50% + 130px),
-    #000 88%,
+    #000 14%,
+    #000 86%,
     transparent
   );
-  mask-image: linear-gradient(
-    to right,
-    transparent,
-    #000 12%,
-    #000 calc(50% - 130px),
-    transparent calc(50% - 118px),
-    transparent calc(50% + 118px),
-    #000 calc(50% + 130px),
-    #000 88%,
-    transparent
-  );
+  mask-image: linear-gradient(to bottom, transparent, #000 14%, #000 86%, transparent);
 }
 
 .notch {
@@ -202,24 +160,28 @@ const strip = computed(() => {
   border-right-width: 1px;
 }
 
-.telemetry {
+/* Tucked in, small and dim. Two short readings rather than one dense strip:
+   a line of telemetry across the whole bottom edge is a status bar, and this
+   display does not have one. */
+.reading {
   position: absolute;
-  /* Clear of the corner brackets at both ends, which is why it starts at 36
-     rather than at the padding. */
-  left: 36px;
-  right: 36px;
-  bottom: 11px;
+  bottom: 12px;
   margin: 0;
   font-size: var(--telemetry);
-  letter-spacing: 0.14em;
+  letter-spacing: 0.16em;
   color: var(--text-dim);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.telemetry.failed {
+.at-left {
+  left: 36px;
+}
+
+.at-right {
+  right: 36px;
+}
+
+.reading.failed {
   color: var(--error);
 }
-
 </style>

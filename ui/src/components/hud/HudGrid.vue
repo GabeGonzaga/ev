@@ -1,38 +1,36 @@
 <script setup lang="ts">
-// The floor the HUD stands on: a grid that recedes.
+// The checkered grid the whole display stands on.
 //
-// Two planes rather than one. Flat, it is graph paper; tilted only, it is a
-// racing game. Together -- a faint flat mesh across the whole screen with a
-// tilted one running away from the bottom edge -- it reads as depth without
-// anybody having to notice why.
+// The same pattern in every state -- one hue, one cell size, one line weight.
+// Only its intensity changes, and that is the point: the sweep can appear to
+// *paint* it in because the pattern is already there at a tenth of its
+// brightness, waiting. Two different grids fading into each other would be a
+// cross-dissolve, which reads as a slide change rather than as light moving
+// across a surface.
 //
-// CSS gradients, not SVG and not canvas: this never changes except during the
-// reveal, so it should cost nothing to keep on screen.
+// Brightest under the middle and gone before the edges, by a radial mask
+// rather than an overlay, so nothing drawn on top of it is dimmed by it.
+//
+// CSS gradients: this never changes except in intensity, so it should cost
+// nothing to keep on screen.
 
 withDefaults(
   defineProps<{
-    /// How much of the grid has been revealed, 0..1, top to bottom. The scan
-    /// beam drives this during WAKING; at rest it is 1 and the mask is a
-    /// no-op. It is a mask rather than an opacity so the beam can appear to
-    /// uncover the mesh rather than turn it up.
-    reveal?: number;
-    /// True only while the beam is crossing. The band that flashes under it
-    /// would otherwise sit at the bottom edge of a finished screen, lit, for
-    /// no reason.
-    sweeping?: boolean;
+    /// 0 for the idle wash, 1 for the awake grid. The sweep drives it.
+    lit?: number;
+    /// How much has been painted in, top to bottom, 0..1. At rest it is 1 and
+    /// the mask is a no-op. A mask rather than an opacity, so the band
+    /// uncovers the pattern instead of turning it up.
+    painted?: number;
   }>(),
-  { reveal: 1, sweeping: false },
+  { lit: 0, painted: 1 },
 );
 </script>
 
 <template>
-  <div class="mesh" :style="{ '--reveal': reveal }" aria-hidden="true">
-    <div class="flat" />
-    <div class="floor" />
-
-    <!-- The squares the beam is passing over right now, brighter, in a band
-         that follows it down and leaves them settled behind it. -->
-    <div v-if="sweeping" class="flash" />
+  <div class="mesh" :style="{ '--lit': lit, '--painted': painted }" aria-hidden="true">
+    <div class="squares idle" />
+    <div class="squares awake" />
   </div>
 </template>
 
@@ -42,75 +40,60 @@ withDefaults(
   inset: 0;
   overflow: hidden;
   pointer-events: none;
-  /* Everything above the beam is drawn; everything below it is not yet. The
-     soft edge is the beam's own trail catching the mesh as it passes. */
-  /* The soft edge runs off the bottom as the reveal completes: measured
-     against 100% + its own width, a finished screen has no ramp on it. */
+  /* Everything above the band is drawn; below it, not yet. The soft edge is
+     the band catching the pattern as it passes. Measured against 100% plus
+     the ramp's own width, so a finished screen has no ramp left on it. */
   -webkit-mask-image: linear-gradient(
     to bottom,
-    #000 calc(var(--reveal) * (100% + 90px) - 90px),
-    transparent calc(var(--reveal) * (100% + 90px))
+    #000 calc(var(--painted) * (100% + 90px) - 90px),
+    transparent calc(var(--painted) * (100% + 90px))
   );
   mask-image: linear-gradient(
     to bottom,
-    #000 calc(var(--reveal) * (100% + 90px) - 90px),
-    transparent calc(var(--reveal) * (100% + 90px))
+    #000 calc(var(--painted) * (100% + 90px) - 90px),
+    transparent calc(var(--painted) * (100% + 90px))
   );
 }
 
-.flat,
-.floor,
-.flash {
+.squares {
   position: absolute;
-  background-image:
-    repeating-linear-gradient(0deg, var(--hud-line) 0 1px, transparent 1px 48px),
-    repeating-linear-gradient(90deg, var(--hud-line) 0 1px, transparent 1px 48px);
-}
-
-/* The mesh over everything, faint enough to be texture rather than pattern. */
-.flat {
-  inset: 0;
-  opacity: 0.55;
-  -webkit-mask-image: radial-gradient(120% 90% at 50% 40%, #000 30%, transparent 85%);
-  mask-image: radial-gradient(120% 90% at 50% 40%, #000 30%, transparent 85%);
-}
-
-.flash {
   inset: 0;
   background-image:
-    repeating-linear-gradient(0deg, var(--neon-bright) 0 1px, transparent 1px 48px),
-    repeating-linear-gradient(90deg, var(--neon-bright) 0 1px, transparent 1px 48px);
-  opacity: 0.34;
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent calc(var(--reveal) * (100% + 90px) - 164px),
-    #000 calc(var(--reveal) * (100% + 90px) - 106px),
-    transparent calc(var(--reveal) * (100% + 90px) - 90px)
+    repeating-linear-gradient(
+      0deg,
+      currentColor 0 1px,
+      transparent 1px var(--grid-cell)
+    ),
+    repeating-linear-gradient(
+      90deg,
+      currentColor 0 1px,
+      transparent 1px var(--grid-cell)
+    );
+  /* Sharpest in the middle, gone well before the edges, so the centre reads
+     as the focal point rather than as the middle of a wallpaper. */
+  -webkit-mask-image: radial-gradient(
+    62% 62% at 50% 48%,
+    #000 0%,
+    rgba(0, 0, 0, 0.55) 45%,
+    transparent 78%
   );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent calc(var(--reveal) * (100% + 90px) - 164px),
-    #000 calc(var(--reveal) * (100% + 90px) - 106px),
-    transparent calc(var(--reveal) * (100% + 90px) - 90px)
+  mask-image: radial-gradient(
+    62% 62% at 50% 48%,
+    #000 0%,
+    rgba(0, 0, 0, 0.55) 45%,
+    transparent 78%
   );
 }
 
-/* And the floor, running off toward a horizon that is off-screen. Anchored
-   to the bottom so the tilt costs nothing at the top of the display. */
-.floor {
-  left: -40%;
-  right: -40%;
-  bottom: -6%;
-  height: 58%;
-  /* Compressed by the tilt, so it needs a stronger line than the flat mesh
-     to arrive at the same weight on screen. */
-  background-image:
-    repeating-linear-gradient(0deg, rgba(120, 180, 255, 0.3) 0 1px, transparent 1px 48px),
-    repeating-linear-gradient(90deg, rgba(120, 180, 255, 0.3) 0 1px, transparent 1px 48px);
-  transform: perspective(760px) rotateX(70deg);
-  transform-origin: 50% 100%;
-  opacity: 0.9;
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 55%);
-  mask-image: linear-gradient(to bottom, transparent, #000 55%);
+/* Two copies of one pattern, cross-faded by `--lit`. Same cell, same phase,
+   so what changes is only how much light is in it. */
+.idle {
+  color: var(--grid-idle);
+  opacity: calc(1 - var(--lit));
+}
+
+.awake {
+  color: var(--grid-awake);
+  opacity: var(--lit);
 }
 </style>

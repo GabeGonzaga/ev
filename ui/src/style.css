@@ -72,23 +72,40 @@
 
   /* --- the instrument ---------------------------------------------------
    *
-   * An instrument, not a dashboard: two backdrops, one line weight, one
-   * neon, and a great deal of nothing. These are the names the HUD is
-   * written against. The older names further down are the same palette seen
-   * from the existing components' side -- one set of colours in two
-   * vocabularies, until the last of those components is gone.
+   * White and one neon blue, on near-black. Nothing else -- a second colour
+   * family is the fastest way to stop looking like one instrument.
    *
-   * Pure white is spent on two things only: the clock and the wordmark.
+   * White does most of the work. The neon is spent only where something is
+   * live: the awake ring, a lit border, the one transport button that is
+   * actually playing. An interface where everything glows says nothing by
+   * glowing.
    */
-  --bg-void: #04070e;
-  --bg-hud: #060a14;
-  --panel-fill: rgba(10, 18, 32, 0.72);
-  --panel-border: rgba(90, 160, 255, 0.22);
-  --hud-line: rgba(120, 180, 255, 0.14);
-  --neon: #3d9bff;
-  --neon-bright: #8fcbff;
-  --neon-dim: rgba(61, 155, 255, 0.35);
-  --text-dim: rgba(220, 231, 245, 0.45);
+  --page: #0a0d12;
+  --ink: #eef4fb;
+  --neon: #3aa0ff;
+  --neon-soft: #66c4ff;
+  --ring-white: rgba(238, 244, 251, 0.9);
+  --panel-fill: rgba(10, 16, 24, 0.66);
+  --panel-border: rgba(58, 160, 255, 0.35);
+  --muted: rgba(200, 224, 245, 0.6);
+
+  /* The checkered grid, in its two intensities. Same hue in every state --
+     only how much of it there is changes, which is what lets the sweep
+     appear to paint it in rather than fade it up. */
+  --grid-idle: rgba(120, 170, 230, 0.1);
+  --grid-awake: rgba(120, 190, 255, 0.16);
+  --grid-line: var(--grid-idle);
+  --grid-cell: 48px;
+
+  /* Reference 3 only: the room light comes up and the display stops being
+     an instrument for a while. */
+  --ambient-core: #2e3947;
+  --ambient-edge: #1c232e;
+  --plasma-core: #2e7fe8;
+  --plasma-rim: #7db8ff;
+
+  --neon-dim: rgba(58, 160, 255, 0.35);
+  --text-dim: rgba(200, 224, 245, 0.45);
   --warn: #ffb454;
   --error: #ff6b6b;
 
@@ -101,8 +118,8 @@
 
   /* Glow is layered and low -- two soft passes rather than one bright one,
      which is the difference between lit and blurred. */
-  --neon-glow: 0 0 6px rgba(61, 155, 255, 0.35), 0 0 18px rgba(61, 155, 255, 0.18);
-  --neon-glow-text: 0 0 8px rgba(61, 155, 255, 0.45), 0 0 22px rgba(61, 155, 255, 0.2);
+  --neon-glow: 0 0 6px rgba(58, 160, 255, 0.35), 0 0 18px rgba(58, 160, 255, 0.18);
+  --neon-glow-text: 0 0 8px rgba(58, 160, 255, 0.45), 0 0 22px rgba(58, 160, 255, 0.2);
 
   color-scheme: dark;
   font: 13.5px/1.5 var(--sans);
@@ -196,24 +213,17 @@
 :root[data-theme="dark"],
 :root.hud-on {
   color-scheme: dark;
-  --page: var(--bg-hud);
-  /* Cyan at the top of the ring, electric blue at the bottom. */
   --ring-top: 143, 203, 255;
   --panel: var(--panel-fill);
   --panel-edge: var(--panel-border);
   --panel-lit: rgba(var(--accent), 0.75);
   --field: rgba(4, 10, 18, 0.55);
-  --text: #dce7f5;
+  --text: var(--ink);
   --display: 300;
-  --muted: rgba(220, 231, 245, 0.62);
   --faint: var(--text-dim);
-  --line: var(--hud-line);
-  /* What accent-coloured *text* uses. In the dark that is the lit end of the
-     palette; in daylight the same colour would be invisible, so it is the
-     accent taken towards ink instead. */
-  --ink: rgb(var(--accent-lit));
+  --line: var(--panel-border);
   --glow: var(--neon-glow);
-  --grid: var(--hud-line);
+  --grid: var(--grid-line);
   --ok: #46d39a;
   --bad: var(--error);
   --live: #ff4d4d;
