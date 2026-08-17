@@ -14,10 +14,12 @@
 
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useAudioLevel } from "../../composables/useAudioLevel";
+import { useCamera } from "../../composables/useCamera";
 import { useFrame } from "../../composables/useFrame";
 import { useTelemetry } from "../../composables/useTelemetry";
 import { SLEEP_MS, WAKE_MS, useAssistantState } from "../../stores/assistant";
-import CameraSurface from "./CameraSurface.vue";
+import CameraFeed from "./CameraFeed.vue";
+import CameraWindow from "./CameraWindow.vue";
 import ConsoleWidget from "./ConsoleWidget.vue";
 import CoreRing from "./CoreRing.vue";
 import DockBar, { type DockAction } from "./DockBar.vue";
@@ -40,6 +42,25 @@ const { data: telemetry, pending: telemetryPending, error: telemetryError } =
 // anything else that wants it later reads the same number rather than opening
 // a second AnalyserNode. Nothing is attached yet, so this is the stub that
 // keeps the display alive in development.
+// One lens, opened once, looked at two ways. Switching between the window and
+// the background must not stop and restart the device.
+const camera = useCamera();
+watch(
+  () => ev.lens,
+  async (how) => {
+    if (how === "off") return camera.close();
+    await camera.open();
+    // A refusal leaves nothing to show, so the display should not pretend to
+    // be showing it.
+    if (!camera.stream.value) ev.watch("off");
+  },
+);
+watch(camera.live, (on) => (ev.looking = on));
+// The session ends itself; the display has to notice.
+watch(camera.stream, (now) => {
+  if (!now && ev.lens !== "off") ev.watch("off");
+});
+
 const audio = useAudioLevel();
 watch(audio.level, (loud) => {
   // Quantised on the way in. The level changes every frame and the store is
@@ -116,9 +137,7 @@ const gridded = computed(() => ev.stage !== "ambient");
 /// The dock is on the three stages that have an interface. Never on the
 /// resting screen and never on the blank one -- both are defined by having
 /// nothing on them.
-const docked = computed(() =>
-  ["idle", "waking", "awake", "camera"].includes(ev.stage),
-);
+const docked = computed(() => ["idle", "waking", "awake"].includes(ev.stage));
 
 /// Lit only while the thing itself is live, which is the whole grammar of
 /// this row.
@@ -134,7 +153,7 @@ const alight = computed(() => ({
 function pick(action: DockAction) {
   ev.touch();
   if (action === "camera") {
-    ev.watch(ev.stage !== "camera");
+    ev.toggleLens();
     return;
   }
   if (action === "microphone") {
@@ -187,7 +206,7 @@ function onKey(event: KeyboardEvent) {
     // third branch any more -- every widget is a window, so "put the windows
     // back" and "close what is open" were the same act, and the first of them
     // was eating the key.
-    if (ev.stage === "camera") ev.watch(false);
+    if (ev.lens !== "off") ev.watch("off");
     else if (ev.open.length) ev.open = [];
     else if (ev.stage !== "idle") ev.rest();
     return;
@@ -222,7 +241,25 @@ onBeforeUnmount(() => {
   <main class="surface" :class="[ev.stage, { working: ev.working }]">
     <!-- Ambient lifts the room light and drops everything else; the other
          four stages share the near-black display and its grid. -->
-    <div class="wash" :class="{ lifted: ev.stage === 'ambient' }" />
+    <div
+      class="wash"
+      :class="{ lifted: ev.stage === 'ambient', behind: ev.lens === 'full' }"
+    />
+
+    <!-- The camera as the background: behind the grid, behind the chrome,
+         behind everything. The instrument stands in front of the room rather
+         than being printed on the picture. -->
+    <div v-if="ev.lens === 'full'" class="behind">
+      <CameraFeed :stream="camera.stream.value" :left="camera.left.value" behind />
+    </div>
+
+    <!-- Both directions, or the display has a door that only opens one way.
+         Beside the label rather than in a panel: there is no panel here, the
+         picture is the background. -->
+    <div v-if="ev.lens === 'full'" class="lens-acts">
+      <button type="button" @click="ev.watch('window')">[ window ]</button>
+      <button type="button" @click="ev.watch('off')">[ close ]</button>
+    </div>
 
     <HudGrid v-if="gridded" :painted="painted" :calm="still.matches" />
     <HudChrome
@@ -261,18 +298,19 @@ onBeforeUnmount(() => {
          the screen. -->
     <TheAmbient v-if="ev.stage === 'ambient'" :level="ev.audioLevel" />
 
-    <!-- The lens. A surface over the display rather than a widget in it: the
-         feed is the thing being looked at, so nothing else competes. -->
-    <CameraSurface
-      v-if="ev.stage === 'camera'"
+    <!-- Summoned, never resident. Everything here can be put away, which is
+         what keeps "the resting look of every stage is empty" true. -->
+    <CameraWindow
+      v-if="ev.lens === 'window'"
+      :stream="camera.stream.value"
+      :left="camera.left.value"
+      :error="camera.error.value"
       :locale="ev.locale"
-      @close="ev.watch(false)"
-      @live="ev.looking = $event"
+      @close="ev.watch('off')"
+      @expand="ev.watch('full')"
       @said="ev.say('ev', $event)"
     />
 
-    <!-- Summoned, never resident. Everything here can be put away, which is
-         what keeps "the resting look of every stage is empty" true. -->
     <ConsoleWidget
       v-if="ev.isOpen('console')"
       :locale="ev.locale"
@@ -321,12 +359,54 @@ onBeforeUnmount(() => {
   transition: opacity 0.45s ease;
 }
 
+/* With the feed behind everything, the display's own background would be
+   painted over the picture. It steps aside and keeps only its vignette. */
+.wash.behind {
+  background: radial-gradient(
+    120% 120% at 50% 48%,
+    transparent 55%,
+    rgba(0, 0, 0, 0.45) 100%
+  );
+}
+
 .wash.lifted {
   background: radial-gradient(
     75% 75% at 50% 42%,
     var(--ambient-core) 0%,
     var(--ambient-edge) 100%
   );
+}
+
+.lens-acts {
+  position: absolute;
+  left: 40px;
+  bottom: 48px;
+  display: flex;
+  gap: 14px;
+  z-index: 5;
+}
+
+.lens-acts button {
+  border: 0;
+  background: none;
+  font-family: var(--mono);
+  font-size: var(--label);
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.lens-acts button:hover {
+  color: var(--neon-soft);
+  text-shadow: var(--neon-glow-text);
+}
+
+/* Behind the grid and the chrome, and behind the panes: the picture is the
+   room, not a layer of the instrument. */
+.behind {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
 }
 
 /* Tall enough to grab, short enough to stay above anything the stage puts

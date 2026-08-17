@@ -21,9 +21,16 @@ import { computed, ref } from "vue";
 /// idle    the thin white ring, arcs turning, waiting to be called
 /// waking  the sweep, once, ~700-900ms
 /// awake   the neon ring, crown and dock: "I'm listening"
-/// camera  the feed has the middle and the core is a badge in the corner
 /// ambient the plasma orb and the clock; a bedside presence
-export type Stage = "blank" | "idle" | "waking" | "awake" | "camera" | "ambient";
+export type Stage = "blank" | "idle" | "waking" | "awake" | "ambient";
+
+/// Where the camera is showing, if it is.
+///
+/// Not a stage: full screen, the feed is the display's *background* -- the
+/// grid still runs over it, the chrome still frames it and the ring still
+/// turns in the corner. A stage would have replaced all of that, which is the
+/// opposite of what a background is.
+export type Lens = "off" | "window" | "full";
 
 /// What E.V. is doing, which the core drives and the ring reflects.
 export type Voice = "idle" | "listening" | "thinking" | "speaking";
@@ -73,6 +80,10 @@ export const useAssistantState = defineStore("assistant", () => {
   /// The lens, while it is on. Invariant 8 wants a visible active state, and
   /// the dock is where it is visible.
   const looking = ref(false);
+  const lens = ref<Lens>("off");
+  /// Which way it was last shown, so turning it on again gives back what was
+  /// last chosen rather than always the same one.
+  const lastLens = ref<Exclude<Lens, "off">>("full");
 
   /// Awake and something open on it.
   const working = computed(() => stage.value === "awake" && open.value.length > 0);
@@ -91,13 +102,13 @@ export const useAssistantState = defineStore("assistant", () => {
   /// Whether the ring is on screen at all -- ambient replaces it with the orb,
   /// blank has nothing.
   const ringed = computed(() =>
-    ["idle", "waking", "awake", "camera"].includes(stage.value),
+    ["idle", "waking", "awake"].includes(stage.value),
   );
 
-  /// The core never leaves the screen. On the camera surface it shrinks into
-  /// the corner and keeps turning; it does not go away, because a display
-  /// where E.V. has vanished is a display that has stopped.
-  const badged = computed(() => stage.value === "camera");
+  /// The core never leaves the screen. With the feed behind everything it
+  /// shrinks into the corner and keeps turning; it does not go away, because
+  /// a display where E.V. has vanished is a display that has stopped.
+  const badged = computed(() => lens.value === "full");
 
   /// A turn is in flight. Not idle however long since the last key.
   const busy = computed(() => voice.value !== "idle");
@@ -148,17 +159,21 @@ export const useAssistantState = defineStore("assistant", () => {
     open.value = [];
   }
 
-  /// The lens, on its own surface. Leaving puts the display back where it
-  /// was rather than somewhere new.
-  function watch_(on: boolean) {
-    if (on) {
-      if (stage.value === "idle" || stage.value === "blank") triggerWake();
-      stage.value = "camera";
-    } else if (stage.value === "camera") {
-      stage.value = "awake";
-      looking.value = false;
+  /// Show the camera, one way or the other, or stop showing it.
+  function watch_(how: Lens) {
+    if (how !== "off") {
+      if (stage.value !== "awake") triggerWake();
+      lastLens.value = how;
     }
+    lens.value = how;
+    if (how === "off") looking.value = false;
     touch();
+  }
+
+  /// What the dock's camera icon does: on to whichever way it was last shown,
+  /// and off from either of them.
+  function toggleLens() {
+    watch_(lens.value === "off" ? lastLens.value : "off");
   }
 
   /// The clean screen: the grid on its own.
@@ -208,7 +223,9 @@ export const useAssistantState = defineStore("assistant", () => {
     tucked,
     ringed,
     badged,
+    lens,
     watch: watch_,
+    toggleLens,
     busy,
     triggerWake,
     rest,
