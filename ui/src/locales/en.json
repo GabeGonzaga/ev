@@ -1,0 +1,59 @@
+{
+  "dock": {
+    "camera": "take a look",
+    "microphone": "listen",
+    "music": "music",
+    "shortcuts": "shortcuts",
+    "add": "add a shortcut",
+    "chat": "chat"
+  },
+  "console": {
+    "placeholder": "enter message...",
+    "attach": "[+ img]",
+    "attach_hint": "not built yet",
+    "send": "[send ↵]"
+  },
+  "conversation": {
+    "subtitle": "transcript",
+    "waiting": "awaiting stream"
+  },
+  "music": {
+    "waiting": "asking music...",
+    "previous": "previous",
+    "play": "play",
+    "pause": "pause",
+    "next": "next",
+    "shuffle": "shuffle",
+    "repeat": "repeat",
+    "repeat_one": "repeating this track",
+    "tag": {
+      "play": "play",
+      "hold": "hold",
+      "idle": "idle"
+    }
+  },
+  "pane": {
+    "waiting": "awaiting stream",
+    "close": "close"
+  },
+  "window": {
+    "close": "close",
+    "minimise": "minimise",
+    "zoom": "zoom"
+  },
+  "shortcuts": {
+    "empty": "nothing saved yet",
+    "forget": "forget it",
+    "label": "label",
+    "label_hint": "github",
+    "says": "says",
+    "says_hint": "open github.com",
+    "save": "[ save ]"
+  },
+  "chrome": {
+    "unreachable": "CORE UNREACHABLE"
+  },
+  "surface": {
+    "camera_unwired": "The camera is not wired to this display yet."
+  }
+}

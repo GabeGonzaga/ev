@@ -12,6 +12,7 @@
 import { computed } from "vue";
 import { clock, useNowPlaying } from "../../composables/useNowPlaying";
 import HudPane from "./HudPane.vue";
+import { t } from "../../i18n";
 
 const props = withDefaults(defineProps<{ locale?: string }>(), { locale: "pt-PT" });
 const emit = defineEmits<{ close: [] }>();
@@ -26,7 +27,9 @@ const along = computed(() => {
 /// The tag in the corner of the art, which is Reference 4's `IDLE`.
 const tag = computed(() => {
   const state = playing.value?.state;
-  return state === "playing" ? "play" : state === "paused" ? "hold" : "idle";
+  return t(
+    state === "playing" ? "music.tag.play" : state === "paused" ? "music.tag.hold" : "music.tag.idle",
+  );
 });
 
 const repeating = computed(() => playing.value?.repeat !== "off");
@@ -38,7 +41,7 @@ const repeating = computed(() => playing.value?.repeat !== "off");
     :pending="pending"
     :error="error"
     :empty="!playing"
-    waiting="asking music..."
+    :waiting="t('music.waiting')"
     :live="playing?.state === 'playing'"
     :at="{ x: 470, y: 150, width: 400, height: 168 }"
     @close="emit('close')"
@@ -63,13 +66,13 @@ const repeating = computed(() => playing.value?.repeat !== "off");
         </div>
 
         <div class="transport">
-          <button type="button" title="previous" @click="tell('previous')">
+          <button type="button" :title="t('music.previous')" @click="tell('previous')">
             <svg viewBox="0 0 24 24"><path d="M18 5v14L8 12zM6 5v14" /></svg>
           </button>
           <button
             type="button"
             :class="{ on: playing.state === 'playing' }"
-            :title="playing.state === 'playing' ? 'pause' : 'play'"
+            :title="playing.state === 'playing' ? t('music.pause') : t('music.play')"
             @click="tell(playing.state === 'playing' ? 'pause' : 'resume')"
           >
             <svg v-if="playing.state === 'playing'" viewBox="0 0 24 24">
@@ -77,13 +80,13 @@ const repeating = computed(() => playing.value?.repeat !== "off");
             </svg>
             <svg v-else viewBox="0 0 24 24"><path d="M7 4.5v15L20 12z" /></svg>
           </button>
-          <button type="button" title="next" @click="tell('next')">
+          <button type="button" :title="t('music.next')" @click="tell('next')">
             <svg viewBox="0 0 24 24"><path d="M6 5v14l10-7zM18 5v14" /></svg>
           </button>
           <button
             type="button"
             :class="{ on: playing.shuffle }"
-            title="shuffle"
+            :title="t('music.shuffle')"
             @click="tell('shuffle')"
           >
             <svg viewBox="0 0 24 24">
@@ -93,7 +96,7 @@ const repeating = computed(() => playing.value?.repeat !== "off");
           <button
             type="button"
             :class="{ on: repeating }"
-            :title="playing.repeat === 'one' ? 'repeating this track' : 'repeat'"
+            :title="playing.repeat === 'one' ? t('music.repeat_one') : t('music.repeat')"
             @click="tell('repeat')"
           >
             <svg viewBox="0 0 24 24">

@@ -13,6 +13,7 @@
 
 import { computed } from "vue";
 import { asUptime, type Telemetry } from "../../composables/useTelemetry";
+import { t } from "../../i18n";
 
 const props = withDefaults(
   defineProps<{
@@ -27,7 +28,7 @@ const props = withDefaults(
 /// Short, because nobody reads these -- they glance to see that they are
 /// still moving, and read them only on the day something is wrong.
 const left = computed(() => {
-  if (props.error) return "CORE UNREACHABLE";
+  if (props.error) return t("chrome.unreachable");
   if (!props.telemetry) return "";
   return `EV · ${props.telemetry.model}`.toUpperCase();
 });

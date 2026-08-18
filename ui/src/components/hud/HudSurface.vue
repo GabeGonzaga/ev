@@ -16,6 +16,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useAudioLevel } from "../../composables/useAudioLevel";
 import { useFrame } from "../../composables/useFrame";
 import { useTelemetry } from "../../composables/useTelemetry";
+import { t } from "../../i18n";
 import { SLEEP_MS, WAKE_MS, useAssistantState } from "../../stores/assistant";
 import ConsoleWidget from "./ConsoleWidget.vue";
 import CoreRing from "./CoreRing.vue";
@@ -133,7 +134,7 @@ function pick(action: DockAction) {
   if (action === "camera") {
     // The lens belongs to the signed host, and the host is not wired to this
     // display yet. Saying so beats a button that pretends.
-    ev.say("ev", "The camera is not wired to this display yet.");
+    ev.say("ev", t("surface.camera_unwired"));
     ev.show("console");
     return;
   }
