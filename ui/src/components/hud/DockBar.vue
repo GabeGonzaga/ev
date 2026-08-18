@@ -117,7 +117,7 @@ const ICONS: { action: DockAction }[] = [
 
 .key.on {
   color: var(--neon);
-  filter: drop-shadow(0 0 5px rgba(58, 160, 255, 0.75));
+  filter: drop-shadow(0 0 5px rgba(63, 165, 246, 0.75));
 }
 
 .indicator {

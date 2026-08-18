@@ -6,8 +6,9 @@
   <key>com.apple.security.device.audio-input</key>
   <true/>
 
-  <!-- The camera, under the hardened runtime. One frame per press, never a
-       stream, and nothing written down (ADR 0029). -->
+  <!-- The camera, under the hardened runtime. A preview while the display is
+       showing one, a frame when one is asked for, and nothing written down
+       either way (ADR 0029). -->
   <key>com.apple.security.device.camera</key>
   <true/>
 

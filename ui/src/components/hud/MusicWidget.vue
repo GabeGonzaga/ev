@@ -9,15 +9,58 @@
 // The cover is the album's own, read out of the local library. Nothing here
 // fetches anything.
 
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { clock, useNowPlaying } from "../../composables/useNowPlaying";
+import { type Floating, useWorkspace } from "../../stores/workspace";
 import HudPane from "./HudPane.vue";
 import { t } from "../../i18n";
 
 const props = withDefaults(defineProps<{ locale?: string }>(), { locale: "en" });
 const emit = defineEmits<{ close: [] }>();
 
-const { playing, pending, error, at, tell } = useNowPlaying(() => props.locale);
+const { playing, pending, error, at, holding, tell } = useNowPlaying(
+  () => props.locale,
+);
+
+/// Put the playhead where the finger is.
+///
+/// The line is a control, not a readout: press it and the song moves. The
+/// position follows the pointer while it is down and the command is sent once
+/// on release -- a seek per pixel would be a hundred commands to cross a
+/// three-minute track, each one an Apple Event and a journal entry.
+function scrub(event: PointerEvent) {
+  const length = playing.value?.length ?? 0;
+  if (!length || event.button !== 0) return;
+
+  const rail = event.currentTarget as HTMLElement;
+  const line = rail.getBoundingClientRect();
+  rail.setPointerCapture(event.pointerId);
+  holding.value = true;
+
+  function place(x: number) {
+    const part = Math.min(1, Math.max(0, (x - line.left) / line.width));
+    at.value = Math.round(part * length);
+  }
+
+  function move(moved: PointerEvent) {
+    place(moved.clientX);
+  }
+
+  function done(up: PointerEvent) {
+    place(up.clientX);
+    rail.releasePointerCapture(up.pointerId);
+    rail.removeEventListener("pointermove", move);
+    rail.removeEventListener("pointerup", done);
+    rail.removeEventListener("pointercancel", done);
+    holding.value = false;
+    void tell(`seek to ${at.value}`);
+  }
+
+  place(event.clientX);
+  rail.addEventListener("pointermove", move);
+  rail.addEventListener("pointerup", done);
+  rail.addEventListener("pointercancel", done);
+}
 
 const along = computed(() => {
   const length = playing.value?.length ?? 0;
@@ -33,6 +76,48 @@ const tag = computed(() => {
 });
 
 const repeating = computed(() => playing.value?.repeat !== "off");
+
+/// Off, all, one, off -- the three positions a music app's repeat button
+/// walks, and the reason "cycle" exists as a word. Each is the sentence a
+/// person would say for it, so the button and the voice reach the same place
+/// by the same route.
+// `says` is the sentence sent to the core -- a command, structure, never
+// translated. `then` is the tooltip, which is words, so it is a key.
+const ROUND: Record<string, { says: string; then: string }> = {
+  off: { says: "repeat on", then: "music.repeat_everything" },
+  all: { says: "cycle", then: "music.repeat_this" },
+  one: { says: "repeat off", then: "music.repeat_stop" },
+};
+
+const nextRepeat = computed(() => ROUND[playing.value?.repeat ?? "off"] ?? ROUND.off);
+
+// --- the lyrics ----------------------------------------------------------
+
+const NAME = "apple_music";
+const workspace = useWorkspace();
+const reading = ref(false);
+/// What shape it was before, so closing the lyrics gives that back rather
+/// than leaving a tall window somebody has to resize by hand.
+let wasWide: Floating | null = null;
+
+/// A page of words wants a page's shape. Turning the window portrait is the
+/// whole gesture: the cover goes to the top, the words run down the rest.
+function flip() {
+  const now = workspace.placement(NAME);
+  if (!reading.value) {
+    if (now !== "docked") wasWide = { ...now };
+    reading.value = true;
+    if (now !== "docked") {
+      workspace.move(NAME, { ...now, width: 360, height: 560 });
+    }
+    return;
+  }
+
+  reading.value = false;
+  if (wasWide) workspace.move(NAME, wasWide);
+}
+
+const words = computed(() => playing.value?.lyrics?.trim() ?? "");
 </script>
 
 <template>
@@ -46,7 +131,7 @@ const repeating = computed(() => playing.value?.repeat !== "off");
     :at="{ x: 470, y: 150, width: 400, height: 168 }"
     @close="emit('close')"
   >
-    <div v-if="playing" class="player">
+    <div v-if="playing" class="player" :class="{ reading }">
       <div class="art">
         <img v-if="playing.cover" :src="playing.cover" :alt="playing.album" />
         <span v-else class="nothing" />
@@ -54,6 +139,7 @@ const repeating = computed(() => playing.value?.repeat !== "off");
       </div>
 
       <div class="what">
+
         <p class="track" :title="playing.track">{{ playing.track || "—" }}</p>
         <p class="by" :title="playing.artist">{{ playing.artist }}</p>
         <p class="on" :title="playing.album">{{ playing.album }}</p>
@@ -61,7 +147,12 @@ const repeating = computed(() => playing.value?.repeat !== "off");
         <div class="along">
           <span class="from">{{ clock(at) }}</span>
           <!-- A line, not a bar. Everything on this display is one pixel. -->
-          <span class="rail"><span class="done" :style="{ width: along + '%' }" /></span>
+          <span class="rail" :class="{ holding }" @pointerdown="scrub">
+            <span class="line">
+              <span class="done" :style="{ width: along + '%' }" />
+              <span class="head" :style="{ left: along + '%' }" />
+            </span>
+          </span>
           <span class="to">{{ clock(playing.length) }}</span>
         </div>
 
@@ -96,8 +187,8 @@ const repeating = computed(() => playing.value?.repeat !== "off");
           <button
             type="button"
             :class="{ on: repeating }"
-            :title="playing.repeat === 'one' ? t('music.repeat_one') : t('music.repeat')"
-            @click="tell('repeat')"
+            :title="t(nextRepeat.then)"
+            @click="tell(nextRepeat.says)"
           >
             <svg viewBox="0 0 24 24">
               <path d="M4 12V9a3 3 0 0 1 3-3h13M20 12v3a3 3 0 0 1-3 3H4" />
@@ -105,16 +196,59 @@ const repeating = computed(() => playing.value?.repeat !== "off");
             </svg>
             <span v-if="playing.repeat === 'one'" class="one">1</span>
           </button>
+          <button
+            :class="{ on: reading }"
+            type="button"
+            :title="t('music.lyrics')"
+            @click="flip"
+          >
+            <svg viewBox="0 0 24 24">
+              <path d="M4 6h16M4 10.5h11M4 15h16M4 19.5h9" />
+            </svg>
+          </button>
         </div>
       </div>
+    </div>
+
+    <!-- The words, under everything, when the window has been turned for
+         them. Empty is said plainly: Apple Music keeps its own lyrics to
+         itself, and inventing some would be worse than none. -->
+    <div v-if="playing && reading" class="lyrics">
+      <p v-if="words" class="words">{{ words }}</p>
+      <p v-else class="none">
+        &gt; no lyrics on this track.<br />
+        Music only hands over what the file itself carries, and a streamed
+        track carries none.
+      </p>
     </div>
   </HudPane>
 </template>
 
 <style scoped>
+/* Turned for reading: the cover on top, the words down the rest of the
+   window. Same components, a different axis. */
+.player.reading {
+  flex-direction: column;
+  flex: 0 0 auto;
+}
+
+.player.reading .art {
+  align-self: center;
+  width: clamp(96px, 46%, 190px);
+}
+
+.player.reading .track,
+.player.reading .by,
+.player.reading .on {
+  text-align: center;
+}
+
 .player {
   display: flex;
   gap: 14px;
+  /* Fills the body, so the progress line and the transport stay on the floor
+     of the window instead of following the cover's height. */
+  flex: 1;
   min-height: 0;
 }
 
@@ -124,8 +258,11 @@ const repeating = computed(() => playing.value?.repeat !== "off");
 .art {
   position: relative;
   flex: 0 0 auto;
-  width: 96px;
-  height: 96px;
+  align-self: flex-start;
+  /* Sized from the window rather than fixed: resizing the player should make
+     the cover bigger, which is most of the reason anybody resizes it. */
+  width: clamp(72px, 30%, 190px);
+  aspect-ratio: 1;
   border: 1px solid var(--panel-border);
 }
 
@@ -134,20 +271,6 @@ const repeating = computed(() => playing.value?.repeat !== "off");
   height: 100%;
   object-fit: cover;
   display: block;
-  filter: contrast(1.05) brightness(0.9);
-}
-
-/* The duotone. `color` takes hue and saturation from this and leaves the
-   cover's own luminance alone, which is what keeps it a photograph rather
-   than a blue rectangle -- and it is the only image on a screen that is
-   otherwise one hue. */
-.art::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: rgba(58, 160, 255, 0.55);
-  mix-blend-mode: color;
-  pointer-events: none;
 }
 
 .nothing {
@@ -156,7 +279,7 @@ const repeating = computed(() => playing.value?.repeat !== "off");
   height: 100%;
   background: repeating-linear-gradient(
     45deg,
-    rgba(58, 160, 255, 0.06) 0 6px,
+    rgba(63, 165, 246, 0.06) 0 6px,
     transparent 6px 12px
   );
 }
@@ -219,9 +342,19 @@ const repeating = computed(() => playing.value?.repeat !== "off");
   font-variant-numeric: tabular-nums;
 }
 
+/* The line stays one pixel. What grows is the room to hit it: seven pixels
+   above and below, invisible, because a one-pixel control is a control nobody
+   can use. */
 .rail {
-  position: relative;
   flex: 1;
+  padding: 7px 0;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.line {
+  position: relative;
+  display: block;
   height: 1px;
   background: rgba(200, 224, 245, 0.18);
 }
@@ -232,7 +365,27 @@ const repeating = computed(() => playing.value?.repeat !== "off");
   top: 0;
   height: 100%;
   background: var(--neon);
-  box-shadow: 0 0 6px rgba(58, 160, 255, 0.7);
+  box-shadow: 0 0 6px rgba(63, 165, 246, 0.7);
+}
+
+/* The playhead. Small and dim until the line is touched, so it reads as a
+   place rather than as a handle demanding to be used. */
+.head {
+  position: absolute;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%;
+  background: var(--neon-soft);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.rail:hover .head,
+.rail.holding .head {
+  opacity: 1;
+  box-shadow: 0 0 8px rgba(63, 165, 246, 0.9);
 }
 
 .transport {
@@ -273,7 +426,41 @@ const repeating = computed(() => playing.value?.repeat !== "off");
 
 .transport button.on {
   color: var(--neon);
-  filter: drop-shadow(0 0 5px rgba(58, 160, 255, 0.75));
+  filter: drop-shadow(0 0 5px rgba(63, 165, 246, 0.75));
+}
+
+.lyrics {
+  flex: 1;
+  min-height: 0;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--panel-border);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--neon-dim) transparent;
+}
+
+.lyrics::-webkit-scrollbar {
+  width: 4px;
+}
+
+.lyrics::-webkit-scrollbar-thumb {
+  background: var(--neon-dim);
+}
+
+.words {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.65;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.none {
+  margin: 0;
+  line-height: 1.6;
+  font-size: 11px;
+  color: var(--muted);
 }
 
 .one {

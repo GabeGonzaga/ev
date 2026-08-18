@@ -28,7 +28,7 @@
   <!-- The camera, for one frame at a time. Without this key macOS does not
        ask; it refuses, and the refusal looks like a broken camera. -->
   <key>NSCameraUsageDescription</key>
-  <string>E.V. takes a single picture when you press Look, and answers a question about it. Frames are not saved.</string>
+  <string>E.V. shows the camera on its own display while you have it open, and takes a picture when you ask a question about what it sees. Nothing is recorded and no frame is saved.</string>
 
   <!-- Music, Notes, Finder and the rest are reached by Apple Events. Until
        this is granted, tools that need it are denied before macOS is asked. -->

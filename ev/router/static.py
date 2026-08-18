@@ -74,6 +74,12 @@ def normalise(utterance: str) -> str:
     return prepare(utterance).casefold()
 
 
+def _url_window(groups: Mapping[str, str]) -> dict[str, object] | None:
+    """The same URL, in a window of its own."""
+    found = _url(groups)
+    return None if found is None else {**found, "where": "window"}
+
+
 def _url(groups: Mapping[str, str]) -> dict[str, object] | None:
     # "github dot com" and "github . com" are the same address as
     # "github.com". A URL has no spaces in it, so what is left after joining
@@ -231,6 +237,22 @@ def _switched(groups: Mapping[str, str], setting: str) -> dict[str, object]:
     return {"setting": setting, "state": _SWITCHES.get(said.casefold(), "toggle")}
 
 
+def _seek(groups: Mapping[str, str]) -> dict[str, object] | None:
+    """`1:35` or `95`, both meaning the same place.
+
+    A person says minutes and a display sends seconds, and neither should have
+    to know what the other does.
+    """
+    if groups.get("only"):
+        return {"to": int(groups["only"])}
+
+    minutes = groups.get("minutes")
+    seconds = groups.get("seconds")
+    if minutes is None or seconds is None:
+        return None
+    return {"to": int(minutes) * 60 + int(seconds)}
+
+
 def _shuffle(groups: Mapping[str, str]) -> dict[str, object] | None:
     return _switched(groups, "shuffle")
 
@@ -345,6 +367,22 @@ def _note(groups: Mapping[str, str]) -> dict[str, object] | None:
 
 
 RULES: tuple[Rule, ...] = (
+    # A window of its own, said before the plain rule so "in a window" is not
+    # swallowed as part of the address.
+    _rule(
+        "browser.open_url",
+        rf"^(?:please\s+)?(?:open|go\s+to|browse\s+to|visit|pull\s+up)\s+"
+        rf"(?:the\s+)?(?:site\s+|website\s+|page\s+)?{_URL}"
+        rf"\s+in\s+(?:a\s+)?(?:small\s+|mini\s+)?window$",
+        _url_window,
+    ),
+    _rule(
+        "browser.open_url",
+        rf"^(?:por\s+favor\s+)?(?:abre|abrir|abra|vai\s+ao|vai\s+à|vai\s+a|"
+        rf"vai\s+para)\s+(?:o\s+|a\s+)?(?:site\s+|página\s+|pagina\s+)?{_URL}"
+        rf"\s+(?:n[ua]m?a?\s+)?(?:pequena\s+)?janela(?:\s+pequena)?$",
+        _url_window,
+    ),
     _rule(
         "browser.open_url",
         rf"^(?:please\s+)?(?:open|go\s+to|browse\s+to|visit|pull\s+up)\s+"
@@ -394,6 +432,21 @@ RULES: tuple[Rule, ...] = (
         rf"(?:\s+(?P<after>{_SWITCH}))?$",
         _shuffle,
     ),
+    # "Cycle" is repeat's third position on its own -- said bare it means this
+    # song again, not the switch. It is a separate rule for exactly that
+    # reason: adding it to the verbs above would have made it a toggle.
+    _rule(
+        "music.mode",
+        r"^(?:please\s+)?cycle"
+        r"(?:\s+(?:this|the\s+current)\s+(?:song|track|one))?$",
+        lambda _groups: {"setting": "repeat", "state": "one"},
+    ),
+    _rule(
+        "music.mode",
+        r"^(?:por\s+favor\s+)?(?:põe\s+|poe\s+|coloca\s+|mete\s+)?"
+        r"(?:em\s+)?ciclo(?:\s+(?:esta|este)\s+(?:música|musica|faixa|tema))?$",
+        lambda _groups: {"setting": "repeat", "state": "one"},
+    ),
     _rule(
         "music.mode",
         rf"^(?:please\s+)?(?:turn\s+)?(?:(?P<before>{_SWITCH})\s+)?"
@@ -409,6 +462,23 @@ RULES: tuple[Rule, ...] = (
         rf"(?:\s+(?P<one>esta|este)\s+(?:música|musica|faixa|tema))?"
         rf"(?:\s+(?P<after>{_SWITCH}))?$",
         _repeat,
+    ),
+    # Somewhere in the track. Both spellings people use for a time -- "95"
+    # and "1:35" -- because a display sends seconds and a person says minutes.
+    _rule(
+        "music.seek",
+        r"^(?:please\s+)?(?:seek|skip|jump|go)\s+(?:to|forward\s+to)\s+"
+        r"(?:(?P<minutes>\d{1,2}):(?P<seconds>[0-5]\d)|(?P<only>\d{1,5})"
+        r"(?:\s*(?:s|sec|secs|seconds))?)$",
+        _seek,
+    ),
+    _rule(
+        "music.seek",
+        r"^(?:por\s+favor\s+)?(?:avança|avanca|salta|vai|passa)\s+"
+        r"(?:para|até|ate|a)\s+(?:o\s+|os\s+)?"
+        r"(?:(?P<minutes>\d{1,2}):(?P<seconds>[0-5]\d)|(?P<only>\d{1,5})"
+        r"(?:\s*(?:s|seg|segs|segundos))?)$",
+        _seek,
     ),
     # A read, and the one the display asks for every second. Tier 1 or it
     # would be a model call per poll.

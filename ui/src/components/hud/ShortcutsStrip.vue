@@ -24,7 +24,7 @@ const emit = defineEmits<{ close: []; done: [] }>();
 const ev = useAssistantState();
 const shortcuts = useShortcuts();
 const label = ref("");
-const says = ref("");
+const link = ref("");
 
 async function run(text: string) {
   ev.say("user", text);
@@ -37,9 +37,9 @@ async function run(text: string) {
 }
 
 function keep() {
-  shortcuts.add(label.value, says.value);
+  shortcuts.add(label.value, link.value);
   label.value = "";
-  says.value = "";
+  link.value = "";
   emit("done");
 }
 </script>
@@ -48,21 +48,40 @@ function keep() {
   <HudPane
     v-if="!adding"
     name="shortcuts"
-    :at="{ x: 34, y: 404, width: 300, height: 150 }"
+    :at="{ x: 60, y: 150, width: 520, height: 300 }"
     @close="emit('close')"
   >
     <div class="strip">
-      <button
-        v-for="one in shortcuts.saved"
-        :key="one.id"
-        class="one"
-        type="button"
-        :title="one.says"
-        @click="run(one.says)"
-      >
-        {{ one.label }}
-        <span class="drop" :title="t('shortcuts.forget')" @click.stop="shortcuts.forget(one.id)">×</span>
-      </button>
+      <span v-for="one in shortcuts.saved" :key="one.id" class="one">
+        <span class="named" :title="one.url">{{ one.label }}</span>
+        <!-- Two ways in, both of them the browser's. E.V. renders no page:
+             a window and a tab differ in the shape of somebody else's
+             window, not in who did the fetching. -->
+        <button
+          class="way"
+          type="button"
+          :title="t('shortcuts.open_window_hint', { url: one.url })"
+          @click="run(`open ${one.url} in a window`)"
+        >
+          {{ t("shortcuts.window") }}
+        </button>
+        <button
+          class="way"
+          type="button"
+          :title="t('shortcuts.open_tab_hint', { url: one.url })"
+          @click="run(`open ${one.url}`)"
+        >
+          {{ t("shortcuts.tab") }}
+        </button>
+        <button
+          class="drop"
+          type="button"
+          :title="t('shortcuts.forget')"
+          @click="shortcuts.forget(one.id)"
+        >
+          ×
+        </button>
+      </span>
       <p v-if="!shortcuts.saved.length" class="none">&gt; {{ t("shortcuts.empty") }}</p>
     </div>
   </HudPane>
@@ -87,12 +106,13 @@ function keep() {
         />
       </label>
       <label>
-        <span>{{ t("shortcuts.says") }}</span>
+        <span>{{ t("shortcuts.link") }}</span>
         <input
-          v-model="says"
+          v-model="link"
           spellcheck="false"
           autocomplete="off"
-          :placeholder="t('shortcuts.says_hint')"
+          inputmode="url"
+          :placeholder="t('shortcuts.link_hint')"
         />
       </label>
       <button class="keep" type="submit">{{ t("shortcuts.save") }}</button>
@@ -112,24 +132,43 @@ function keep() {
 .one {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   padding: 4px 8px;
   border: 1px solid var(--panel-border);
-  background: none;
   font-family: var(--mono);
   font-size: 11px;
   letter-spacing: 0.08em;
   color: var(--muted);
+}
+
+.named {
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+/* The two ways, said in words. Icons for "window" and "tab" would be two
+   rectangles differing by a few pixels, which is a puzzle rather than a
+   choice. */
+.way {
+  border: 0;
+  background: none;
+  font: inherit;
+  letter-spacing: 0.14em;
+  color: var(--muted);
   cursor: pointer;
 }
 
-.one:hover {
+.way:hover {
   color: var(--neon-soft);
-  border-color: rgba(58, 160, 255, 0.6);
+  text-shadow: var(--neon-glow-text);
 }
 
 .drop {
-  color: rgba(200, 224, 245, 0.35);
+  border: 0;
+  background: none;
+  font: inherit;
+  color: rgba(200, 224, 245, 0.3);
+  cursor: pointer;
 }
 
 .drop:hover {
@@ -185,7 +224,7 @@ input {
 
 input:focus {
   outline: none;
-  border-color: rgba(58, 160, 255, 0.7);
+  border-color: rgba(63, 165, 246, 0.7);
 }
 
 .keep {

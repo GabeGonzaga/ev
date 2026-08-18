@@ -80,31 +80,44 @@
    * actually playing. An interface where everything glows says nothing by
    * glowing.
    */
-  --page: #0a0d12;
-  --ink: #eef4fb;
-  --neon: #3aa0ff;
-  --neon-soft: #66c4ff;
-  --ring-white: rgba(238, 244, 251, 0.9);
-  --panel-fill: rgba(10, 16, 24, 0.66);
-  --panel-border: rgba(58, 160, 255, 0.35);
+  /* Sampled off the reference footage rather than chosen. Matte navy, never
+     pure black: the background is lifted at the centre, and the whole display
+     has exactly one saturated colour in it. */
+  --page: #0d1421;
+  --ink: #e6eaf2;
+  --neon: #3fa5f6;
+  --neon-soft: #7db8ff;
+
+  /* Colour is state. Steel while idling, azure while awake, red while
+     listening -- the ring's own body says which, which is why the ring is
+     never white and the glow is never the whole signal. */
+  --ring-steel: #3f7096;
+  --ring-ice: #c4def3;
+  --ring-white: rgba(230, 234, 242, 0.9);
+
+  --panel-fill: rgba(13, 20, 33, 0.66);
+  --panel-border: rgba(63, 165, 246, 0.35);
   --muted: rgba(200, 224, 245, 0.6);
 
   /* The checkered grid, in its two intensities. Same hue in every state --
      only how much of it there is changes, which is what lets the sweep
      appear to paint it in rather than fade it up. */
-  --grid-idle: rgba(120, 170, 230, 0.1);
-  --grid-awake: rgba(120, 190, 255, 0.16);
+  /* Grey-indigo, and deliberately not the accent: the grid is the room the
+     instrument stands in, not part of the instrument. */
+  --grid-idle: rgba(122, 148, 194, 0.09);
+  --grid-awake: rgba(122, 148, 194, 0.13);
   --grid-line: var(--grid-idle);
   --grid-cell: 48px;
 
   /* Reference 3 only: the room light comes up and the display stops being
      an instrument for a while. */
-  --ambient-core: #2e3947;
-  --ambient-edge: #1c232e;
-  --plasma-core: #2e7fe8;
-  --plasma-rim: #7db8ff;
+  --ambient-core: #1c2740;
+  --ambient-edge: #0f172d;
+  --plasma-core: #224771;
+  --plasma-rim: #4f86bd;
+  --clock-ink: #f5f9fc;
 
-  --neon-dim: rgba(58, 160, 255, 0.35);
+  --neon-dim: rgba(63, 165, 246, 0.35);
   --text-dim: rgba(200, 224, 245, 0.45);
   --warn: #ffb454;
   --error: #ff6b6b;
@@ -118,8 +131,8 @@
 
   /* Glow is layered and low -- two soft passes rather than one bright one,
      which is the difference between lit and blurred. */
-  --neon-glow: 0 0 6px rgba(58, 160, 255, 0.35), 0 0 18px rgba(58, 160, 255, 0.18);
-  --neon-glow-text: 0 0 8px rgba(58, 160, 255, 0.45), 0 0 22px rgba(58, 160, 255, 0.2);
+  --neon-glow: 0 0 6px rgba(63, 165, 246, 0.35), 0 0 18px rgba(63, 165, 246, 0.18);
+  --neon-glow-text: 0 0 8px rgba(63, 165, 246, 0.45), 0 0 22px rgba(63, 165, 246, 0.2);
 
   color-scheme: dark;
   font: 13.5px/1.5 var(--sans);

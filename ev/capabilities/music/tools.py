@@ -9,6 +9,7 @@ from ev.capabilities.music.args import (
     ModeArgs,
     NowPlayingArgs,
     PlayArgs,
+    SeekArgs,
     VolumeArgs,
 )
 from ev.capabilities.music.service import (
@@ -16,6 +17,7 @@ from ev.capabilities.music.service import (
     MODE,
     NOW_PLAYING,
     PLAY,
+    SEEK,
     VOLUME,
     MusicService,
 )
@@ -66,6 +68,19 @@ def music_tools(service: MusicService) -> tuple[ToolSpec[Any], ...]:
             args=ModeArgs,
             risk=RiskLevel.SENSITIVE,
             handler=service.mode,
+            permissions=APPLE_EVENTS,
+            # Always this one, so the level set for it governs every call.
+            application=lambda _args: "Music",
+        ),
+        ToolSpec(
+            name=SEEK,
+            description=(
+                "Move the playhead within the track that is playing: "
+                "'skip to 1:30', 'avança para 2:04'. Seconds from the start."
+            ),
+            args=SeekArgs,
+            risk=RiskLevel.SENSITIVE,
+            handler=service.seek,
             permissions=APPLE_EVENTS,
             # Always this one, so the level set for it governs every call.
             application=lambda _args: "Music",

@@ -55,10 +55,34 @@ onMounted(() => {
 
 // --- moving and sizing ---------------------------------------------------
 
+/// Which edges a handle pulls. A corner pulls two.
+interface Pull {
+  at: string;
+  left?: boolean;
+  right?: boolean;
+  top?: boolean;
+  bottom?: boolean;
+  cursor: string;
+}
+
+/// Every edge and every corner, not one 16px square in the corner. A window
+/// that can only be resized from a single hidden target is a window most
+/// people conclude cannot be resized -- which is exactly what happened.
+const HANDLES: Pull[] = [
+  { at: "n", top: true, cursor: "ns-resize" },
+  { at: "s", bottom: true, cursor: "ns-resize" },
+  { at: "w", left: true, cursor: "ew-resize" },
+  { at: "e", right: true, cursor: "ew-resize" },
+  { at: "nw", top: true, left: true, cursor: "nwse-resize" },
+  { at: "ne", top: true, right: true, cursor: "nesw-resize" },
+  { at: "sw", bottom: true, left: true, cursor: "nesw-resize" },
+  { at: "se", bottom: true, right: true, cursor: "nwse-resize" },
+];
+
 /// Both gestures are the same shape: remember where the pointer started and
 /// what the window was, then write the difference on every move. Pointer
 /// capture, because at any real drag speed the pointer outruns the window.
-function grab(event: PointerEvent, what: "move" | "size") {
+function grab(event: PointerEvent, what: "move" | Pull) {
   if (!props.movable || event.button !== 0) return;
   const from = workspace.placement(props.name);
   if (from === "docked") return;
@@ -74,12 +98,26 @@ function grab(event: PointerEvent, what: "move" | "size") {
   function onMove(moved: PointerEvent) {
     const dx = moved.clientX - startX;
     const dy = moved.clientY - startY;
-    workspace.move(
-      props.name,
-      what === "move"
-        ? { ...was, x: was.x + dx, y: was.y + dy }
-        : { ...was, width: was.width + dx, height: was.height + dy },
-    );
+
+    if (what === "move") {
+      workspace.move(props.name, { ...was, x: was.x + dx, y: was.y + dy });
+      return;
+    }
+
+    // Pulling the top or the left moves the window as well as sizing it:
+    // the opposite edge is what has to stay still.
+    const next = { ...was };
+    if (what.right) next.width = was.width + dx;
+    if (what.bottom) next.height = was.height + dy;
+    if (what.left) {
+      next.x = was.x + dx;
+      next.width = was.width - dx;
+    }
+    if (what.top) {
+      next.y = was.y + dy;
+      next.height = was.height - dy;
+    }
+    workspace.move(props.name, next);
   }
 
   function done() {
@@ -114,10 +152,13 @@ const geometry = computed(() => {
     :style="geometry"
     @pointerdown="movable && workspace.raise(name)"
   >
-    <!-- The tab: small, lit, and the handle. -->
-    <header>
-      <span class="tab" @pointerdown="grab($event, 'move')">{{ name }}</span>
-      <span class="rule" @pointerdown="grab($event, 'move')" />
+    <!-- The whole bar is the handle, not just the tab. The rule between them
+         is one pixel tall and the tab is a few characters wide: between them
+         they were the only places a press did anything, which is a window
+         most people conclude cannot be moved. -->
+    <header @pointerdown="grab($event, 'move')">
+      <span class="tab">{{ name }}</span>
+      <span class="rule" />
       <button
         v-if="closable"
         class="shut"
@@ -145,7 +186,16 @@ const geometry = computed(() => {
       <slot v-else />
     </div>
 
-    <span v-if="movable" class="grip" @pointerdown="grab($event, 'size')" />
+    <template v-if="movable">
+      <span
+        v-for="pull in HANDLES"
+        :key="pull.at"
+        class="pull"
+        :class="pull.at"
+        :style="{ cursor: pull.cursor }"
+        @pointerdown="grab($event, pull)"
+      />
+    </template>
   </section>
 </template>
 
@@ -169,7 +219,7 @@ const geometry = computed(() => {
 }
 
 .pane.live {
-  border-color: rgba(58, 160, 255, 0.7);
+  border-color: rgba(63, 165, 246, 0.7);
   box-shadow: var(--neon-glow), 0 20px 60px rgba(0, 0, 0, 0.55);
 }
 
@@ -177,15 +227,22 @@ header {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 6px 0 8px;
+  /* Deep enough to aim at. The bar is the handle, so it is worth the pixels
+     -- eight above and eight below the tab rather than six and nothing. */
+  padding: 8px 6px 8px 8px;
   touch-action: none;
+  cursor: grab;
+}
+
+header:active {
+  cursor: grabbing;
 }
 
 /* Lit, and the only lit thing on a panel that is not doing anything. */
 .tab {
   padding: 3px 9px;
   border: 1px solid var(--panel-border);
-  background: rgba(58, 160, 255, 0.12);
+  background: rgba(63, 165, 246, 0.12);
   font-family: var(--mono);
   font-size: var(--label);
   font-weight: 500;
@@ -193,18 +250,12 @@ header {
   text-transform: uppercase;
   color: var(--neon-soft);
   white-space: nowrap;
-  cursor: grab;
-}
-
-.tab:active {
-  cursor: grabbing;
 }
 
 .rule {
   flex: 1;
   height: 1px;
   background: var(--panel-border);
-  cursor: grab;
 }
 
 .shut {
@@ -285,14 +336,68 @@ header {
   line-height: 1.55;
 }
 
-/* The corner the eye already reads as a corner doubles as the grip. */
-.grip {
+/* Every edge and every corner. Six pixels of reach, which is invisible and
+   findable -- the corners overlap the edges and win by coming later. */
+.pull {
   position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 16px;
-  height: 16px;
-  cursor: nwse-resize;
   touch-action: none;
+}
+
+.pull.n,
+.pull.s {
+  left: 6px;
+  right: 6px;
+  height: 6px;
+}
+
+.pull.n {
+  top: -3px;
+}
+
+.pull.s {
+  bottom: -3px;
+}
+
+.pull.w,
+.pull.e {
+  top: 6px;
+  bottom: 6px;
+  width: 6px;
+}
+
+.pull.w {
+  left: -3px;
+}
+
+.pull.e {
+  right: -3px;
+}
+
+.pull.nw,
+.pull.ne,
+.pull.sw,
+.pull.se {
+  width: 14px;
+  height: 14px;
+}
+
+.pull.nw {
+  top: -3px;
+  left: -3px;
+}
+
+.pull.ne {
+  top: -3px;
+  right: -3px;
+}
+
+.pull.sw {
+  bottom: -3px;
+  left: -3px;
+}
+
+.pull.se {
+  bottom: -3px;
+  right: -3px;
 }
 </style>

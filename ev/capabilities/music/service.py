@@ -21,6 +21,7 @@ from ev.capabilities.music.args import (
     ModeArgs,
     NowPlayingArgs,
     PlayArgs,
+    SeekArgs,
     VolumeArgs,
 )
 from ev.domain.naming import closest
@@ -32,6 +33,7 @@ CONTROL = "music.control"
 VOLUME = "music.volume"
 MODE = "music.mode"
 NOW_PLAYING = "music.now_playing"
+SEEK = "music.seek"
 
 COVER_TYPES = {
     b"\xff\xd8\xff": "image/jpeg",
@@ -41,6 +43,11 @@ COVER_TYPES = {
 scripting dictionary reports a format constant that does not always match what
 `raw data` actually contains, and a JPEG announced as a PNG renders as
 nothing."""
+
+
+def _clock(seconds: int) -> str:
+    """`1:30`. What a person says back about a place in a song."""
+    return f"{seconds // 60}:{seconds % 60:02d}"
 
 
 def _seconds(value: str) -> int:
@@ -288,6 +295,24 @@ class MusicService:
             speech=self._speaker.say(key, track=playing),
         )
 
+    async def seek(self, args: SeekArgs) -> ToolResult:
+        landed = await self._adapter.seek(args.to)
+        if not landed:
+            return ToolResult.failure(
+                SEEK,
+                ToolErrorCode.INVALID_ARGUMENTS,
+                self._speaker.say("music.nothing_playing"),
+            )
+
+        where = _seconds(landed)
+        return ToolResult.success(
+            SEEK,
+            data={"at": where},
+            # Where it landed, not where it was asked for: the script clamps,
+            # and announcing the request would be announcing a guess.
+            speech=self._speaker.say("music.seeked", when=_clock(where)),
+        )
+
     async def now_playing(self, _args: NowPlayingArgs) -> ToolResult:
         """What is playing, for a display to draw.
 
@@ -306,6 +331,7 @@ class MusicService:
             shuffle,
             repeating,
             cover,
+            words,
         ) = await self._adapter.now_playing(self._artwork)
 
         return ToolResult.success(
@@ -320,6 +346,11 @@ class MusicService:
                 "shuffle": shuffle == "on",
                 "repeat": repeating,
                 "cover": self._cover(cover, name, album),
+                # Whatever the file carries. Apple Music's streamed catalogue
+                # keeps its own time-synced lyrics to itself, so this is empty
+                # for almost everything -- and empty is the honest answer
+                # rather than a reason to go and fetch some.
+                "lyrics": words.strip(),
             },
             # Nothing is said out loud: this is a display reading itself, and
             # a status line spoken every second is not an assistant.

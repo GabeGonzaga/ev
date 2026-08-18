@@ -250,6 +250,7 @@ NOW_PLAYING: Final = """on run argv
 	set outLen to "0"
 	set outShuffle to "off"
 	set outRepeat to "off"
+	set outLyrics to ""
 	tell application "Music"
 		set outState to player state as text
 		if outState is not "stopped" then
@@ -266,6 +267,9 @@ NOW_PLAYING: Final = """on run argv
 				else if song repeat is all then
 					set outRepeat to "all"
 				end if
+				try
+					set outLyrics to lyrics of theTrack
+				end try
 				if artPath is not "" then
 					try
 						set theArt to raw data of artwork 1 of theTrack
@@ -283,7 +287,7 @@ NOW_PLAYING: Final = """on run argv
 	end if
 	return outState & linefeed & outName & linefeed & outArtist & linefeed & \
 		outAlbum & linefeed & outPos & linefeed & outLen & linefeed & \
-		outShuffle & linefeed & outRepeat & linefeed & wroteArt
+		outShuffle & linefeed & outRepeat & linefeed & wroteArt & linefeed & outLyrics
 end run
 
 on writeArt(theData, thePath)
@@ -294,7 +298,7 @@ on writeArt(theData, thePath)
 	end try
 	close access outFile
 end writeArt"""
-"""What is playing, and the cover, in one round trip.
+"""What is playing, the cover and the lyrics, in one round trip.
 
 The file is written *outside* the `tell` block, through a handler called with
 `my`. `open for access` and `write` belong to AppleScript, not to Music, and
@@ -306,6 +310,29 @@ Reading is guarded rather than assumed. A track that is streaming, one Music
 can no longer reach, or a player that has just been asked to skip past the end
 of a queue all leave a current track that answers some questions and not
 others; what cannot be read stays empty rather than failing the whole read."""
+
+SEEK: Final = """on run argv
+	set theWhen to (item 1 of argv) as integer
+	tell application "Music"
+		if player state is stopped then return ""
+		set theLength to 0
+		try
+			set theLength to (duration of current track) as integer
+		end try
+		if theWhen < 0 then set theWhen to 0
+		-- A second short of the end rather than the end itself: setting the
+		-- position to the duration is asking Music to stand on the boundary,
+		-- and it answers by moving to the next track.
+		if theLength > 0 and theWhen > (theLength - 1) then set theWhen to theLength - 1
+		set player position to theWhen
+		return (theWhen as text)
+	end tell
+end run"""
+"""Where in the track to stand.
+
+Whole seconds, clamped by the script rather than by the caller: the display
+knows the length it was last told, and a scrub that lands a pixel past the end
+should not skip the song."""
 
 MODE: Final = """on run argv
 	set theSetting to item 1 of argv
@@ -423,17 +450,25 @@ class MusicAdapter:
     async def control(self, action: str) -> str:
         return await self._applescript.run(CONTROL, action)
 
+    async def seek(self, seconds: int) -> str:
+        """Move the playhead. Answers with where it actually landed."""
+        return await self._applescript.run(SEEK, str(seconds))
+
     async def now_playing(self, artwork: Path | None) -> list[str]:
-        """Nine lines: state, name, artist, album, position, length, shuffle,
-        repeat, and where the cover was written -- or empty if there was none.
+        """Ten fields: state, name, artist, album, position, length, shuffle,
+        repeat, where the cover was written, and the lyrics.
+
+        The lyrics come last and are not split. They are the one field with
+        newlines of its own, and splitting the whole answer on linefeed would
+        turn a song into nine fields and a mess.
         """
         answer = await self._applescript.run(
             NOW_PLAYING, str(artwork) if artwork else ""
         )
-        lines = answer.split("\n")
+        fields = answer.split("\n", 9)
         # A short answer is a script that stopped early, not a track with
         # missing fields; padding keeps the caller from indexing off the end.
-        return [*lines, *([""] * (9 - len(lines)))][:9]
+        return [*fields, *([""] * (10 - len(fields)))][:10]
 
     async def mode(self, setting: str, state: str) -> str:
         """Set shuffle or repeat, and answer with the position it is now in."""

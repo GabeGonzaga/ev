@@ -37,6 +37,18 @@ from ev.infrastructure.macos.processes import ProcessRunner
 MISSING = "EV Nonexistent QQQ"
 
 
+async def _where(applescript: AppleScriptClient) -> int:
+    """The playhead, now. Read so the seek check can put it back where it
+    found it."""
+    answer = await applescript.run(
+        'on run\n\ttell application "Music"\n'
+        '\t\tif player state is stopped then return "0"\n'
+        "\t\treturn (player position as integer) as text\n"
+        "\tend tell\nend run"
+    )
+    return int(answer or 0)
+
+
 async def main() -> int:
     applescript = AppleScriptClient(ProcessRunner())
     adapter = MusicAdapter(applescript)
@@ -87,6 +99,9 @@ async def main() -> int:
     # Likewise: no branch matches, so neither switch is written and whatever
     # the user has shuffle and repeat set to survives the check.
     await expect_value("switches", adapter.mode("noop", "toggle"))
+    # Where it already is: the script runs end to end and the playhead does
+    # not move, so a check does not scrub the user's music.
+    await expect_value("seek", adapter.seek(await _where(applescript)))
     await expect_value("volume step", adapter.step(0))
 
     print("running every notes script against Notes")

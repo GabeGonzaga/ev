@@ -24,6 +24,14 @@ import { computed, ref } from "vue";
 /// ambient the plasma orb and the clock; a bedside presence
 export type Stage = "blank" | "idle" | "waking" | "awake" | "ambient";
 
+/// Where the camera is showing, if it is.
+///
+/// Not a stage: full screen, the feed is the display's *background* -- the
+/// grid still runs over it, the chrome still frames it and the ring still
+/// turns in the corner. A stage would have replaced all of that, which is the
+/// opposite of what a background is.
+export type Lens = "off" | "window" | "full";
+
 /// What E.V. is doing, which the core drives and the ring reflects.
 export type Voice = "idle" | "listening" | "thinking" | "speaking";
 
@@ -31,6 +39,11 @@ export type Voice = "idle" | "listening" | "thinking" | "speaking";
 /// forbids news and market widgets, because both would mean fetching from the
 /// internet.
 export type Widget = "console" | "music" | "shortcuts" | "add";
+
+/// The wide ones. Only these push the core out of the middle: a window big
+/// enough to want the centre gets it, and everything else is small enough to
+/// sit beside a core that has simply made room.
+const WIDE: readonly Widget[] = ["shortcuts"];
 
 export interface Turn {
   id: number;
@@ -70,16 +83,35 @@ export const useAssistantState = defineStore("assistant", () => {
   /// The lens, while it is on. Invariant 8 wants a visible active state, and
   /// the dock is where it is visible.
   const looking = ref(false);
+  const lens = ref<Lens>("off");
+  /// Which way it was last shown, so turning it on again gives back what was
+  /// last chosen rather than always the same one.
+  const lastLens = ref<Exclude<Lens, "off">>("full");
 
-  /// Awake and something open on it. The core drifts to the right edge and
-  /// the middle belongs to the widgets.
+  /// Awake and something open on it.
   const working = computed(() => stage.value === "awake" && open.value.length > 0);
+
+  /// A wide window is up, so the core leaves the middle for it.
+  const aside = computed(
+    () => working.value && open.value.some((each) => WIDE.includes(each)),
+  );
+
+  /// Something narrow is up. The core stays where it is and only makes
+  /// itself smaller -- moving it to the edge for a 400px panel is a lot of
+  /// travel to free room nobody needed, and it leaves the middle of the
+  /// display as somewhere windows can be dragged through.
+  const tucked = computed(() => working.value && !aside.value);
 
   /// Whether the ring is on screen at all -- ambient replaces it with the orb,
   /// blank has nothing.
   const ringed = computed(() =>
     ["idle", "waking", "awake"].includes(stage.value),
   );
+
+  /// The core never leaves the screen. With the feed behind everything it
+  /// shrinks into the corner and keeps turning; it does not go away, because
+  /// a display where E.V. has vanished is a display that has stopped.
+  const badged = computed(() => lens.value === "full");
 
   /// A turn is in flight. Not idle however long since the last key.
   const busy = computed(() => voice.value !== "idle");
@@ -130,6 +162,23 @@ export const useAssistantState = defineStore("assistant", () => {
     open.value = [];
   }
 
+  /// Show the camera, one way or the other, or stop showing it.
+  function watch_(how: Lens) {
+    if (how !== "off") {
+      if (stage.value !== "awake") triggerWake();
+      lastLens.value = how;
+    }
+    lens.value = how;
+    if (how === "off") looking.value = false;
+    touch();
+  }
+
+  /// What the dock's camera icon does: on to whichever way it was last shown,
+  /// and off from either of them.
+  function toggleLens() {
+    watch_(lens.value === "off" ? lastLens.value : "off");
+  }
+
   /// The clean screen: the grid on its own.
   function clear() {
     stage.value = stage.value === "blank" ? "idle" : "blank";
@@ -173,7 +222,13 @@ export const useAssistantState = defineStore("assistant", () => {
     audioLevel,
     error,
     working,
+    aside,
+    tucked,
     ringed,
+    badged,
+    lens,
+    watch: watch_,
+    toggleLens,
     busy,
     triggerWake,
     rest,

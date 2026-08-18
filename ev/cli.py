@@ -245,7 +245,7 @@ def build_registry(
     applications = Applications()
 
     for spec in (
-        *browser_tools(BrowserService(OpenAdapter(processes), speaker)),
+        *browser_tools(BrowserService(OpenAdapter(processes, applescript), speaker)),
         *application_tools(
             ApplicationService(
                 ApplicationAdapter(processes, applescript), applications, speaker

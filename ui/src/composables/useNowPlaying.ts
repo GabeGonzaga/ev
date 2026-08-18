@@ -23,6 +23,8 @@ export interface Playing {
   shuffle: boolean;
   repeat: "off" | "all" | "one" | string;
   cover: string | null;
+  /// Whatever the file carries, which for a streamed track is nothing.
+  lyrics: string;
 }
 
 export interface NowPlaying {
@@ -31,6 +33,10 @@ export interface NowPlaying {
   error: Ref<string | null>;
   /// Seconds in, advanced locally between reads.
   at: Ref<number>;
+  /// True while a finger is on the progress line. The clock stops and reads
+  /// stop overwriting the position: a scrub fighting a poll is a scrub that
+  /// jumps back every four seconds.
+  holding: Ref<boolean>;
   read: () => Promise<void>;
   /// Say something to the core, then read what it did.
   tell: (what: string) => Promise<void>;
@@ -45,6 +51,7 @@ export function useNowPlaying(locale: () => string): NowPlaying {
   const pending = ref(true);
   const error = ref<string | null>(null);
   const at = ref(0);
+  const holding = ref(false);
 
   let ticking = 0;
   let polling = 0;
@@ -61,7 +68,7 @@ export function useNowPlaying(locale: () => string): NowPlaying {
         return;
       }
       playing.value = data;
-      at.value = data.at;
+      if (!holding.value) at.value = data.at;
       error.value = null;
     } catch (trouble) {
       error.value = String(trouble instanceof Error ? trouble.message : trouble);
@@ -83,7 +90,7 @@ export function useNowPlaying(locale: () => string): NowPlaying {
   // times a second to move a bar one pixel is the wrong trade.
   polling = window.setInterval(read, EVERY_MS);
   ticking = window.setInterval(() => {
-    if (playing.value?.state !== "playing") return;
+    if (holding.value || playing.value?.state !== "playing") return;
     at.value = Math.min(playing.value.length, at.value + 1);
   }, 1000);
 
@@ -94,7 +101,7 @@ export function useNowPlaying(locale: () => string): NowPlaying {
     window.clearInterval(ticking);
   });
 
-  return { playing, pending, error, at, read, tell };
+  return { playing, pending, error, at, holding, read, tell };
 }
 
 /// `2:04`. Music answers in whole seconds and nothing here is longer than an

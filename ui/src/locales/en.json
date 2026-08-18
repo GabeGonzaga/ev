@@ -13,10 +13,6 @@
     "attach_hint": "not built yet",
     "send": "[send ↵]"
   },
-  "conversation": {
-    "subtitle": "transcript",
-    "waiting": "awaiting stream"
-  },
   "music": {
     "waiting": "asking music...",
     "previous": "previous",
@@ -24,13 +20,15 @@
     "pause": "pause",
     "next": "next",
     "shuffle": "shuffle",
-    "repeat": "repeat",
-    "repeat_one": "repeating this track",
     "tag": {
       "play": "play",
       "hold": "hold",
       "idle": "idle"
-    }
+    },
+    "repeat_everything": "repeat everything",
+    "repeat_this": "repeat this track",
+    "repeat_stop": "stop repeating",
+    "lyrics": "lyrics"
   },
   "pane": {
     "waiting": "awaiting stream",
@@ -46,14 +44,15 @@
     "forget": "forget it",
     "label": "label",
     "label_hint": "github",
-    "says": "says",
-    "says_hint": "open github.com",
-    "save": "[ save ]"
+    "save": "[ save ]",
+    "link": "link",
+    "link_hint": "github.com",
+    "window": "window",
+    "tab": "tab",
+    "open_window_hint": "open {url} in a small window",
+    "open_tab_hint": "open {url} in a tab"
   },
   "chrome": {
     "unreachable": "CORE UNREACHABLE"
-  },
-  "surface": {
-    "camera_unwired": "The camera is not wired to this display yet."
   }
 }

@@ -60,3 +60,11 @@
 {"id": "now-playing", "locale": "pt-PT", "utterance": "o que está a tocar", "tool": "music.now_playing", "arguments": {}}
 {"id": "now-playing-question", "locale": "en", "utterance": "what's playing", "tool": "music.now_playing", "arguments": {}}
 {"id": "now-playing-question", "locale": "pt-PT", "utterance": "a tocar agora", "tool": "music.now_playing", "arguments": {}}
+{"id": "seek-clock", "locale": "en", "utterance": "skip to 1:30", "tool": "music.seek", "arguments": {"to": 90}}
+{"id": "seek-clock", "locale": "pt-PT", "utterance": "avança para 1:30", "tool": "music.seek", "arguments": {"to": 90}}
+{"id": "seek-seconds", "locale": "en", "utterance": "seek to 95", "tool": "music.seek", "arguments": {"to": 95}}
+{"id": "seek-seconds", "locale": "pt-PT", "utterance": "salta para 95", "tool": "music.seek", "arguments": {"to": 95}}
+{"id": "cycle", "locale": "en", "utterance": "cycle", "tool": "music.mode", "arguments": {"setting": "repeat", "state": "one"}}
+{"id": "cycle", "locale": "pt-PT", "utterance": "ciclo", "tool": "music.mode", "arguments": {"setting": "repeat", "state": "one"}}
+{"id": "cycle-this-song", "locale": "en", "utterance": "cycle this song", "tool": "music.mode", "arguments": {"setting": "repeat", "state": "one"}}
+{"id": "cycle-this-song", "locale": "pt-PT", "utterance": "põe em ciclo", "tool": "music.mode", "arguments": {"setting": "repeat", "state": "one"}}
