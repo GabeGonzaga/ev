@@ -12,6 +12,7 @@ import { submit } from "../../api";
 import { useAssistantState } from "../../stores/assistant";
 import { useShortcuts } from "../../stores/shortcuts";
 import HudPane from "./HudPane.vue";
+import { t } from "../../i18n";
 
 const props = withDefaults(
   defineProps<{ adding?: boolean; locale?: string }>(),
@@ -60,9 +61,9 @@ function keep() {
         @click="run(one.says)"
       >
         {{ one.label }}
-        <span class="drop" title="forget it" @click.stop="shortcuts.forget(one.id)">×</span>
+        <span class="drop" :title="t('shortcuts.forget')" @click.stop="shortcuts.forget(one.id)">×</span>
       </button>
-      <p v-if="!shortcuts.saved.length" class="none">&gt; nothing saved yet</p>
+      <p v-if="!shortcuts.saved.length" class="none">&gt; {{ t("shortcuts.empty") }}</p>
     </div>
   </HudPane>
 
@@ -77,19 +78,24 @@ function keep() {
   >
     <form class="form" @submit.prevent="keep">
       <label>
-        <span>label</span>
-        <input v-model="label" spellcheck="false" autocomplete="off" placeholder="github" />
+        <span>{{ t("shortcuts.label") }}</span>
+        <input
+          v-model="label"
+          spellcheck="false"
+          autocomplete="off"
+          :placeholder="t('shortcuts.label_hint')"
+        />
       </label>
       <label>
-        <span>says</span>
+        <span>{{ t("shortcuts.says") }}</span>
         <input
           v-model="says"
           spellcheck="false"
           autocomplete="off"
-          placeholder="open github.com"
+          :placeholder="t('shortcuts.says_hint')"
         />
       </label>
-      <button class="keep" type="submit">[ save ]</button>
+      <button class="keep" type="submit">{{ t("shortcuts.save") }}</button>
     </form>
   </HudPane>
 </template>

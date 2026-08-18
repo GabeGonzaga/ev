@@ -12,6 +12,7 @@
 
 import { computed, nextTick, ref, watch } from "vue";
 import { useFrame } from "../../composables/useFrame";
+import { t } from "../../i18n";
 import type { Turn } from "../../stores/assistant";
 import HudPane from "./HudPane.vue";
 
@@ -90,13 +91,13 @@ watch(shown, toBottom);
 <template>
   <HudPane
     name="conversation"
-    subtitle="transcript"
+    :subtitle="t('conversation.subtitle')"
     source="whisper·small"
     :pending="pending"
     :error="error"
     :empty="!turns.length"
     :live="!!arriving"
-    waiting="awaiting stream"
+    :waiting="t('conversation.waiting')"
   >
     <div ref="log" class="log" @scroll="onScroll">
       <p v-for="turn in turns" :key="turn.id" class="turn" :class="turn.who">

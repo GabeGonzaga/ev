@@ -18,6 +18,8 @@ export type DockAction =
   | "add"
   | "chat";
 
+import { t } from "../../i18n";
+
 defineProps<{
   /// Which of them are live right now.
   lit?: Partial<Record<DockAction, boolean>>;
@@ -25,13 +27,15 @@ defineProps<{
 
 const emit = defineEmits<{ pick: [action: DockAction] }>();
 
-const ICONS: { action: DockAction; title: string }[] = [
-  { action: "camera", title: "take a look" },
-  { action: "microphone", title: "listen" },
-  { action: "music", title: "music" },
-  { action: "shortcuts", title: "shortcuts" },
-  { action: "add", title: "add a shortcut" },
-  { action: "chat", title: "chat" },
+// The titles live in the locale file under the action's own name, so the
+// list here is only the order of the row.
+const ICONS: { action: DockAction }[] = [
+  { action: "camera" },
+  { action: "microphone" },
+  { action: "music" },
+  { action: "shortcuts" },
+  { action: "add" },
+  { action: "chat" },
 ];
 </script>
 
@@ -43,7 +47,7 @@ const ICONS: { action: DockAction; title: string }[] = [
       class="key"
       :class="{ on: lit?.[icon.action] }"
       type="button"
-      :title="icon.title"
+      :title="t(`dock.${icon.action}`)"
       @click="emit('pick', icon.action)"
     >
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
