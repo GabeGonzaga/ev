@@ -18,6 +18,7 @@
 
 import { computed, onMounted } from "vue";
 import { type Floating, useWorkspace } from "../../stores/workspace";
+import { t } from "../../i18n";
 
 const props = withDefaults(
   defineProps<{
@@ -37,7 +38,7 @@ const props = withDefaults(
     movable?: boolean;
     closable?: boolean;
   }>(),
-  { waiting: "awaiting stream", movable: true, closable: true },
+  { waiting: "", movable: true, closable: true },
 );
 
 const emit = defineEmits<{ close: [] }>();
@@ -162,7 +163,7 @@ const geometry = computed(() => {
         v-if="closable"
         class="shut"
         type="button"
-        title="close"
+        :title="t('pane.close')"
         @pointerdown.stop
         @click="emit('close')"
       >
@@ -180,7 +181,7 @@ const geometry = computed(() => {
     <div class="body">
       <p v-if="error" class="failed">{{ error }}</p>
       <p v-else-if="pending || empty" class="waiting">
-        &gt; {{ waiting }}<span class="caret" />
+        &gt; {{ waiting || t("pane.waiting") }}<span class="caret" />
       </p>
       <slot v-else />
     </div>

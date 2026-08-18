@@ -13,8 +13,9 @@ import { computed, ref } from "vue";
 import { clock, useNowPlaying } from "../../composables/useNowPlaying";
 import { type Floating, useWorkspace } from "../../stores/workspace";
 import HudPane from "./HudPane.vue";
+import { t } from "../../i18n";
 
-const props = withDefaults(defineProps<{ locale?: string }>(), { locale: "pt-PT" });
+const props = withDefaults(defineProps<{ locale?: string }>(), { locale: "en" });
 const emit = defineEmits<{ close: [] }>();
 
 const { playing, pending, error, at, holding, tell } = useNowPlaying(
@@ -69,7 +70,9 @@ const along = computed(() => {
 /// The tag in the corner of the art, which is Reference 4's `IDLE`.
 const tag = computed(() => {
   const state = playing.value?.state;
-  return state === "playing" ? "play" : state === "paused" ? "hold" : "idle";
+  return t(
+    state === "playing" ? "music.tag.play" : state === "paused" ? "music.tag.hold" : "music.tag.idle",
+  );
 });
 
 const repeating = computed(() => playing.value?.repeat !== "off");
@@ -78,10 +81,12 @@ const repeating = computed(() => playing.value?.repeat !== "off");
 /// walks, and the reason "cycle" exists as a word. Each is the sentence a
 /// person would say for it, so the button and the voice reach the same place
 /// by the same route.
+// `says` is the sentence sent to the core -- a command, structure, never
+// translated. `then` is the tooltip, which is words, so it is a key.
 const ROUND: Record<string, { says: string; then: string }> = {
-  off: { says: "repeat on", then: "repeat everything" },
-  all: { says: "cycle", then: "repeat this track" },
-  one: { says: "repeat off", then: "stop repeating" },
+  off: { says: "repeat on", then: "music.repeat_everything" },
+  all: { says: "cycle", then: "music.repeat_this" },
+  one: { says: "repeat off", then: "music.repeat_stop" },
 };
 
 const nextRepeat = computed(() => ROUND[playing.value?.repeat ?? "off"] ?? ROUND.off);
@@ -121,7 +126,7 @@ const words = computed(() => playing.value?.lyrics?.trim() ?? "");
     :pending="pending"
     :error="error"
     :empty="!playing"
-    waiting="asking music..."
+    :waiting="t('music.waiting')"
     :live="playing?.state === 'playing'"
     :at="{ x: 470, y: 150, width: 400, height: 168 }"
     @close="emit('close')"
@@ -152,13 +157,13 @@ const words = computed(() => playing.value?.lyrics?.trim() ?? "");
         </div>
 
         <div class="transport">
-          <button type="button" title="previous" @click="tell('previous')">
+          <button type="button" :title="t('music.previous')" @click="tell('previous')">
             <svg viewBox="0 0 24 24"><path d="M18 5v14L8 12zM6 5v14" /></svg>
           </button>
           <button
             type="button"
             :class="{ on: playing.state === 'playing' }"
-            :title="playing.state === 'playing' ? 'pause' : 'play'"
+            :title="playing.state === 'playing' ? t('music.pause') : t('music.play')"
             @click="tell(playing.state === 'playing' ? 'pause' : 'resume')"
           >
             <svg v-if="playing.state === 'playing'" viewBox="0 0 24 24">
@@ -166,13 +171,13 @@ const words = computed(() => playing.value?.lyrics?.trim() ?? "");
             </svg>
             <svg v-else viewBox="0 0 24 24"><path d="M7 4.5v15L20 12z" /></svg>
           </button>
-          <button type="button" title="next" @click="tell('next')">
+          <button type="button" :title="t('music.next')" @click="tell('next')">
             <svg viewBox="0 0 24 24"><path d="M6 5v14l10-7zM18 5v14" /></svg>
           </button>
           <button
             type="button"
             :class="{ on: playing.shuffle }"
-            title="shuffle"
+            :title="t('music.shuffle')"
             @click="tell('shuffle')"
           >
             <svg viewBox="0 0 24 24">
@@ -182,7 +187,7 @@ const words = computed(() => playing.value?.lyrics?.trim() ?? "");
           <button
             type="button"
             :class="{ on: repeating }"
-            :title="nextRepeat.then"
+            :title="t(nextRepeat.then)"
             @click="tell(nextRepeat.says)"
           >
             <svg viewBox="0 0 24 24">
@@ -194,7 +199,7 @@ const words = computed(() => playing.value?.lyrics?.trim() ?? "");
           <button
             :class="{ on: reading }"
             type="button"
-            title="lyrics"
+            :title="t('music.lyrics')"
             @click="flip"
           >
             <svg viewBox="0 0 24 24">

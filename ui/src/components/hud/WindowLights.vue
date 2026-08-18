@@ -11,21 +11,27 @@
 // The glyph appears on hover over the group, as it does natively.
 
 import { hasWindowControls, windowControl } from "../../api";
+import { t } from "../../i18n";
 </script>
 
 <template>
   <div v-if="hasWindowControls" class="lights">
-    <button class="close" type="button" title="close" @click="windowControl('close')" />
+    <button
+      class="close"
+      type="button"
+      :title="t('window.close')"
+      @click="windowControl('close')"
+    />
     <button
       class="minimise"
       type="button"
-      title="minimise"
+      :title="t('window.minimise')"
       @click="windowControl('minimise')"
     />
     <button
       class="zoom"
       type="button"
-      title="zoom"
+      :title="t('window.zoom')"
       @click="windowControl('fullscreen')"
     />
   </div>

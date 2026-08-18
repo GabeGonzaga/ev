@@ -17,7 +17,7 @@ const props = withDefaults(
     /// was asked in, and the date it leaves on the wall should match.
     locale?: string;
   }>(),
-  { level: 0, locale: "pt-PT" },
+  { level: 0, locale: "en" },
 );
 
 const time = ref("");

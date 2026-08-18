@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import plistlib
+from pathlib import Path
 from typing import cast
 
 import pytest
@@ -103,8 +105,29 @@ async def test_a_tab_never_asks_for_a_window() -> None:
 
 
 @pytest.mark.asyncio
-async def test_the_window_script_is_exactly_this(fake_bin: FakeBin) -> None:
+async def test_the_window_script_is_exactly_this(
+    fake_bin: FakeBin, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from ev.capabilities.browser import adapters
     from ev.infrastructure.macos.applescript import AppleScriptClient
+
+    # The browser choice is a fixture, not a fact about the runner: the suite
+    # runs on Linux, where Launch Services does not exist, and on a Mac the
+    # real plist would answer with whichever browser the machine's owner uses.
+    plist = tmp_path / "launchservices.plist"
+    plist.write_bytes(
+        plistlib.dumps(
+            {
+                "LSHandlers": [
+                    {
+                        "LSHandlerURLScheme": "http",
+                        "LSHandlerRoleAll": "com.google.chrome",
+                    }
+                ]
+            }
+        )
+    )
+    monkeypatch.setattr(adapters, "LAUNCH_SERVICES", plist)
 
     adapter = OpenAdapter(ProcessRunner(), AppleScriptClient(ProcessRunner()))
 

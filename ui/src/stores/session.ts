@@ -41,7 +41,7 @@ export const useSession = defineStore("session", () => {
     application: string | null;
     assurance: string;
   } | null>(null);
-  const locale = ref<string>("pt-PT");
+  const locale = ref<string>("en");
   // What the history is filtered by. Empty is the whole trail: a search box
   // someone cleared is not a search for nothing.
   const search = ref<string>("");

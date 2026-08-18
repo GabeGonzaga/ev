@@ -12,12 +12,13 @@
 
 import { computed, nextTick, ref, watch } from "vue";
 import { submit } from "../../api";
+import { t } from "../../i18n";
 import { useAssistantState } from "../../stores/assistant";
 import HudPane from "./HudPane.vue";
 
 const props = withDefaults(
   defineProps<{ locale?: string }>(),
-  { locale: "pt-PT" },
+  { locale: "en" },
 );
 
 const emit = defineEmits<{ close: [] }>();
@@ -100,15 +101,17 @@ watch(
       <input
         v-model="said"
         type="text"
-        placeholder="enter message..."
+        :placeholder="t('console.placeholder')"
         spellcheck="false"
         autocomplete="off"
       />
     </form>
 
     <footer>
-      <button type="button" class="act" title="not built yet" disabled>[+ img]</button>
-      <button type="button" class="act" @click="send">[send ↵]</button>
+      <button type="button" class="act" :title="t('console.attach_hint')" disabled>
+        {{ t("console.attach") }}
+      </button>
+      <button type="button" class="act" @click="send">{{ t("console.send") }}</button>
     </footer>
   </HudPane>
 </template>

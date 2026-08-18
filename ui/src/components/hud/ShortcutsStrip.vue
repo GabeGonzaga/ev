@@ -12,10 +12,11 @@ import { submit } from "../../api";
 import { useAssistantState } from "../../stores/assistant";
 import { useShortcuts } from "../../stores/shortcuts";
 import HudPane from "./HudPane.vue";
+import { t } from "../../i18n";
 
 const props = withDefaults(
   defineProps<{ adding?: boolean; locale?: string }>(),
-  { adding: false, locale: "pt-PT" },
+  { adding: false, locale: "en" },
 );
 
 const emit = defineEmits<{ close: []; done: [] }>();
@@ -59,29 +60,29 @@ function keep() {
         <button
           class="way"
           type="button"
-          :title="`open ${one.url} in a small window`"
+          :title="t('shortcuts.open_window_hint', { url: one.url })"
           @click="run(`open ${one.url} in a window`)"
         >
-          window
+          {{ t("shortcuts.window") }}
         </button>
         <button
           class="way"
           type="button"
-          :title="`open ${one.url} in a tab`"
+          :title="t('shortcuts.open_tab_hint', { url: one.url })"
           @click="run(`open ${one.url}`)"
         >
-          tab
+          {{ t("shortcuts.tab") }}
         </button>
         <button
           class="drop"
           type="button"
-          title="forget it"
+          :title="t('shortcuts.forget')"
           @click="shortcuts.forget(one.id)"
         >
           ×
         </button>
       </span>
-      <p v-if="!shortcuts.saved.length" class="none">&gt; nothing saved yet</p>
+      <p v-if="!shortcuts.saved.length" class="none">&gt; {{ t("shortcuts.empty") }}</p>
     </div>
   </HudPane>
 
@@ -96,20 +97,25 @@ function keep() {
   >
     <form class="form" @submit.prevent="keep">
       <label>
-        <span>label</span>
-        <input v-model="label" spellcheck="false" autocomplete="off" placeholder="github" />
+        <span>{{ t("shortcuts.label") }}</span>
+        <input
+          v-model="label"
+          spellcheck="false"
+          autocomplete="off"
+          :placeholder="t('shortcuts.label_hint')"
+        />
       </label>
       <label>
-        <span>link</span>
+        <span>{{ t("shortcuts.link") }}</span>
         <input
           v-model="link"
           spellcheck="false"
           autocomplete="off"
           inputmode="url"
-          placeholder="github.com"
+          :placeholder="t('shortcuts.link_hint')"
         />
       </label>
-      <button class="keep" type="submit">[ save ]</button>
+      <button class="keep" type="submit">{{ t("shortcuts.save") }}</button>
     </form>
   </HudPane>
 </template>

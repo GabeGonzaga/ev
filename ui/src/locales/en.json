@@ -1,0 +1,58 @@
+{
+  "dock": {
+    "camera": "take a look",
+    "microphone": "listen",
+    "music": "music",
+    "shortcuts": "shortcuts",
+    "add": "add a shortcut",
+    "chat": "chat"
+  },
+  "console": {
+    "placeholder": "enter message...",
+    "attach": "[+ img]",
+    "attach_hint": "not built yet",
+    "send": "[send ↵]"
+  },
+  "music": {
+    "waiting": "asking music...",
+    "previous": "previous",
+    "play": "play",
+    "pause": "pause",
+    "next": "next",
+    "shuffle": "shuffle",
+    "tag": {
+      "play": "play",
+      "hold": "hold",
+      "idle": "idle"
+    },
+    "repeat_everything": "repeat everything",
+    "repeat_this": "repeat this track",
+    "repeat_stop": "stop repeating",
+    "lyrics": "lyrics"
+  },
+  "pane": {
+    "waiting": "awaiting stream",
+    "close": "close"
+  },
+  "window": {
+    "close": "close",
+    "minimise": "minimise",
+    "zoom": "zoom"
+  },
+  "shortcuts": {
+    "empty": "nothing saved yet",
+    "forget": "forget it",
+    "label": "label",
+    "label_hint": "github",
+    "save": "[ save ]",
+    "link": "link",
+    "link_hint": "github.com",
+    "window": "window",
+    "tab": "tab",
+    "open_window_hint": "open {url} in a small window",
+    "open_tab_hint": "open {url} in a tab"
+  },
+  "chrome": {
+    "unreachable": "CORE UNREACHABLE"
+  }
+}
