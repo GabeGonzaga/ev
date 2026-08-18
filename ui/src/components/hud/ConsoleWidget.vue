@@ -18,7 +18,7 @@ import HudPane from "./HudPane.vue";
 
 const props = withDefaults(
   defineProps<{ locale?: string }>(),
-  { locale: "pt-PT" },
+  { locale: "en" },
 );
 
 const emit = defineEmits<{ close: [] }>();
