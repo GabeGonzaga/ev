@@ -61,9 +61,12 @@ export const useAssistantState = defineStore("assistant", () => {
   const audioLevel = ref(0);
   const error = ref<string | null>(null);
   /// The language E.V. answers in, which is also the language its display
-  /// writes dates and speaks back in. Settings will own this when the display
-  /// is wired to the core; pt-PT is the project's default until then.
-  const locale = ref("pt-PT");
+  /// writes dates and speaks back in. English is the main one; every other
+  /// language is a file in `locales/` that Ditto produced, and settings will
+  /// own the choice when the display is wired to the core. When Portuguese is
+  /// chosen it is pt-PT, never pt-BR -- that rule is about the variant, not
+  /// the default.
+  const locale = ref("en");
   /// The lens, while it is on. Invariant 8 wants a visible active state, and
   /// the dock is where it is visible.
   const looking = ref(false);

@@ -14,7 +14,7 @@ import { clock, useNowPlaying } from "../../composables/useNowPlaying";
 import HudPane from "./HudPane.vue";
 import { t } from "../../i18n";
 
-const props = withDefaults(defineProps<{ locale?: string }>(), { locale: "pt-PT" });
+const props = withDefaults(defineProps<{ locale?: string }>(), { locale: "en" });
 const emit = defineEmits<{ close: [] }>();
 
 const { playing, pending, error, at, tell } = useNowPlaying(() => props.locale);

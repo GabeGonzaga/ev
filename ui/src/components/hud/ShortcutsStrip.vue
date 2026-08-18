@@ -16,7 +16,7 @@ import { t } from "../../i18n";
 
 const props = withDefaults(
   defineProps<{ adding?: boolean; locale?: string }>(),
-  { adding: false, locale: "pt-PT" },
+  { adding: false, locale: "en" },
 );
 
 const emit = defineEmits<{ close: []; done: [] }>();
