@@ -135,17 +135,16 @@ fn room(app: &AppHandle, samples: Vec<i16>) {
             follow(app);
         }
         Some(_) => {
-            let _ = app.emit(
-                "turn.completed",
-                TurnResult {
-                    heard: turn.heard,
-                    spoken: turn.speech.iter().map(|s| s.text.clone()).collect(),
-                    ok: turn.response.ok,
-                    outcome: "ran".into(),
-                    error: turn.response.error.as_ref().map(|e| e.message.clone()),
-                    data: turn.response.payload.get("data").cloned(),
-                },
-            );
+            let result = TurnResult {
+                heard: turn.heard,
+                spoken: turn.speech.iter().map(|s| s.text.clone()).collect(),
+                ok: turn.response.ok,
+                outcome: "ran".into(),
+                error: turn.response.error.as_ref().map(|e| e.message.clone()),
+                data: turn.response.payload.get("data").cloned(),
+            };
+            speak(&result.spoken, locale.as_deref());
+            let _ = app.emit("turn.completed", result);
         }
     }
 }
@@ -274,6 +273,62 @@ struct TurnResult {
     data: Option<serde_json::Value>,
 }
 
+/// Which macOS voice says it.
+///
+/// The setting wins when it names one, because voice quality on macOS is a
+/// download: the compact voice ships with the system, the Enhanced and
+/// Premium ones are fetched in Spoken Content, and the better one is not
+/// always named as the one it replaces. Otherwise the locale chooses --
+/// without naming her, macOS reads a Portuguese sentence with whatever the
+/// system default is, which is usually Brazilian or English.
+fn voice_for(saved: &settings::Settings, locale: Option<&str>) -> Option<String> {
+    if let Some(named) = &saved.voice {
+        return Some(named.clone());
+    }
+    match locale {
+        Some("pt-PT") => Some("Joana".to_string()),
+        _ => None,
+    }
+}
+
+/// Say the answer out loud.
+///
+/// The app had no voice at all: it collected the spoken lines, handed them to
+/// the window and stopped, so E.V. answered in writing in the one surface
+/// built to be spoken to. `ev-host` has always said them in a terminal; this
+/// is the same act in the app, where it belongs -- the audio device is the
+/// signed process's, and that is this one.
+///
+/// On its own thread, because `say` returns when the sentence has finished
+/// being said. Waiting for it would hold the turn open and the window would
+/// show the answer only after it had been heard.
+fn speak(lines: &[String], locale: Option<&str>) {
+    let saved = settings::load();
+    if !saved.speak || lines.is_empty() {
+        return;
+    }
+
+    let said = lines.join(" ");
+    let voice = voice_for(&saved, locale);
+
+    std::thread::spawn(move || {
+        let mut command = std::process::Command::new("say");
+        if let Some(name) = voice {
+            command.arg("-v").arg(name);
+        }
+        // "--" ends option parsing: a sentence starting with "-" is a
+        // sentence, not a flag. The words are the model's, so they are never
+        // trusted to be flag-shaped.
+        command.arg("--").arg(said);
+
+        if let Err(error) = command.status() {
+            // Failing to speak is not a reason to fail a turn that already
+            // happened. The words are on screen either way.
+            eprintln!("could not speak: {error}");
+        }
+    });
+}
+
 /// What starts a turn.
 enum Input {
     /// Typed in the panel.
@@ -356,7 +411,7 @@ fn run_turn(app: &AppHandle, input: Input, locale: Option<String>) -> Result<Tur
     };
 
     let payload = &turn.response.payload;
-    Ok(TurnResult {
+    let result = TurnResult {
         heard: turn.heard,
         spoken: turn.speech.iter().map(|s| s.text.clone()).collect(),
         ok: turn.response.ok,
@@ -367,7 +422,9 @@ fn run_turn(app: &AppHandle, input: Input, locale: Option<String>) -> Result<Tur
             .to_string(),
         error: turn.response.error.as_ref().map(|e| e.message.clone()),
         data: payload.get("data").cloned(),
-    })
+    };
+    speak(&result.spoken, locale.as_deref());
+    Ok(result)
 }
 
 #[tauri::command]
