@@ -24,6 +24,21 @@ pub const DEFAULT_SHORTCUT: &str = "CmdOrCtrl+Shift+Space";
 pub struct Settings {
     pub shortcut: String,
     pub locale: Option<String>,
+    /// Which macOS voice says it, by the name `say -v '?'` prints.
+    ///
+    /// None lets the locale choose, which is what most people want. It exists
+    /// because voice quality on macOS is a download: the compact voice ships
+    /// with the system and the Enhanced and Premium ones are fetched in
+    /// Spoken Content, and once fetched they may be named differently from
+    /// the compact one they replace. Naming the voice here is how someone
+    /// points E.V. at the better one without waiting for a release.
+    pub voice: Option<String>,
+    /// Whether E.V. says its answers out loud at all.
+    ///
+    /// On, because an assistant that only writes is a text box. Off is one
+    /// edit away for a shared office or a late night, and the answer is still
+    /// on screen either way.
+    pub speak: bool,
 }
 
 impl Default for Settings {
@@ -34,6 +49,8 @@ impl Default for Settings {
             // set is not a Portuguese one, and guessing from what was said
             // would mean detecting the language before routing.
             locale: None,
+            voice: None,
+            speak: true,
         }
     }
 }
@@ -83,6 +100,10 @@ mod tests {
 
         assert_eq!(settings.shortcut, DEFAULT_SHORTCUT);
         assert_eq!(settings.locale, None);
+        // The two the voice needs: no voice named, and speaking on. A file
+        // written before either existed still opens an app that talks.
+        assert_eq!(settings.voice, None);
+        assert!(settings.speak);
     }
 
     #[test]
@@ -90,6 +111,8 @@ mod tests {
         let settings = Settings {
             shortcut: "Alt+Space".into(),
             locale: Some("pt-PT".into()),
+            voice: Some("Joana (Premium)".into()),
+            speak: false,
         };
 
         let text = serde_json::to_string(&settings).expect("json");
@@ -97,5 +120,9 @@ mod tests {
 
         assert_eq!(read.shortcut, "Alt+Space");
         assert_eq!(read.locale.as_deref(), Some("pt-PT"));
+        // A voice name with spaces and brackets in it is what Spoken Content
+        // actually calls the downloaded voices, so it has to survive the trip.
+        assert_eq!(read.voice.as_deref(), Some("Joana (Premium)"));
+        assert!(!read.speak);
     }
 }
