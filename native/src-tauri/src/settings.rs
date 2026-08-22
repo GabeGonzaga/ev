@@ -15,22 +15,27 @@ use serde::{Deserialize, Serialize};
 
 /// Hold this to talk, and to bring E.V. up.
 ///
-/// `E`, because it is E.V.'s. A letter beats a space here: space chords are
-/// crowded on this system -- `Cmd+Space` is Spotlight, `Ctrl+Space` and
-/// `Ctrl+Option+Space` switch the input source, `Ctrl+Cmd+Space` is the emoji
-/// panel -- and none of that is true of this one. `Cmd+Shift+E` would have
-/// been the obvious spelling and is the editor's file tree, so the control
-/// key takes it instead.
+/// `Shift+Space`, asked for by name and set against the advice below, which
+/// is left here because the trade is real and the way out should be one edit.
 ///
-/// Two modifiers, not one: a chord that swaps the whole interface should not
-/// be reachable by a slip. And a chord rather than a bare modifier held or
-/// double-tapped, which would need an event tap and with it the Accessibility
-/// permission -- a much larger thing to ask for than a key combination.
+/// It is global, so it is taken everywhere rather than only here, and the
+/// pattern that triggers it -- Shift still down when the space bar goes down
+/// -- is one ordinary typing produces all day: `OK ` and `E.V. ` both end
+/// that way, because the thumb reaches the bar before the little finger has
+/// let go. Every one of those opens E.V. and starts recording, in whatever
+/// application was being typed into. In a browser it also takes `Shift+Space`
+/// away from scrolling a page back up.
 ///
-/// Note for anyone tempted by `Space+Shift+E`: there is no such accelerator.
-/// A shortcut is modifiers plus exactly one key, and the modifiers are only
-/// Command, Control, Option and Shift. Space can be the key or nothing.
-pub const DEFAULT_SHORTCUT: &str = "Ctrl+Shift+E";
+/// A letter is the shape that does not have this problem -- `Ctrl+Shift+E`
+/// was the previous default and is a one-word change back. Space chords with
+/// a second modifier are the middle ground: `Ctrl+Shift+Space` is free of the
+/// system's own bindings, and Shift alone is not.
+///
+/// Note, since it comes up: `Space+Shift+E` is not an accelerator and cannot
+/// be one. A shortcut is modifiers plus exactly one key, and the modifiers
+/// are only Command, Control, Option and Shift. Space can be the key, or
+/// nothing at all.
+pub const DEFAULT_SHORTCUT: &str = "Shift+Space";
 
 /// Defaults this app has shipped before.
 ///
@@ -44,6 +49,7 @@ const SUPERSEDED: &[&str] = &[
     "CmdOrCtrl+Shift+Space",
     "Alt+Shift+Space",
     "Ctrl+Shift+Space",
+    "Ctrl+Shift+E",
 ];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
