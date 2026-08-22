@@ -13,13 +13,29 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-/// Hold this to talk, and to bring E.V. up. `Option+Shift+Space` rather than
-/// `Cmd+Space`, which is Spotlight, and rather than a bare modifier, which
-/// needs an event tap and with it the Accessibility permission -- a much
-/// larger thing to ask for than a key combination.
+/// Hold this to talk, and to bring E.V. up.
 ///
-/// `Alt` is what the global-shortcut plugin calls the Option key.
-pub const DEFAULT_SHORTCUT: &str = "Alt+Shift+Space";
+/// Space chords are crowded on this system and every obvious one is taken:
+/// `Cmd+Space` is Spotlight, `Ctrl+Space` and `Ctrl+Option+Space` switch the
+/// input source, `Ctrl+Cmd+Space` is the emoji panel, and `Option+Space`
+/// types a non-breaking space -- which a global binding would swallow
+/// everywhere, not only here. `Ctrl+Shift+Space` is the one left that is
+/// neither a system shortcut nor a character.
+///
+/// A bare modifier -- double-tapping something -- would need an event tap and
+/// with it the Accessibility permission, which is a much larger thing to ask
+/// for than a key combination.
+pub const DEFAULT_SHORTCUT: &str = "Ctrl+Shift+Space";
+
+/// Defaults this app has shipped before.
+///
+/// A saved file carrying one of these was almost certainly never chosen: the
+/// whole settings struct is written whenever anything in it changes, so
+/// picking a language freezes whatever the shortcut default happened to be
+/// that day, and every later default is then invisible to that install. A
+/// value equal to a past default is therefore treated as unset. Anything else
+/// is somebody's own choice and is left exactly alone.
+const SUPERSEDED: &[&str] = &["CmdOrCtrl+Shift+Space", "Alt+Shift+Space"];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -72,10 +88,16 @@ pub fn path() -> PathBuf {
 /// refusing to start: an app that cannot be opened cannot be used to fix its
 /// own settings file.
 pub fn load() -> Settings {
-    std::fs::read_to_string(path())
+    let mut settings: Settings = std::fs::read_to_string(path())
         .ok()
         .and_then(|text| serde_json::from_str(&text).ok())
-        .unwrap_or_default()
+        .unwrap_or_default();
+
+    if SUPERSEDED.contains(&settings.shortcut.as_str()) {
+        settings.shortcut = DEFAULT_SHORTCUT.to_string();
+    }
+
+    settings
 }
 
 pub fn save(settings: &Settings) -> Result<(), String> {
@@ -106,6 +128,19 @@ mod tests {
         // written before either existed still opens an app that talks.
         assert_eq!(settings.voice, None);
         assert!(settings.speak);
+    }
+
+    #[test]
+    fn a_past_default_is_not_a_choice() {
+        // The trap this closes: saving a language froze the shortcut, so the
+        // install went on using a default that had since been replaced and
+        // nothing short of hand-editing the file could move it.
+        for stale in SUPERSEDED {
+            assert_ne!(
+                *stale, DEFAULT_SHORTCUT,
+                "a superseded default must not be the current one",
+            );
+        }
     }
 
     #[test]
