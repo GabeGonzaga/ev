@@ -15,17 +15,22 @@ use serde::{Deserialize, Serialize};
 
 /// Hold this to talk, and to bring E.V. up.
 ///
-/// Space chords are crowded on this system and every obvious one is taken:
-/// `Cmd+Space` is Spotlight, `Ctrl+Space` and `Ctrl+Option+Space` switch the
-/// input source, `Ctrl+Cmd+Space` is the emoji panel, and `Option+Space`
-/// types a non-breaking space -- which a global binding would swallow
-/// everywhere, not only here. `Ctrl+Shift+Space` is the one left that is
-/// neither a system shortcut nor a character.
+/// `E`, because it is E.V.'s. A letter beats a space here: space chords are
+/// crowded on this system -- `Cmd+Space` is Spotlight, `Ctrl+Space` and
+/// `Ctrl+Option+Space` switch the input source, `Ctrl+Cmd+Space` is the emoji
+/// panel -- and none of that is true of this one. `Cmd+Shift+E` would have
+/// been the obvious spelling and is the editor's file tree, so the control
+/// key takes it instead.
 ///
-/// A bare modifier -- double-tapping something -- would need an event tap and
-/// with it the Accessibility permission, which is a much larger thing to ask
-/// for than a key combination.
-pub const DEFAULT_SHORTCUT: &str = "Ctrl+Shift+Space";
+/// Two modifiers, not one: a chord that swaps the whole interface should not
+/// be reachable by a slip. And a chord rather than a bare modifier held or
+/// double-tapped, which would need an event tap and with it the Accessibility
+/// permission -- a much larger thing to ask for than a key combination.
+///
+/// Note for anyone tempted by `Space+Shift+E`: there is no such accelerator.
+/// A shortcut is modifiers plus exactly one key, and the modifiers are only
+/// Command, Control, Option and Shift. Space can be the key or nothing.
+pub const DEFAULT_SHORTCUT: &str = "Ctrl+Shift+E";
 
 /// Defaults this app has shipped before.
 ///
@@ -35,7 +40,11 @@ pub const DEFAULT_SHORTCUT: &str = "Ctrl+Shift+Space";
 /// that day, and every later default is then invisible to that install. A
 /// value equal to a past default is therefore treated as unset. Anything else
 /// is somebody's own choice and is left exactly alone.
-const SUPERSEDED: &[&str] = &["CmdOrCtrl+Shift+Space", "Alt+Shift+Space"];
+const SUPERSEDED: &[&str] = &[
+    "CmdOrCtrl+Shift+Space",
+    "Alt+Shift+Space",
+    "Ctrl+Shift+Space",
+];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
