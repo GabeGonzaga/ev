@@ -83,6 +83,12 @@ export const useAssistantState = defineStore("assistant", () => {
   /// The lens, while it is on. Invariant 8 wants a visible active state, and
   /// the dock is where it is visible.
   const looking = ref(false);
+  /// The wake loop's microphone, while it is open -- which is all day, if the
+  /// name is on. The same invariant asks for this one, and it is deliberately
+  /// not `voice`: a room being listened to for two syllables is not E.V.
+  /// listening to a request, and drawing them the same would make the one
+  /// that matters unreadable.
+  const hearing = ref(false);
   const lens = ref<Lens>("off");
   /// Which way it was last shown, so turning it on again gives back what was
   /// last chosen rather than always the same one.
@@ -217,6 +223,7 @@ export const useAssistantState = defineStore("assistant", () => {
     voice,
     locale,
     looking,
+    hearing,
     open,
     transcript,
     audioLevel,

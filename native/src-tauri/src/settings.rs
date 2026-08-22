@@ -13,11 +13,13 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-/// Hold this to talk. `Cmd+Shift+Space` rather than `Cmd+Space`, which is
-/// Spotlight, and rather than a bare modifier, which needs an event tap and
-/// with it the Accessibility permission -- a much larger thing to ask for
-/// than a key combination.
-pub const DEFAULT_SHORTCUT: &str = "CmdOrCtrl+Shift+Space";
+/// Hold this to talk, and to bring E.V. up. `Option+Shift+Space` rather than
+/// `Cmd+Space`, which is Spotlight, and rather than a bare modifier, which
+/// needs an event tap and with it the Accessibility permission -- a much
+/// larger thing to ask for than a key combination.
+///
+/// `Alt` is what the global-shortcut plugin calls the Option key.
+pub const DEFAULT_SHORTCUT: &str = "Alt+Shift+Space";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]

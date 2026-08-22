@@ -17,6 +17,7 @@ import { useAudioLevel } from "../../composables/useAudioLevel";
 import { useCamera } from "../../composables/useCamera";
 import { useFrame } from "../../composables/useFrame";
 import { useTelemetry } from "../../composables/useTelemetry";
+import { useWakeSignals } from "../../composables/useWakeSignals";
 import { SLEEP_MS, WAKE_MS, useAssistantState } from "../../stores/assistant";
 import CameraFeed from "./CameraFeed.vue";
 import CameraWindow from "./CameraWindow.vue";
@@ -26,12 +27,17 @@ import DockBar, { type DockAction } from "./DockBar.vue";
 import HudBeam from "./HudBeam.vue";
 import HudChrome from "./HudChrome.vue";
 import HudGrid from "./HudGrid.vue";
+import ParticleSphere from "./ParticleSphere.vue";
 import MusicWidget from "./MusicWidget.vue";
 import ShortcutsStrip from "./ShortcutsStrip.vue";
 import TheAmbient from "./TheAmbient.vue";
 import WindowLights from "./WindowLights.vue";
 
 const ev = useAssistantState();
+
+// The name, the hotkey, the microphone and the lens, as the core reports
+// them. Until this call the display answered only to the spacebar.
+useWakeSignals();
 
 // Wired here rather than in the chrome: the chrome takes what it draws as
 // props, so it can be mounted on its own with numbers made up on the spot.
@@ -143,7 +149,7 @@ const docked = computed(() => ["idle", "waking", "awake"].includes(ev.stage));
 /// this row.
 const alight = computed(() => ({
   camera: ev.looking,
-  microphone: ev.voice === "listening",
+  microphone: ev.voice === "listening" || ev.hearing,
   music: ev.isOpen("music"),
   shortcuts: ev.isOpen("shortcuts"),
   add: ev.isOpen("add"),
@@ -278,8 +284,19 @@ onBeforeUnmount(() => {
 
     <!-- The core. Not on the blank stage, which is the grid on its own, and
          not in ambient, where the plasma orb takes its place. -->
+    <!-- The home stage: the shell of points, with the name in it. It gives
+         way to the ring as the sweep crosses, rather than being swapped for
+         it -- the wordmark is the same type in the same place in both, so
+         what changes is the geometry around the name. -->
+    <ParticleSphere
+      v-if="ev.ringed && lit < 1"
+      :level="ev.audioLevel"
+      :shown="1 - lit"
+    />
+
     <CoreRing
       v-if="ev.ringed"
+      :style="{ opacity: lit }"
       :lit="lit"
       :voice="ev.voice"
       :level="ev.audioLevel"
