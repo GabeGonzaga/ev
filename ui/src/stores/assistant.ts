@@ -38,7 +38,7 @@ export type Voice = "idle" | "listening" | "thinking" | "speaking";
 /// The things that can be open on the display. Deliberately short: the spec
 /// forbids news and market widgets, because both would mean fetching from the
 /// internet.
-export type Widget = "console" | "music" | "shortcuts" | "add";
+export type Widget = "console" | "music" | "shortcuts" | "add" | "map";
 
 /// The wide ones. Only these push the core out of the middle: a window big
 /// enough to want the centre gets it, and everything else is small enough to

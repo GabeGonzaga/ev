@@ -170,6 +170,7 @@ class WebSurface:
         app.router.add_post("/api/audio", self._audio_route)
         app.router.add_post("/api/vision", self._vision_route)
         app.router.add_get("/api/history", self._history_route)
+        app.router.add_get("/api/map", self._map_route)
 
         if self._assets is not None and self._assets.is_dir():
             app.router.add_get("/", self._index)
@@ -342,6 +343,34 @@ class WebSurface:
             path.unlink(missing_ok=True)
 
         return web.json_response({"heard": said, **await self._begin(said, locale)})
+
+    def _basemap(self) -> Path:
+        """The map's ground, beside the journal.
+
+        Never in the repository: it is data, it is large, and `CLAUDE.md` says
+        where data lives. One file rather than a directory of tiles, because
+        PMTiles is an archive addressed by byte range -- which is the whole
+        reason a map can be served without a tile server.
+        """
+        return self._state_dir / "maps" / "basemap.pmtiles"
+
+    async def _map_route(self, request: web.Request) -> web.StreamResponse:
+        found = self._basemap()
+        if not found.is_file():
+            # A map with no ground is not a fault to explain at length: the
+            # panel has the path and says it better than a body would.
+            raise web.HTTPNotFound(text="no basemap")
+
+        # FileResponse answers `Range` itself, which is the only header that
+        # matters here -- without it this hands over a file that can be
+        # gigabytes to draw one screen.
+        return web.FileResponse(
+            found,
+            headers={
+                "Content-Type": "application/octet-stream",
+                "Accept-Ranges": "bytes",
+            },
+        )
 
     async def _history_route(self, request: web.Request) -> web.StreamResponse:
         if self._history is None:

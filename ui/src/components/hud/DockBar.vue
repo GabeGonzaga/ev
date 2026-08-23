@@ -16,7 +16,8 @@ export type DockAction =
   | "music"
   | "shortcuts"
   | "add"
-  | "chat";
+  | "chat"
+  | "map";
 
 import { t } from "../../i18n";
 
@@ -36,6 +37,7 @@ const ICONS: { action: DockAction }[] = [
   { action: "shortcuts" },
   { action: "add" },
   { action: "chat" },
+  { action: "map" },
 ];
 </script>
 
@@ -58,6 +60,10 @@ const ICONS: { action: DockAction }[] = [
         <template v-else-if="icon.action === 'microphone'">
           <rect x="9" y="3" width="6" height="11" rx="3" />
           <path d="M5.5 12a6.5 6.5 0 0 0 13 0M12 18.5V21" />
+        </template>
+        <template v-else-if="icon.action === 'map'">
+          <path d="M9 4.5 3.5 6.8v12.7L9 17.2l6 2.3 5.5-2.3V4.5L15 6.8z" />
+          <path d="M9 4.5v12.7M15 6.8v12.7" />
         </template>
         <template v-else-if="icon.action === 'music'">
           <path d="M9 18V6l10-2v12" />
