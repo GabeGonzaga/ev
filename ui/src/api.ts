@@ -221,6 +221,38 @@ export async function onHotkeyTurn(
   await listen<TurnResult>("turn.completed", (event) => finished(event.payload));
 }
 
+/// The basemap, a byte range at a time.
+///
+/// A map is tiles, and tiles are normally a server: every pan tells somebody
+/// where you are looking. This one is a single file on this machine -- the
+/// PMTiles format is an archive addressed by range, so the renderer asks for
+/// the few kilobytes covering the view and nothing else. The range comes
+/// back through the same door as everything else: a command in the app, a
+/// request on the local surface. No tile host, no key, no viewport leaving
+/// the machine.
+export const mapPresent = (): Promise<boolean> =>
+  inTauri
+    ? callTauri<boolean>("map_present")
+    : fetch("/api/map", { method: "HEAD", headers: { Authorization: `Bearer ${claimToken()}` } })
+        .then((answer) => answer.ok)
+        .catch(() => false);
+
+export async function mapRange(offset: number, length: number): Promise<ArrayBuffer> {
+  if (inTauri) {
+    return callTauri<ArrayBuffer>("map_range", { offset, length });
+  }
+  const answer = await fetch("/api/map", {
+    headers: {
+      Authorization: `Bearer ${claimToken()}`,
+      // The one header that matters: without it this would pull a file that
+      // can be gigabytes to draw one screen.
+      Range: `bytes=${offset}-${offset + length - 1}`,
+    },
+  });
+  if (!answer.ok) throw new Error(`the basemap refused a range: ${answer.status}`);
+  return answer.arrayBuffer();
+}
+
 export interface Settings {
   shortcut: string;
   locale: string | null;

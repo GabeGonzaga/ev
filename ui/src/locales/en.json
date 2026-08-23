@@ -5,7 +5,8 @@
     "music": "music",
     "shortcuts": "shortcuts",
     "add": "add a shortcut",
-    "chat": "chat"
+    "chat": "chat",
+    "map": "map"
   },
   "console": {
     "placeholder": "enter message...",
@@ -54,5 +55,11 @@
   },
   "chrome": {
     "unreachable": "CORE UNREACHABLE"
+  },
+  "map": {
+    "waiting": "reading the ground...",
+    "absent": "no basemap on this machine",
+    "put_it": "put one here",
+    "get_one": "a regional extract from protomaps.com, or built with the pmtiles cli. nothing is downloaded while the map is open — the file is read from disk."
   }
 }

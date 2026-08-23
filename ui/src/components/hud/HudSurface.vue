@@ -27,6 +27,7 @@ import DockBar, { type DockAction } from "./DockBar.vue";
 import HudBeam from "./HudBeam.vue";
 import HudChrome from "./HudChrome.vue";
 import HudGrid from "./HudGrid.vue";
+import MapWindow from "./MapWindow.vue";
 import ParticleSphere from "./ParticleSphere.vue";
 import MusicWidget from "./MusicWidget.vue";
 import ShortcutsStrip from "./ShortcutsStrip.vue";
@@ -154,6 +155,7 @@ const alight = computed(() => ({
   shortcuts: ev.isOpen("shortcuts"),
   add: ev.isOpen("add"),
   chat: ev.isOpen("console"),
+  map: ev.isOpen("map"),
 }));
 
 function pick(action: DockAction) {
@@ -327,6 +329,8 @@ onBeforeUnmount(() => {
       @expand="ev.watch('full')"
       @said="ev.say('ev', $event)"
     />
+
+    <MapWindow v-if="ev.isOpen('map')" @close="ev.hide('map')" />
 
     <ConsoleWidget
       v-if="ev.isOpen('console')"

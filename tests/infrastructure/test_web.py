@@ -646,3 +646,57 @@ async def test_a_page_cannot_answer_what_only_the_app_can(tmp_path: Path) -> Non
     # The turn finished without ever asking the page.
     assert answer.json()["outcome"] == "ran"
     assert reached == [False]
+
+
+# --- the basemap ----------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_a_missing_basemap_is_a_plain_no(tmp_path: Path) -> None:
+    # Nothing to draw is not a fault to explain: the panel holds the path and
+    # says it better than a body would.
+    core = Core()
+    async with surface(tmp_path, core) as (web, base):
+        async with httpx.AsyncClient() as client:
+            answer = await client.get(f"{base}/api/map", headers=headers(web.token))
+
+        assert answer.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_the_basemap_is_read_by_the_range_asked_for(tmp_path: Path) -> None:
+    """The one header that matters.
+
+    PMTiles is an archive addressed by byte range, and that is the whole
+    reason a map can be served without a tile server: the renderer asks for
+    the few kilobytes under the view. Without `Range` this would hand over a
+    file that can be gigabytes to draw one screen.
+    """
+    ground = tmp_path / "maps" / "basemap.pmtiles"
+    ground.parent.mkdir(parents=True)
+    ground.write_bytes(bytes(range(256)))
+
+    core = Core()
+    async with surface(tmp_path, core) as (web, base):
+        async with httpx.AsyncClient() as client:
+            answer = await client.get(
+                f"{base}/api/map",
+                headers=headers(web.token, Range="bytes=16-31"),
+            )
+
+        assert answer.status_code == 206
+        assert answer.content == bytes(range(16, 32))
+
+
+@pytest.mark.asyncio
+async def test_the_basemap_still_needs_the_token(tmp_path: Path) -> None:
+    ground = tmp_path / "maps" / "basemap.pmtiles"
+    ground.parent.mkdir(parents=True)
+    ground.write_bytes(b"not really tiles")
+
+    core = Core()
+    async with surface(tmp_path, core) as (_web, base):
+        async with httpx.AsyncClient() as client:
+            answer = await client.get(f"{base}/api/map")
+
+        assert answer.status_code == 401

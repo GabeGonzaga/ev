@@ -545,6 +545,49 @@ async fn look(
     .map_err(|error| error.to_string())?
 }
 
+/// The map's ground: one file, beside the journal.
+///
+/// Never in the repository -- it is data and it is large, and `CLAUDE.md` says
+/// where data lives. One archive rather than a directory of tiles, because
+/// PMTiles is addressed by byte range, which is the whole reason a map can be
+/// drawn here without a tile server anywhere in the picture.
+fn basemap() -> PathBuf {
+    settings::state_dir().join("maps").join("basemap.pmtiles")
+}
+
+/// Whether there is any ground to draw.
+#[tauri::command]
+fn map_present() -> bool {
+    basemap().is_file()
+}
+
+/// One range of it, as bytes.
+///
+/// The renderer asks for the few kilobytes under the view and this hands them
+/// over; no tile host is told anything, because there is no tile host. Bytes
+/// rather than a number array: a range is tens of kilobytes, and JSON would
+/// spell every one of them as three or four characters.
+#[tauri::command]
+fn map_range(offset: u64, length: u64) -> Result<tauri::ipc::Response, String> {
+    use std::io::{Read, Seek, SeekFrom};
+
+    // A ceiling, because the length arrives from the other side of the
+    // window: a renderer asks for what it needs, and a bug there should not
+    // become an allocation the size of the file here.
+    const MOST: u64 = 32 * 1024 * 1024;
+
+    let mut file = std::fs::File::open(basemap()).map_err(|error| error.to_string())?;
+    file.seek(SeekFrom::Start(offset))
+        .map_err(|error| error.to_string())?;
+
+    let mut bytes = Vec::new();
+    file.take(length.min(MOST))
+        .read_to_end(&mut bytes)
+        .map_err(|error| error.to_string())?;
+
+    Ok(tauri::ipc::Response::new(bytes))
+}
+
 #[tauri::command]
 async fn history(limit: u32, query: Option<String>) -> Result<serde_json::Value, String> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -770,6 +813,8 @@ pub fn run() {
             window_control,
             look,
             history,
+            map_present,
+            map_range,
             set_locale,
             set_shortcut,
             settings,
